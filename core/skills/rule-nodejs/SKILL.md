@@ -1,7 +1,7 @@
 ---
 name: rule-nodejs
 description: "MANDATORY rules for ALL Node.js/TypeScript work. MUST be loaded before any Node.js project creation, initialization, package installation, or development. Non-negotiable conventions for package manager, boilerplate, and project setup."
-user-invokable: false
+user-invocable: false
 ---
 
 Node.js 관련 프로젝트를 새로 생성할 때 아래 지침을 따릅니다.

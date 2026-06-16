@@ -1,7 +1,7 @@
 ---
 name: rule-python
 description: "MANDATORY rules for ALL Python work. MUST be loaded before any Python project creation, environment setup, dependency installation, or development. Non-negotiable conventions for package manager and project setup."
-user-invokable: false
+user-invocable: false
 ---
 
 Python 관련 작업 시 아래 지침을 따릅니다.

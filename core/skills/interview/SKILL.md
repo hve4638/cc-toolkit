@@ -48,7 +48,7 @@ Inspired by the [Ouroboros project](https://github.com/Q00/ouroboros) which demo
 
 ## Phase 1: Initialize
 
-1. **Parse the user's idea** from `{{ARGUMENTS}}`
+1. **Parse the user's idea** from the task input at the end of this skill
 2. **Detect brownfield vs greenfield**:
    - Run `explore` agent (haiku): check if cwd has existing source code, package files, or git history
    - If source files exist AND the user's idea references modifying/extending something: **brownfield**
@@ -519,4 +519,4 @@ Each mode is used exactly once, then normal Socratic questioning resumes. Modes 
 | 0.8 - 1.0 | Almost nothing known | Early stages, keep going |
 </Advanced>
 
-Task: {{ARGUMENTS}}
+Task: $ARGUMENTS

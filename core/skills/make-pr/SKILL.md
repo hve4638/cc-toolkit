@@ -25,4 +25,4 @@ description: "PR 제출을 위한 양식 생성"
 </template>
 </make-pr>
 
-Task: {{ARGUMENTS}}
+Task: $ARGUMENTS

@@ -13,4 +13,4 @@ allow_implicit_invocation: false
 이 지시는 사용자가 실제 쓰기, 명령 실행 등의 작업을 명시적으로 요청한 경우까지 유효합니다.
 </report_first>
 
-TASKL: $ARGUMENTS
+Task: $ARGUMENTS
