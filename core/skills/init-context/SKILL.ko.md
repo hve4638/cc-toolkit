@@ -127,7 +127,7 @@ JSON 출력: `[{lang, evidence, fragmentName}, ...]` (예: `[{lang:"python", evi
 다음을 정규화된 JSON 으로 직렬화 후 SHA-256:
 ```json
 {
-  "plugins": [{name, installPath, templateBody}, ...],
+  "plugins": [{name, installPath, partialBody}, ...],
   "selections": {
     "plugins": [...selected names],
     "rules": [...selected fragment names],
