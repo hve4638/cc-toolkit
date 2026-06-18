@@ -1,6 +1,6 @@
 ---
 name: codex-mcp-guide
-description: "Make sure to consult this skill before invoking the `mcp__codex__codex` MCP tool."
+description: "Required parameter conventions for the `mcp__codex__codex` MCP tool (sandbox, approval-policy) and how to constrain read-only scope. Use before invoking that tool."
 ---
 
 ## Rule

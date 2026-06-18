@@ -1,6 +1,6 @@
 ---
 name: knowledge-fsonl
-description: Knowledge of fsonl
+description: "Reference for the FSONL (Function-Styled Object Notation Lines) serialization format: spec, grammar, and Python implementation. Refer to it when fsonl knowledge is needed."
 ---
 
 # FSONL — Function-Styled Object Notation Lines

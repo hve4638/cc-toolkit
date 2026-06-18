@@ -1,6 +1,6 @@
 ---
 name: codex-mcp-guide
-description: "`mcp__codex__codex` MCP 도구를 호출하기 전에 반드시 이 스킬을 확인한다."
+description: "`mcp__codex__codex` MCP 도구의 필수 파라미터 컨벤션(sandbox·approval-policy)과 읽기 전용 범위 제약 방법. 이 도구를 호출하기 전에 사용."
 ---
 
 ## Rule

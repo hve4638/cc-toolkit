@@ -25,7 +25,7 @@
 | 셋업 | `/core-setup` | ast-grep + Codex CLI 설치 + Codex MCP user 스코프 등록 |
 | 커밋·PR | `/stage` | 의도 단위 스테이징 + 컨벤션 맞춤 커밋 메시지 추천. 커밋은 하지 않음 |
 | | `/make-commit` | git 변경 → `type(scope): subject` 컨벤션 커밋. 일관성 우선, Co-authored-by 금지 |
-| | `/make-pr` | 셀프 PR 양식 생성 (WHY 중심). 실제 PR 은 하지 않음 |
+| | `/draft-pr` | 셀프 PR 본문 양식 작성 (WHY 중심). 실제 PR 은 하지 않음 |
 | 리뷰·분석 | `/cross-review` | codex MCP + subagent 교차 리뷰 (기본 1-1, 동일 작업) |
 | | `/reverse-engineer` | 프로젝트 분석 → `_report/<date>-project-analysis/` 에 8 산출물 (INDEX, overview, tech-stack, directory-structure, data-flow, core-implementation, constraints, insights) |
 | 세션 인계 | `/handoff` | 현재 세션을 task-unit 문서로 `.agent-memory/handoff/<timestamp>_<slug>/` 에 보관 |

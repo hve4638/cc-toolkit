@@ -1,9 +1,10 @@
 ---
-name: make-pr
+name: draft-pr
 description: "PR 제출을 위한 양식 생성"
+disable-model-invocation: true
 ---
 
-<make-pr>
+<draft-pr>
 현재 작업사항을 PR로 올리기 위한 형식을 작성한다. 실제 PR은 하지 않는다.
 개인 프로젝트 셀프 PR 용이므로 간결하고 WHAT보다 WHY에 집중.
 
@@ -23,6 +24,6 @@ description: "PR 제출을 위한 양식 생성"
 
 - 이 PR에서 안 한 것
 </template>
-</make-pr>
+</draft-pr>
 
 Task: $ARGUMENTS

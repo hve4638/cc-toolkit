@@ -1,6 +1,7 @@
 ---
 name: make-commit
 description: 커밋 생성
+disable-model-invocation: true
 ---
 
 <make-commit>
