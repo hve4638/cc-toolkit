@@ -17,7 +17,9 @@ Thumbs.db
 report/
 _ref/
 _unused/
+_sample/
 report.md
+TODO.md
 .ko
 
 # logs
