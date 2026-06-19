@@ -76,28 +76,28 @@ async function main() {
     } catch {
       return emit({ continue: true });
     }
-    saveCache({ hashes: { [resolved]: sha256(content) } }, ctx);
+    // WHY: 이번 사이클에 이 inlay 의 INLAY.md 가 갱신됐음을 표시. Stop 훅은
+    //      codeTouched 이면서 inlayUpdated 가 아닌 inlay 만 잔소리하므로,
+    //      코드 수정 전·후 어느 순서로 INLAY 를 갱신해도 오탐이 안 난다.
+    saveCache(
+      {
+        hashes: { [resolved]: sha256(content) },
+        tracking: { [resolved]: { inlayUpdated: true } },
+      },
+      ctx,
+    );
     return emit({ continue: true });
   }
 
   const nearest = findNearestContext(resolved);
   if (!nearest) return emit({ continue: true });
 
-  let mtime;
-  try {
-    mtime = statSync(nearest).mtimeMs;
-  } catch {
-    return emit({ continue: true });
-  }
-
-  // WHY: stopHookFired 를 false 로 리셋해 "잔소리 무시하고 코드를 더 만진"
-  //      경우 다음 Stop 훅이 재발화 가능하게 한다. 같은 작업 사이클이 아니라
-  //      새 작업 사이클임을 표시.
+  // WHY: 코드를 만진 inlay 를 이번 사이클의 codeTouched 로 표시. stopHookFired
+  //      를 false 로 리셋해 "잔소리 무시하고 코드를 더 만진" 경우 다음 Stop
+  //      훅이 재발화 가능하게 한다 (새 작업 사이클임을 표시).
   saveCache(
     {
-      tracking: {
-        [nearest]: { lastInternalWrite: Date.now(), contextMtimeAtWrite: mtime },
-      },
+      tracking: { [nearest]: { codeTouched: true } },
       stopHookFired: false,
     },
     ctx,

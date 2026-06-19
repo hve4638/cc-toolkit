@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { statSync } from 'fs';
+import { existsSync } from 'fs';
 import { dirname } from 'path';
 import { execFileSync } from 'child_process';
 import {
   loadOwnCache,
   saveCache,
+  clearTracking,
   ensureCacheDir,
   resolveProjectRoot,
 } from '../_build/src/lib/state-file.mjs';
@@ -88,40 +89,50 @@ async function main() {
     return silent();
   }
 
-  // WHY: stop_hook_active 는 block 결정으로 유발한 continuation 에서 true.
-  //      inlay 는 1회 잔소리에 block 을 쓰므로 두 번째 진입은 차단해
-  //      loop 방지. stopHookFired 가 1차 가드, 이건 2차 가드.
-  if (input.stop_hook_active === true) return silent();
   if (input.hook_event_name && input.hook_event_name !== 'SubagentStop') return silent();
 
-  const { session_id, agent_id, cwd } = input;
+  const { session_id, agent_id } = input;
   if (!session_id) return silent();
   // WHY: SubagentStop 은 자기 own 파일만 본다. agent_id 없으면 식별 불가라 silent.
   if (!agent_id) return silent();
 
   const projectRoot = resolveProjectRoot(input);
   ensureCacheDir(projectRoot);
-  const cache = loadOwnCache({ projectRoot, sessionId: session_id, agentId: agent_id });
+  const ctx = { projectRoot, sessionId: session_id, agentId: agent_id };
 
-  if (cache.stopHookFired) return silent();
-
-  const stale = [];
-  for (const [ctxPath, info] of Object.entries(cache.tracking)) {
-    let mtime;
-    try {
-      mtime = statSync(ctxPath).mtimeMs;
-    } catch {
-      // WHY: INLAY.md 가 사라졌으면 추적 항목 자체가 의미 없다. skip.
-      continue;
-    }
-    if (mtime === info.contextMtimeAtWrite) stale.push(ctxPath);
+  // WHY: 모든 SubagentStop 진입은 이 서브에이전트 작업 사이클의 끝 = own
+  //      tracking 을 비울 지점. 조기 반환 경로 (continuation 재진입 / 이미 1회
+  //      발화) 도 비워야, continuation 윈도우의 inlayUpdated 가 다음 사이클
+  //      (재개된 백그라운드 서브에이전트 포함) 로 새지 않는다. 코드 수정은
+  //      stopHookFired=false 로 재무장하므로 코드 변경 사이클은 조기 반환을
+  //      타지 않는다 → doc-first 정탐 보존.
+  if (input.stop_hook_active === true) {
+    clearTracking(ctx);
+    return silent();
   }
 
-  if (stale.length === 0) return silent();
+  const cache = loadOwnCache(ctx);
+  if (cache.stopHookFired) {
+    clearTracking(ctx);
+    return silent();
+  }
 
-  // WHY: own 파일에 1 회 발화 플래그 기록. 다음 PostToolUse 의 내부 파일
-  //      수정 시 false 로 리셋되어 새 작업 사이클에서 재발화 가능.
-  saveCache({ stopHookFired: true }, { projectRoot, sessionId: session_id, agentId: agent_id });
+  // WHY: codeTouched 인데 inlayUpdated 가 없는 inlay 만 = 코드는 고쳤는데
+  //      INLAY.md 는 안 만진 것. mtime 비교를 버려 수정 순서에 무관.
+  //      existsSync 로 사라진 INLAY.md 는 추적에서 제외.
+  const stale = [];
+  for (const [ctxPath, info] of Object.entries(cache.tracking)) {
+    if (info.codeTouched && !info.inlayUpdated && existsSync(ctxPath)) stale.push(ctxPath);
+  }
+
+  if (stale.length === 0) {
+    clearTracking(ctx);
+    return silent();
+  }
+
+  // WHY: own 파일에 tracking 리셋 + 발화 플래그를 한 번의 atomic write 로.
+  //      다음 PostToolUse 의 코드 수정이 stopHookFired=false 로 리셋하면 재발화.
+  saveCache({ resetTracking: true, stopHookFired: true }, ctx);
 
   // WHY: Stop 훅 스키마는 hookSpecificOutput 에 'Stop' 을 허용하지 않음
   //      (validator: PreToolUse / UserPromptSubmit / PostToolUse / PostToolBatch

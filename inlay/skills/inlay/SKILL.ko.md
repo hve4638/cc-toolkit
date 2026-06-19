@@ -148,7 +148,7 @@ WHY 주석이 없는 라인이라도 요청 범위 밖이면 건드리지 않는
 - 주입 형태: `<inlay-context path="...">...</inlay-context>` 블록을 루트 → 리프 순서로 나열.
 - 같은 inlay 를 같은 세션에서 두 번째로 만나면 본문이 변하지 않은 한 출력에서 빠진다 (silent skip).
 - INLAY.md 자체를 수정하는 호출 (`Edit`/`Write`/`MultiEdit`/`NotebookEdit` + 대상 파일이 `INLAY.md`) 에서는 chain 주입을 막아 자기 본문이 prompt 에 다시 박히는 순환을 차단.
-- 도구 실행 후 (PostToolUse) 에도 훅이 작동한다 — INLAY.md 자체 수정이면 새 본문으로 해시 갱신, 내부 파일 수정이면 가장 가까운 조상 INLAY.md 의 mtime 을 추적.
+- 도구 실행 후 (PostToolUse) 에도 훅이 작동한다 — INLAY.md 자체 수정이면 새 본문으로 해시 갱신, 내부 파일 수정이면 가장 가까운 조상 INLAY.md 를 이번 작업 사이클에 손댄 것으로 표시.
 
 이 자동 주입은 명시 도구 호출과 별개로 작동하므로, 통상 흐름에선 도구를 직접 호출하지 않아도 된다. 명시 호출이 필요한 경우는 아래 도구 절을 참고.
 

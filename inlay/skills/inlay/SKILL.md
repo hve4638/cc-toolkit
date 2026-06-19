@@ -148,7 +148,7 @@ The plugin's hooks intercept `Read` / `Edit` / `Write` / `MultiEdit` / `Notebook
 - Injection form: `<inlay-context path="...">...</inlay-context>` blocks listed root → leaf.
 - The second time the same inlay is encountered in the same session, it is omitted from output as long as its content is unchanged (silent skip).
 - Calls that edit an INLAY.md itself (`Edit`/`Write`/`MultiEdit`/`NotebookEdit` with target file `INLAY.md`) suppress chain injection — this prevents the inlay's own body from being re-injected into the prompt as a self-loop.
-- The hook also runs after tool execution (PostToolUse) — if an INLAY.md was edited, its hash is refreshed against the new body; if an inner file was edited, the mtime of the nearest ancestor INLAY.md is tracked.
+- The hook also runs after tool execution (PostToolUse) — if an INLAY.md was edited, its hash is refreshed against the new body; if an inner file was edited, the nearest ancestor INLAY.md is marked as touched for the current work cycle.
 
 Because automatic injection is independent of explicit tool calls, the agent normally does not need to call the tools by hand. For cases that do require an explicit call, see the tool section below.
 

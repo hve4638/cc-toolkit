@@ -28,6 +28,16 @@ function readJsonOrEmpty(filePath) {
   }
 }
 
+// WHY: 한 inlay 의 tracking 항목은 사이클 동안 codeTouched / inlayUpdated 두
+//      플래그가 서로 다른 호출 (코드 수정 vs INLAY.md 수정) 에서 누적된다.
+//      항목 단위로 얕게 병합해야 한 호출이 다른 호출의 플래그를 덮어쓰지 않는다.
+function mergeTracking(into, from) {
+  for (const [key, val] of Object.entries(from)) {
+    into[key] = { ...into[key], ...val };
+  }
+  return into;
+}
+
 export function getCacheDir(projectRoot) {
   return join(projectRoot, CACHE_SUBDIR);
 }
@@ -55,42 +65,15 @@ export function loadCache({ projectRoot, sessionId, agentId }) {
   //      own 이 base 를 덮어써야 자기 변경이 우선 반영된다.
   return {
     hashes: { ...base.hashes, ...own.hashes },
-    tracking: { ...base.tracking, ...own.tracking },
+    tracking: mergeTracking({ ...base.tracking }, own.tracking),
     stopHookFired: own.stopHookFired ?? false,
   };
 }
 
 export function loadOwnCache({ projectRoot, sessionId, agentId }) {
-  // WHY: SubagentStop 은 자기 own 파일만 본다. base/타 subagent 변경은 메인 Stop 책임.
+  // WHY: SubagentStop 은 자기 own 파일만 본다. 서브가 만진 inlay 는 서브 자신이
+  //      책임지고 (SubagentStop 이 보고·정리), 메인 Stop 으로 전파되지 않는다.
   return readJsonOrEmpty(ownFile(projectRoot, sessionId, agentId));
-}
-
-export function loadCacheForStop({ projectRoot, sessionId }) {
-  // WHY: Stop 훅은 메인 컨텍스트에서만 발화하지만 서브에이전트가 만진
-  //      inlay 도 함께 검사해야 미갱신 누락이 없다. 같은 session_id 의 own
-  //      파일 (`${sessionId}-*.json`) 을 모두 union 한다. stopHookFired
-  //      플래그는 메인 파일 값만 — 잔소리 1회 차단은 메인 책임이다.
-  const dir = getCacheDir(projectRoot);
-  const base = readJsonOrEmpty(baseFile(projectRoot, sessionId));
-  const merged = {
-    hashes: { ...base.hashes },
-    tracking: { ...base.tracking },
-    stopHookFired: base.stopHookFired ?? false,
-  };
-  let entries;
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return merged;
-  }
-  const prefix = `${sessionId}-`;
-  for (const name of entries) {
-    if (!name.startsWith(prefix) || !name.endsWith('.json')) continue;
-    const own = readJsonOrEmpty(join(dir, name));
-    Object.assign(merged.hashes, own.hashes);
-    Object.assign(merged.tracking, own.tracking);
-  }
-  return merged;
 }
 
 export function saveCache(updates, { projectRoot, sessionId, agentId }) {
@@ -99,9 +82,21 @@ export function saveCache(updates, { projectRoot, sessionId, agentId }) {
   const path = targetFile(projectRoot, sessionId, agentId);
   const cur = readJsonOrEmpty(path);
   if (updates.hashes) Object.assign(cur.hashes, updates.hashes);
-  if (updates.tracking) Object.assign(cur.tracking, updates.tracking);
+  // WHY: resetTracking 은 tracking 을 통째로 비운다. 잔소리 set 과 stopHookFired
+  //      기록을 한 번의 atomic write 로 묶어, 둘 사이에서 훅이 timeout 으로
+  //      죽을 때 생기는 어긋난 상태 (tracking 만 비고 flag 미기록) 를 막는다.
+  if (updates.resetTracking) cur.tracking = {};
+  if (updates.tracking) mergeTracking(cur.tracking, updates.tracking);
   if (typeof updates.stopHookFired === 'boolean') cur.stopHookFired = updates.stopHookFired;
   atomicWriteFileSync(path, JSON.stringify(cur));
+}
+
+// WHY: 각 소유자 (메인=base, 서브에이전트=own) 는 자기 파일의 tracking 만 비운다.
+//      메인이 서브 own 파일을 비우면 살아있는 백그라운드 서브에이전트의 미보고
+//      기록을 지워 격리 모델 (saveCache 주석 참조) 을 깬다. 서브 own 정리는
+//      각 SubagentStop 책임이고, 죽은 서브의 잔여 파일은 cleanupOrphans 가 회수.
+export function clearTracking({ projectRoot, sessionId, agentId }) {
+  saveCache({ resetTracking: true }, { projectRoot, sessionId, agentId });
 }
 
 export function compactReset({ projectRoot, sessionId, agentId }) {
