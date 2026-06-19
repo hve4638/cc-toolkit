@@ -1,80 +1,80 @@
 ---
 name: pairtdd
-description: Use this skill when the user asks to run an adversarial pair-TDD session.
-argument-hint: "[수행할 task 설명]"
+description: Use this skill when the user asks to run an adversarial pair-TDD session. Spawns a single tdd-adversary tester in the background; the main session itself is the implementer.
+argument-hint: "[task description]"
 ---
 
 <pairtdd_instruction>
 
-## Step 1: 스펙 확보
+## Step 1: Spec acquisition
 
-### 1.1 slug 도출
+### 1.1 Slug derivation
 
-사용자가 제공한 task 와 현재 대화 맥락을 종합해 짧은 이름(`[a-zA-Z0-9_-]`)을 도출한다. 현재 시각을 `YYYYMMDD-HHMM` 포맷으로 prefix 해 slug 를 구성한다. 예: 이름이 `pricing-rules` 면 slug 는 `20260509-1234-pricing-rules`. 사용자 확인을 받지 않고 그대로 진행한다.
+Combine the user-provided task with the current conversation context to derive a short name (`[a-zA-Z0-9_-]`). Prefix the current time in `YYYYMMDD-HHMM` format to form the slug. Example: name `pricing-rules` → slug `20260601-1234-pricing-rules`. Proceed without user confirmation.
 
-### 1.2 스펙 작성
+### 1.2 Spec writing
 
-현재 대화에 TDD 대상에 관한 충분한 컨텍스트(요구사항·도메인·입출력 형태)가 있는지 자체 판단한다.
+Self-judge whether the current conversation already holds enough context about the TDD target (requirements, domain, input/output shape).
 
-- 충분 → 그 컨텍스트를 정리해 스펙 초안을 작성하고 사용자 검토·수정을 받는다. 인터뷰 생략.
-- 부족 → 핵심 질문 3-5개로 짧게 인터뷰하고 답변을 정리해 스펙을 작성한다.
+- Enough → organize that context into a spec draft and have the user review/edit. Skip the interview.
+- Not enough → run a brief 3–5 question interview and write the spec from the answers.
 
-확정본을 `.agent-memory/tdd-spec/<slug>.md` 에 저장한다 (디렉토리 없으면 생성). 형식은 자연어 + 입출력 예시 + 경계 조건.
+Save the finalized spec to `.agent-memory/tdd-spec/<slug>.md` (create the directory if absent). Format: natural language + I/O examples + boundary conditions.
 
-## Step 2: 워크트리 부트스트랩
+## Step 2: Setup
 
-`scripts/bootstrap.sh <slug>` 를 실행한다. 성공 시 stdout 으로 워크트리 절대경로가 반환된다. 실패 메시지(git 저장소 아님, 스펙 파일 부재 등)를 사용자에게 전달하고 중단한다.
+Obtain the starting commit SHA (base-sha) via `git rev-parse HEAD`. Verify that git `user.name` / `user.email` are set; if not, notify the user and stop.
 
-이어서 `git -C <worktree> rev-parse HEAD` 로 시작 커밋 SHA 를 얻는다.
+## Step 3: Spawn the tester
 
-## Step 3: 멤버 스폰
+Spawn the tester only as a named background subagent:
 
-두 멤버를 named background subagent 로 동시에 띄운다:
+- `Agent({name: "tdd-adversary", subagent_type: "tdd-adversary", run_in_background: true, prompt: "Working directory is <repo root>. Idle until the bootstrap SendMessage arrives."})`
 
-- `Agent({name: "tdd-adversary", subagent_type: "tdd-adversary", run_in_background: true, prompt: "워크트리는 <worktree path>. 다음 SendMessage 로 도착할 bootstrap 메시지까지 대기."})`
-- `Agent({name: "tdd-implementer", subagent_type: "tdd-implementer", run_in_background: true, prompt: "워크트리는 <worktree path>. 프로젝트의 언어·테스트 프레임워크를 스캔하고, adversary 의 SHA 가 SendMessage 로 도착할 때까지 대기."})`
+The tester uses `core/agents/tdd-adversary.md` as-is. Do not spawn the implementer — main fills that role.
 
-두 멤버는 `core/agents/tdd-adversary.md` 와 `core/agents/tdd-implementer.md` 의 정의를 그대로 사용한다.
+Reuse this same background subagent across all subsequent rounds. Step 4 and Step 5 SendMessages continue its accumulated context (prior SHAs, no-progress count, cheat suspicions). Do not call `Agent()` again.
 
-## Step 4: 첫 신호 송신
+## Step 4: Send the first signal
 
-adversary 에게 다음 한 줄을 정확히 보낸다:
+Send exactly this single line to the tester:
 
 ```
-bootstrap: spec=<abs spec path> worktree=<wt path> base-sha=<start sha> — produce first red
+bootstrap: spec=<abs spec path> worktree=<repo root> base-sha=<base-sha> — produce first red
 ```
 
-abs spec path 는 메인 저장소의 `.agent-memory/tdd-spec/<slug>.md` 의 절대경로. base-sha 는 Step 2 의 시작 커밋 SHA.
+`abs spec path` is the absolute path of `.agent-memory/tdd-spec/<slug>.md`. The tester's definition reads the `worktree=` key as its working directory.
 
-## Step 5: 라운드 루프
+## Step 5: Round loop
 
-leader 는 비진척 카운터(`no_progress_count`) 를 0 으로 시작. 각 turn 의 반환값을 받아 다음 멤버에게 SendMessage 로 라우팅한다:
+Start `no_progress_count` at 0. Handle each tester return:
 
-- adversary 반환:
-  - `<sha>: <case>` → `no_progress_count = 0`; `SendMessage(to: "tdd-implementer", message: "red-sha=<sha>")`
-  - `no-progress: <reason>` → `no_progress_count += 1`; `>= 2` 이면 Step 6 으로 (`converged: 2 consecutive no-progress`); 미만이면 `SendMessage(to: "tdd-adversary", message: "retry: try a new region or angle")`
-  - `escalation: <issue>` → 사용자에게 전달, 결정 대기
-- implementer 반환:
-  - `<sha>: <case>` → `SendMessage(to: "tdd-adversary", message: "last-impl-sha=<sha>")`
-  - `blocker: <issue>` → 사용자에게 전달, 결정 대기
+- `<sha>: <case>` (new red commit) → `no_progress_count = 0`. Main is this round's implementer:
+  1. Read the failing test via `git show <sha>`.
+  2. Write production code to make it pass. Follow the usual main-session flow (inlay, external rules).
+  3. Actually run the full test suite and **verify everything is green** (no assumptions).
+  4. Commit. The number of intermediate commits and the message format are free.
+  5. Obtain the final green commit SHA via `git rev-parse HEAD` and `SendMessage(to: "tdd-adversary", message: "last-impl-sha=<sha>")`.
+- `no-progress: <reason>` → `no_progress_count += 1`. If `>= 2`, go to Step 6 (`converged: 2 consecutive no-progress`). Otherwise `SendMessage(to: "tdd-adversary", message: "retry: try a new region or angle")`.
+- `escalation: <issue>` → relay to the user as-is and wait for a decision. If the user chooses to continue, send that decision to the tester as `retry: <user directive>` and return to Step 5.
 
-사용자 중단 신호가 오면 즉시 Step 6.
+On a user stop signal, go to Step 6 immediately.
 
-## Step 6: 종료 처리
+## Step 6: Termination
 
-수렴 또는 사용자 중단 시:
-- `git -C <worktree> log --oneline` 출력으로 라운드 요약을 보여준다.
-- 워크트리 경로를 안내한다.
-- 머지/폐기 결정을 사용자에게 위임한다. 워크트리를 자동 삭제하지 않는다.
+On convergence or user stop:
+- Show the round summary via `git log --oneline`.
 
-escalation 시: 메시지를 사용자에게 그대로 전달하고 결정을 기다린다.
+## Guardrails (core — invariant; the preserved tester depends on them)
 
-## 가드레일
+- Do not modify or delete the tester's test files. Main touches production code only. Weakening the tests makes the tester meaningless.
+- Before handing the turn back to the tester, HEAD MUST be a commit verified green by **actually running the full suite**.
+- The spec lives at `.agent-memory/tdd-spec/<slug>.md` and is shared with the tester.
+- Termination is decided by main based on the tester's consecutive no-progress signals.
 
-- 모든 작업을 워크트리 안에서만 수행한다.
-- 스펙 파일은 메인 저장소의 `.agent-memory/tdd-spec/<slug>.md` 에 위치한다 (gitignored 가정으로 히스토리 미오염).
-- 멤버 간 메시지에 leader 가 끼어들지 않는다. escalation 메시지만 사용자에게 중계한다.
-- 사용자가 명시적으로 머지하지 않는 한 워크트리를 폐기하지 않는다.
+## Recommendations (loose — not enforced)
+
+- Avoid shortcuts like hardcoding test inputs or mirroring fixtures in a lookup. The tester will catch them with a counterexample on the next round and permanently encode it as a regression.
 
 </pairtdd_instruction>
 
