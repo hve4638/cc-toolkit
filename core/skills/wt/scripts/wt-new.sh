@@ -53,13 +53,18 @@ else
   target="$root/${repo_name}-${slug}"
 fi
 
+git -C "$repo" check-ref-format --branch "$slug" >/dev/null 2>&1 \
+  || die "'$slug' is not a usable branch name"
 [ -e "$target" ] && die "target already exists: $target"
 if git -C "$repo" show-ref --verify --quiet "refs/heads/$slug"; then
   die "branch '$slug' already exists; pick another name or remove it first"
 fi
 
 mkdir -p "$(dirname "$target")"
-git -C "$repo" worktree add -b "$slug" "$target" "$base" 1>&2
+if ! git -C "$repo" worktree add -b "$slug" "$target" "$base" 1>&2; then
+  git -C "$repo" branch -D "$slug" 2>/dev/null || true   # drop a half-created branch
+  die "git worktree add failed for '$slug'"
+fi
 
 # Drop a self-contained destroyer into the worktree and hide it from git status.
 cp "$(dirname "$0")/wt-destroy.sh" "$target/wt-destroy"

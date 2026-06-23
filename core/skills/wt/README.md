@@ -34,7 +34,7 @@ wt-new.sh <이름> [기준-ref]
 
 생성 직후:
 - `wt-destroy.sh` 를 `<워크트리>/wt-destroy` 로 복사하고 실행권한 부여.
-- 그 repo 의 `$GIT_COMMON_DIR/info/exclude` 에 `/wt-destroy` 를 등록해 `git status` 에서 숨긴다. `/` 앵커라 각 워크트리 루트의 그 파일만 가린다.
+- 그 repo 의 `$GIT_COMMON_DIR/info/exclude`(전 워크트리 공유) 에 `/wt-destroy` 를 등록해 `git status` 에서 숨긴다. 이 exclude 는 메인 포함 모든 워크트리의 루트 `wt-destroy` 에 적용된다 (git 이 공용 exclude 만 읽어 per-worktree 스코핑은 불가).
 
 ## wt-destroy 작동
 
@@ -45,13 +45,13 @@ wt-new.sh <이름> [기준-ref]
 ./wt-destroy <키>     # 키 확인 후 강제 삭제
 ```
 
-대상은 **스크립트 파일이 놓인 위치(`$0`)** 의 워크트리다 (호출자 cwd 아님). git-dir == git-common-dir 이면 메인 워크트리이므로 거부한다. 삭제 명령은 메인 repo 로 `cd` 한 뒤 실행해 셸 cwd 가 사라진 폴더에 갇히는 걸 피한다.
+대상은 **스크립트 파일이 놓인 위치(`$0`)** 의 워크트리다 (호출자 cwd 아님). 그래서 어느 디렉터리에서 불러도 같은 워크트리를 지운다 — 워크트리 밖에서 경로로 부르면 호출 셸이 삭제된 폴더에 갇히지 않는다. git-dir == git-common-dir 이면 메인 워크트리이므로 거부한다. 스크립트 자신은 remove 전에 메인 repo 로 `cd` 하고, 재실행 안내는 호출 경로(`$0`)를 그대로 써서 같은 cwd 에서 복붙되게 한다.
 
 ### 인자 없음
 
 워킹트리가 깨끗하고(`status --porcelain` 비어 있음) 브랜치가 타 ref 에 모두 도달 가능(잃을 커밋 0)하면 곧바로 정리한다: `worktree remove` → `branch -d` → `prune` → 빈 그룹 폴더 `rmdir`.
 
-그렇지 않으면 아무것도 건드리지 않고, 사유와 destroy 키를 출력한 뒤 exit 1 로 멈춘다. 출력에는 사용자에게 의도를 재확인하고 맞는 경우만 진행하라는 지시가 포함된다 — 에이전트가 키로 곧바로 재실행하지 않게 하는 가드레일.
+그렇지 않으면 아무것도 건드리지 않고, 거부 사유와 confirmation key 재실행 명령을 출력한 뒤 exit 1 로 멈춘다. 출력은 순수 CLI 경고만 담는다. "에이전트는 키로 곧바로 재실행하지 말고 사용자에게 재확인 후 진행" 가드레일은 SKILL.md 본문에 두고, 스크립트 출력엔 에이전트 지시를 넣지 않는다.
 
 "잃을 커밋" 판정: 브랜치 고유 커밋 수 = `rev-list --count <브랜치> --not <자신을 뺀 모든 heads/remotes/tags>`. 0 이면 다른 곳에 다 있으니 안전. detached HEAD 는 판정 불가로 보고 항상 불안전 처리.
 
@@ -59,7 +59,7 @@ wt-new.sh <이름> [기준-ref]
 
 현재 상태로 키를 다시 계산해 인자와 비교한다. 일치하면 `worktree remove --force` + `branch -D` 로 강제 삭제. 불일치(그 사이 상태 변동)면 새 키를 안내하고 멈춘다.
 
-### destroy 키
+### confirmation key
 
 `sha256(상태)` 의 앞 5 hex. 상태 = HEAD + `status --porcelain` + `diff HEAD` + untracked(비-ignored) 파일 내용 해시. 그래서 커밋·tracked 변경·untracked 내용 변경 어디서든 바뀌고, ignored 파일(node_modules 등)은 영향이 없다.
 

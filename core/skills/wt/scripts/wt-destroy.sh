@@ -4,17 +4,17 @@
 # branch. Dropped into each worktree by wt-new; self-locates, so it needs no
 # path argument.
 #
-# Usage:
-#   ./wt-destroy          Inspect state. If the working tree is clean AND the
+# Usage (call by path from outside the worktree; it self-locates via its own path):
+#   <worktree>/wt-destroy        Inspect state. If the working tree is clean AND the
 #                         branch is fully merged elsewhere (nothing to lose),
 #                         destroy immediately. Otherwise print a state-bound
-#                         destroy key and stop without touching anything.
-#   ./wt-destroy <key>    Force-destroy, but only when <key> matches the key
+#                         confirmation key and stop without touching anything.
+#   <worktree>/wt-destroy <key>  Force-destroy, but only when <key> matches the key
 #                         recomputed from the CURRENT state. If the state moved
 #                         since the key was shown, the keys differ and it stops
 #                         with a fresh key.
 #
-# The destroy key is sha256(current state)[:5]. It changes whenever HEAD, the
+# The confirmation key is sha256(current state)[:5]. It changes whenever HEAD, the
 # tracked diff, or untracked (non-ignored) file contents change.
 
 set -euo pipefail
@@ -59,8 +59,10 @@ lost_count() {
 destroy() { # $1 = force (0|1)
   cd "$main_repo"
   if [ "$1" = 1 ]; then git worktree remove --force "$wt"; else git worktree remove "$wt"; fi
+  # Force-delete is safe here: the no-arg path already proved nothing is lost
+  # (lost_count==0), and the key path means the user explicitly confirmed.
   if [ -n "$branch" ] && git show-ref --verify --quiet "refs/heads/$branch"; then
-    if [ "$1" = 1 ]; then git branch -D "$branch"; else git branch -d "$branch"; fi
+    git branch -D "$branch"
   fi
   git worktree prune
   rmdir "$(dirname "$wt")" 2>/dev/null || true   # remove empty group folder (case A)
@@ -75,9 +77,9 @@ if [ $# -ge 1 ]; then
     destroy 1
     exit 0
   fi
-  printf '제공한 키가 현재 상태와 맞지 않는다 (그 사이 상태가 바뀌었을 수 있다).\n'
-  printf 'destroy키: '\''%s'\''\n' "$key"
-  printf '정말 삭제하려면 ./wt-destroy %s 를 입력해라.\n' "$key"
+  printf 'Confirmation key does not match the current state (it changed since the key was issued).\n'
+  printf 'To delete anyway, re-run with the new key:\n'
+  printf '    %s %s\n' "$0" "$key"
   exit 1
 fi
 
@@ -88,15 +90,17 @@ if is_clean && [ "$(lost_count)" = 0 ]; then
 fi
 
 # Not safe to destroy silently. Explain why, then emit the state-bound key.
-if is_clean; then
-  reason="타 branch에 merge되지 않았다"
+if [ -z "$branch" ]; then
+  reason="HEAD is detached, so commit safety can't be verified"
+elif is_clean; then
+  reason="the branch is not merged elsewhere"
 elif [ "$(lost_count)" = 0 ]; then
-  reason="정리되지 않은 변경사항이 있다"
+  reason="the working tree has uncommitted changes"
 else
-  reason="정리되지 않은 변경사항이 있고 타 branch에 merge되지 않았다"
+  reason="the working tree has uncommitted changes and the branch is not merged elsewhere"
 fi
 
-printf '현재 %s. 정말 삭제하면 작업 내역을 잃을 수 있다. *사용자에게 이 의도가 맞는지 다시 확인하고, 맞는 경우만 진행할 것.*\n' "$reason"
-printf 'destroy키: '\''%s'\''\n' "$key"
-printf '정말 삭제하려면 ./wt-destroy %s 를 입력해라.\n' "$key"
+printf 'Refusing to destroy this worktree: %s; this would lose work.\n' "$reason"
+printf 'To delete anyway, re-run with the confirmation key:\n'
+printf '    %s %s\n' "$0" "$key"
 exit 1
