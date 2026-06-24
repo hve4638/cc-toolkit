@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+// ccrec launcher — runs the engine bundled in the skill folder (node-only, no deps).
+// core exposes <plugin-root>/bin on PATH, so `ccrec …` works anywhere.
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+await import(join(dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'ccrec', 'scripts', 'ccrec.mjs'))
+  .catch(e => { process.stderr.write(`ccrec: ${e?.message ?? e}\n`); process.exit(1); });

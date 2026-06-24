@@ -6,6 +6,8 @@ description: "Defines skill authoring and review conventions — frontmatter mod
 <skillify_guide_instruction>
 # skillify-guide
 
+Third person and the imperative throughout, in both the description and the body. No 1st/2nd person (`I`/`you`/`your`): in the description this is critical for matching reliability; in the body it keeps instructions impersonal for whatever model runs the skill.
+
 ## Frontmatter
 
 Required: `name`, `description` (authoring rules in §Description). `description` ≤ 1024 chars, no XML tags.
@@ -22,14 +24,12 @@ Follows the [Anthropic official guide](https://platform.claude.com/docs/en/agent
 
 1. `Length` — ≤ 1024 chars (frontmatter validation limit). Official examples average ~22 words / ~145 chars. Shorter is better.
 2. `What + When structure` — two parts: *what the skill does* and *when to use it*. Official pattern: `"Generate X by Y. Use when ..."`.
-3. `Third person` — declarative ("The skill does X" / "Processes X"). 1st/2nd person ("I can help ...", "You can use ...") forbidden. Critical for matching reliability.
-4. `Include key terms` — name trigger-relevant tools, file extensions, commands, domain terms *concretely*. Do not abstract them away.
-5. `Specificity` — both under- and over-trigger fail. Ambiguous trigger context degrades matching reliability.
+3. `Include key terms` — name trigger-relevant tools, file extensions, commands, domain terms *concretely*. Do not abstract them away.
+4. `Specificity` — both under- and over-trigger fail. Ambiguous trigger context degrades matching reliability.
 
 ### Strong prohibitions
 
 - Vague descriptions ("helps with stuff", "processes things", "Helps with documents")
-- 1st/2nd person
 - Behavioral rules embedded in description (those belong in the body)
 - Time-sensitive information ("after August 2025 ...")
 

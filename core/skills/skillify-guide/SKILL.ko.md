@@ -6,6 +6,8 @@ description: "스킬 작성·리뷰 컨벤션을 정의한다 — frontmatter �
 <skillify_guide_instruction>
 # skillify-guide
 
+description 과 body 모두 3인칭·명령형으로 쓴다. 1·2인칭 (`I`/`너`/`네`) 금지: description 에서는 매칭 신뢰성에 직결되고, body 에서는 어떤 모델이 실행하든 지시를 비인격적으로 유지한다.
+
 ## Frontmatter
 
 필수: `name`, `description` (작성 룰은 §Description 참조). `description` 은 1024 chars 이하 + XML 태그 금지.
@@ -22,14 +24,12 @@ description: "스킬 작성·리뷰 컨벤션을 정의한다 — frontmatter �
 
 1. `Length` — 1024 chars 이하 (frontmatter 검증 한도). 공식 예시 평균 ~22 words / ~145 chars. 짧을수록 좋음.
 2. `What + When 구조` — 스킬이 *무엇을 하는지* + *언제 사용하는지* 두 부분. 공식 패턴: `"Generate X by Y. Use when ..."`.
-3. `Third person` — 평서문 ("스킬이 X 한다" / "Processes X"). 1·2인칭 ("I can help ...", "You can use ...") 금지. 매칭 신뢰성에 중요.
-4. `Key terms 포함` — 트리거가 될 도구명·확장자·명령어·도메인 용어를 *구체적으로* 명시. 추상화로 일반화하지 않는다.
-5. `Specificity` — under/over-trigger 둘 다 실패. 트리거 맥락이 모호하면 매칭 신뢰성↓.
+3. `Key terms 포함` — 트리거가 될 도구명·확장자·명령어·도메인 용어를 *구체적으로* 명시. 추상화로 일반화하지 않는다.
+4. `Specificity` — under/over-trigger 둘 다 실패. 트리거 맥락이 모호하면 매칭 신뢰성↓.
 
 ### 강한 금지
 
 - 모호한 description ("도움이 됨", "처리한다", "Helps with documents")
-- 1·2인칭
 - description 에 행동 룰 임베드 (body 의 몫)
 - time-sensitive 정보 ("2025년 8월 이후 ...")
 
