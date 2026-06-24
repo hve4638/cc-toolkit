@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 #
 # wt-destroy — remove THIS worktree (the one this script file lives in) and its
-# branch. Dropped into each worktree by wt-new; self-locates, so it needs no
-# path argument.
+# branch, discarding its work. Dropped into each worktree by wt-new; self-locates,
+# so it needs no path argument. To keep the work instead, use wt-land.
 #
 # Usage (call by path from outside the worktree; it self-locates via its own path):
-#   <worktree>/wt-destroy        Inspect state. If the working tree is clean AND the
-#                         branch is fully merged elsewhere (nothing to lose),
-#                         destroy immediately. Otherwise print a state-bound
-#                         confirmation key and stop without touching anything.
+#   <worktree>/wt-destroy        Inspect state. If nothing was done since the
+#                         worktree was created (no new commits, clean working
+#                         tree), remove it immediately. Otherwise print a
+#                         state-bound confirmation key and stop without touching
+#                         anything.
 #   <worktree>/wt-destroy <key>  Force-destroy, but only when <key> matches the key
 #                         recomputed from the CURRENT state. If the state moved
 #                         since the key was shown, the keys differ and it stops
@@ -34,6 +35,8 @@ common_dir="$(cd "$(git -C "$wt" rev-parse --git-common-dir)" && pwd)"
 
 main_repo="$(dirname "$common_dir")"
 branch="$(git -C "$wt" symbolic-ref --quiet --short HEAD || true)"
+head="$(git -C "$wt" rev-parse HEAD)"
+base="$(cat "$git_dir/wt-base" 2>/dev/null || true)"   # fork point recorded by wt-new
 
 statekey() {
   {
@@ -47,20 +50,16 @@ statekey() {
 
 is_clean() { [ -z "$(git -C "$wt" status --porcelain)" ]; }
 
-# Commits on this branch reachable from no other ref — they would be lost.
-lost_count() {
-  if [ -z "$branch" ]; then echo 1; return; fi   # detached HEAD: treat as unsafe
-  local others
-  others="$(git -C "$wt" for-each-ref --format='%(refname)' \
-            refs/heads refs/remotes refs/tags | grep -vxF "refs/heads/$branch" || true)"
-  git -C "$wt" rev-list --count "$branch" --not $others
-}
+# True only when nothing was done since wt-new created this worktree: still on a
+# branch at the recorded fork point with a clean tree (no commits, no changes). A
+# detached HEAD never qualifies — it routes through the key path for a human look.
+untouched() { [ -n "$branch" ] && [ -n "$base" ] && [ "$head" = "$base" ] && is_clean; }
 
 destroy() { # $1 = force (0|1)
   cd "$main_repo"
   if [ "$1" = 1 ]; then git worktree remove --force "$wt"; else git worktree remove "$wt"; fi
-  # Force-delete is safe here: the no-arg path already proved nothing is lost
-  # (lost_count==0), and the key path means the user explicitly confirmed.
+  # Force-delete is safe here: the no-arg path runs only when untouched, and the
+  # key path means the user explicitly confirmed.
   if [ -n "$branch" ] && git show-ref --verify --quiet "refs/heads/$branch"; then
     git branch -D "$branch"
   fi
@@ -83,21 +82,23 @@ if [ $# -ge 1 ]; then
   exit 1
 fi
 
-# Phase 1: no args.
-if is_clean && [ "$(lost_count)" = 0 ]; then
+# Phase 1: no args. Auto-remove only an untouched worktree.
+if untouched; then
   destroy 0
   exit 0
 fi
 
-# Not safe to destroy silently. Explain why, then emit the state-bound key.
+# Work was done here. Explain why, then emit the state-bound key.
 if [ -z "$branch" ]; then
   reason="HEAD is detached, so commit safety can't be verified"
-elif is_clean; then
-  reason="the branch is not merged elsewhere"
-elif [ "$(lost_count)" = 0 ]; then
-  reason="the working tree has uncommitted changes"
+elif [ -z "$base" ]; then
+  reason="its creation point is unknown, so commit safety can't be verified"
+elif ! is_clean && [ "$head" != "$base" ]; then
+  reason="it has uncommitted changes and commits made since it was created"
+elif ! is_clean; then
+  reason="it has uncommitted changes"
 else
-  reason="the working tree has uncommitted changes and the branch is not merged elsewhere"
+  reason="it has commits made since it was created"
 fi
 
 printf 'Refusing to destroy this worktree: %s; this would lose work.\n' "$reason"

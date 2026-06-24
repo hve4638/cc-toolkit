@@ -20,6 +20,7 @@ die() { printf 'wt: %s\n' "$1" >&2; exit 1; }
 [ $# -ge 1 ] || die "usage: wt-new.sh <name> [base-ref]"
 raw_name="$1"
 base="${2:-HEAD}"
+base_given=$([ $# -ge 2 ] && echo 1 || echo 0)
 root="$PWD"
 
 slug="$(printf '%s' "$raw_name" \
@@ -43,14 +44,26 @@ else
   repo=""
   for d in "$root"/*/; do
     [ -d "$d" ] || continue
-    if git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      [ -z "$repo" ] || die "multiple repos under '$root'; run from inside the repo"
-      repo="${d%/}"
-    fi
+    git -C "$d" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+    # Skip linked worktrees (git-dir != git-common-dir): the siblings wt-new
+    # itself drops in this layout are not separate repos.
+    gd="$(cd "$d" && cd "$(git rev-parse --git-dir)" && pwd)"
+    cgd="$(cd "$d" && cd "$(git rev-parse --git-common-dir)" && pwd)"
+    [ "$gd" = "$cgd" ] || continue
+    [ -z "$repo" ] || die "multiple repos under '$root'; run from inside the repo"
+    repo="${d%/}"
   done
   [ -n "$repo" ] || die "no git repo at or under '$root'"
   repo_name="$(basename "$repo")"
   target="$root/${repo_name}-${slug}"
+fi
+
+# Record the land target only when branching off the current branch (no explicit
+# base-ref). An explicit base is ambiguous, so wt-land then requires --into.
+if [ "$base_given" = 0 ]; then
+  parent="$(git -C "$repo" symbolic-ref --quiet --short HEAD || true)"
+else
+  parent=""
 fi
 
 git -C "$repo" check-ref-format --branch "$slug" >/dev/null 2>&1 \
@@ -66,13 +79,33 @@ if ! git -C "$repo" worktree add -b "$slug" "$target" "$base" 1>&2; then
   die "git worktree add failed for '$slug'"
 fi
 
-# Drop a self-contained destroyer into the worktree and hide it from git status.
-cp "$(dirname "$0")/wt-destroy.sh" "$target/wt-destroy"
-chmod +x "$target/wt-destroy"
+# Drop the self-contained land/destroy helpers into the worktree and hide them.
+src="$(dirname "$0")"
+cp "$src/wt-land.sh"    "$target/wt-land";    chmod +x "$target/wt-land"
+cp "$src/wt-destroy.sh" "$target/wt-destroy"; chmod +x "$target/wt-destroy"
+
+# Record per-worktree metadata in its private git dir (not the working tree):
+#   wt-base   = fork point, so wt-destroy can tell an untouched worktree apart.
+#   wt-parent = land target, so wt-land knows where to squash-merge back.
+wt_git_dir="$(git -C "$target" rev-parse --absolute-git-dir)"
+git -C "$target" rev-parse HEAD > "$wt_git_dir/wt-base"
+printf '%s\n' "$parent" > "$wt_git_dir/wt-parent"
+
 common_dir="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd)"
 mkdir -p "$common_dir/info"
-grep -qxF '/wt-destroy' "$common_dir/info/exclude" 2>/dev/null \
-  || printf '/wt-destroy\n' >> "$common_dir/info/exclude"
-printf 'dropped ./wt-destroy into the worktree\n' 1>&2
+for f in /wt-land /wt-destroy; do
+  grep -qxF "$f" "$common_dir/info/exclude" 2>/dev/null \
+    || printf '%s\n' "$f" >> "$common_dir/info/exclude"
+done
+printf 'dropped ./wt-land and ./wt-destroy into the worktree\n' 1>&2
+
+# Operator hint on stderr (stdout stays the worktree path). Call these by path
+# from outside the worktree so the shell is not left in a deleted folder.
+if [ -n "$parent" ]; then
+  printf 'to squash-merge the commits in this worktree onto %s, then remove it:\n    %s/wt-land -m "<message>"\n' "$parent" "$target" 1>&2
+else
+  printf 'to squash-merge the commits in this worktree onto a branch, then remove it:\n    %s/wt-land -m "<message>" --into=<branch>\n' "$target" 1>&2
+fi
+printf 'to discard the work in this worktree, then remove it:\n    %s/wt-destroy\n' "$target" 1>&2
 
 printf '%s\n' "$target"
