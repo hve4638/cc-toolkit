@@ -18,6 +18,11 @@
       "description": "Base bundle — 19 general-purpose agents + hooks (rule reminders, context guard) + MCP server (LSP + AST Grep) + common slash skills (commit/PR, review, handoff, docs, rules)"
     },
     {
+      "name": "frame",
+      "source": "./frame",
+      "description": "Opt-in code-work guardrails behind per-project markers (.inlay/.ponytail) — one dispatcher routes hook events to active guardrails"
+    },
+    {
       "name": "expert",
       "source": "./expert",
       "description": "Advanced/heavyweight tools — Python REPL MCP server (future ralph-like workflow skills)"

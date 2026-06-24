@@ -1,0 +1,17 @@
+{
+  "name": "frame",
+  "version": "0.4.0",
+  "description": "Opt-in code-work guardrails behind per-project markers — one dispatcher routes hook events to active guardrails (inlay, ponytail)",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "guardrails",
+    "methodology"
+  ],
+  "mcpServers": "./.mcp.json",
+  "skills": "./skills/"
+}

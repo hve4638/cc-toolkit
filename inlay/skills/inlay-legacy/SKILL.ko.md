@@ -1,5 +1,5 @@
 ---
-name: inlay
+name: inlay-legacy
 description: "코드 작성·수정·리팩터·디버깅·리뷰·모듈 설계 시 (writing, editing, refactoring, debugging, reviewing code or designing modules/architecture) 적용하는 맥락 보존 방법론. INLAY.md 로 디렉토리별 책임·진입점·도메인 용어를 박고, WHY 주석으로 비자명한 결정을 보존한다."
 ---
 
