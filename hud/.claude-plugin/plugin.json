@@ -1,6 +1,6 @@
 {
   "name": "hud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Heads-Up Display statusline — live session state (git, todos, ctx%, agents, ralph, background tasks)",
   "author": {
     "name": "your-name-here"

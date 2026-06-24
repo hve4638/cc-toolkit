@@ -8,23 +8,23 @@
  * When set, state is stored at $OMC_STATE_DIR/{project-identifier}/ instead
  * of {worktree}/.omc/. This preserves state across worktree deletions.
  */
-/** Standard .omc subdirectories */
+/** Standard state subdirectories under .agent-memory/hud */
 export declare const OmcPaths: {
-    readonly ROOT: ".omc";
-    readonly STATE: ".omc/state";
-    readonly SESSIONS: ".omc/state/sessions";
-    readonly PLANS: ".omc/plans";
-    readonly RESEARCH: ".omc/research";
-    readonly NOTEPAD: ".omc/notepad.md";
-    readonly PROJECT_MEMORY: ".omc/project-memory.json";
-    readonly DRAFTS: ".omc/drafts";
-    readonly NOTEPADS: ".omc/notepads";
-    readonly LOGS: ".omc/logs";
-    readonly SCIENTIST: ".omc/scientist";
-    readonly AUTOPILOT: ".omc/autopilot";
-    readonly SKILLS: ".omc/skills";
-    readonly SHARED_MEMORY: ".omc/state/shared-memory";
-    readonly DEEPINIT_MANIFEST: ".omc/deepinit-manifest.json";
+    readonly ROOT: ".agent-memory/hud";
+    readonly STATE: ".agent-memory/hud/state";
+    readonly SESSIONS: ".agent-memory/hud/state/sessions";
+    readonly PLANS: ".agent-memory/hud/plans";
+    readonly RESEARCH: ".agent-memory/hud/research";
+    readonly NOTEPAD: ".agent-memory/hud/notepad.md";
+    readonly PROJECT_MEMORY: ".agent-memory/hud/project-memory.json";
+    readonly DRAFTS: ".agent-memory/hud/drafts";
+    readonly NOTEPADS: ".agent-memory/hud/notepads";
+    readonly LOGS: ".agent-memory/hud/logs";
+    readonly SCIENTIST: ".agent-memory/hud/scientist";
+    readonly AUTOPILOT: ".agent-memory/hud/autopilot";
+    readonly SKILLS: ".agent-memory/hud/skills";
+    readonly SHARED_MEMORY: ".agent-memory/hud/state/shared-memory";
+    readonly DEEPINIT_MANIFEST: ".agent-memory/hud/deepinit-manifest.json";
 };
 /**
  * Get the git worktree root for the current or specified directory.

@@ -13,23 +13,23 @@ import { execSync } from 'child_process';
 import { existsSync, mkdirSync, realpathSync } from 'fs';
 import { resolve, normalize, relative, sep, join, isAbsolute, basename, dirname } from 'path';
 import { getClaudeConfigDir } from '../utils/config-dir.js';
-/** Standard .omc subdirectories */
+/** Standard state subdirectories under .agent-memory/hud */
 export const OmcPaths = {
-    ROOT: '.omc',
-    STATE: '.omc/state',
-    SESSIONS: '.omc/state/sessions',
-    PLANS: '.omc/plans',
-    RESEARCH: '.omc/research',
-    NOTEPAD: '.omc/notepad.md',
-    PROJECT_MEMORY: '.omc/project-memory.json',
-    DRAFTS: '.omc/drafts',
-    NOTEPADS: '.omc/notepads',
-    LOGS: '.omc/logs',
-    SCIENTIST: '.omc/scientist',
-    AUTOPILOT: '.omc/autopilot',
-    SKILLS: '.omc/skills',
-    SHARED_MEMORY: '.omc/state/shared-memory',
-    DEEPINIT_MANIFEST: '.omc/deepinit-manifest.json',
+    ROOT: '.agent-memory/hud',
+    STATE: '.agent-memory/hud/state',
+    SESSIONS: '.agent-memory/hud/state/sessions',
+    PLANS: '.agent-memory/hud/plans',
+    RESEARCH: '.agent-memory/hud/research',
+    NOTEPAD: '.agent-memory/hud/notepad.md',
+    PROJECT_MEMORY: '.agent-memory/hud/project-memory.json',
+    DRAFTS: '.agent-memory/hud/drafts',
+    NOTEPADS: '.agent-memory/hud/notepads',
+    LOGS: '.agent-memory/hud/logs',
+    SCIENTIST: '.agent-memory/hud/scientist',
+    AUTOPILOT: '.agent-memory/hud/autopilot',
+    SKILLS: '.agent-memory/hud/skills',
+    SHARED_MEMORY: '.agent-memory/hud/state/shared-memory',
+    DEEPINIT_MANIFEST: '.agent-memory/hud/deepinit-manifest.json',
 };
 /**
  * LRU cache for worktree root lookups to avoid repeated git subprocess calls.

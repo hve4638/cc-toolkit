@@ -7,7 +7,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { getWorktreeRoot } from '../lib/worktree-paths.js';
+import { getOmcRoot } from '../lib/worktree-paths.js';
 import type { RateLimits, StatuslineStdin } from './types.js';
 
 const TRANSIENT_CONTEXT_PERCENT_TOLERANCE = 3;
@@ -17,8 +17,7 @@ const TRANSIENT_CONTEXT_PERCENT_TOLERANCE = 3;
 // ============================================================================
 
 function getStdinCachePath(): string {
-  const root = getWorktreeRoot() || process.cwd();
-  return join(root, '.omc', 'state', 'hud-stdin-cache.json');
+  return join(getOmcRoot(), 'state', 'hud-stdin-cache.json');
 }
 
 /**
@@ -27,8 +26,7 @@ function getStdinCachePath(): string {
  */
 export function writeStdinCache(stdin: StatuslineStdin): void {
   try {
-    const root = getWorktreeRoot() || process.cwd();
-    const cacheDir = join(root, '.omc', 'state');
+    const cacheDir = join(getOmcRoot(), 'state');
     if (!existsSync(cacheDir)) {
       mkdirSync(cacheDir, { recursive: true });
     }
