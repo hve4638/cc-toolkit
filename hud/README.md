@@ -1,7 +1,8 @@
 # hud
 
-Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate limit·context %·모델명과
-실행 중 subagent 트리를 표시한다.
+Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate limit·context %·모델명을
+표시한다. 모든 값은 Claude Code 가 보내주는 stdin 과 git 에서 읽으며, 워크스페이스에
+파일을 쓰지 않는다.
 
 ## 설치
 
@@ -18,20 +19,17 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
 
 ```
 📁 cc-plugin | 🌿 main | ⏳ 5h:10%(4d12h) wk:40%(2d12h) | 📦 context:24% | 💻 Opus 4.7 (1M context)
-├─ O architect    2m   analyzing architecture patterns...
-└─ e explore     45s   searching for test files
 ```
 
 표시 요소:
 
 | 요소 | 내용 |
 |---|---|
-| `📁 {cwd}` | 현재 디렉토리 basename (`$HOME` 은 `~` 로 치환) |
+| `📁 {cwd}` | 현재 디렉토리 basename (`$HOME` 은 `~` 로 치환). 실행 베이스 cwd 가 사라졌으면 (워크트리 삭제 등) `📁 missing` 으로 표시하고 브랜치는 생략 |
 | `🌿 {branch}` | Git 브랜치. detached HEAD 면 커밋 해시 7자 |
 | `⏳ 5h:… wk:…` | 5시간 / 7일 rate limit 사용률과 남은 시간 |
 | `📦 context:{pct}%` | context window 사용률 |
 | `💻 {model}` | Claude Code 가 보내주는 모델 display_name |
-| `├─ / └─` | 실행 중 subagent 트리 (없으면 생략) |
 
 ## 제거
 
@@ -49,8 +47,7 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
   "hveHud": {
     "elements": {
       "cwd": true, "gitBranch": true, "rateLimits": true,
-      "contextBar": true, "model": true, "agents": true,
-      "agentsFormat": "multiline", "agentsMaxLines": 5
+      "contextBar": true, "model": true
     },
     "thresholds": { "contextWarning": 70, "contextCritical": 85 }
   }
@@ -75,11 +72,10 @@ pnpm run dev          # watch 모드
 
 ```
 src/hud/         엔진 본체 (entry: index.ts)
-src/hud/elements/  25개 디스플레이 요소
+src/hud/elements/  디스플레이 요소 (cwd, git, model, limits, context)
 src/lib/         파일 I/O (atomic-write, file-lock, worktree-paths)
 src/utils/       공통 유틸 (string-width, config-dir, ssrf-guard)
 src/platform/    OS 감지 (isWSL, isProcessAlive)
-src/team/        worker-canonicalization (dedup stub)
 scripts/install.mjs    설치 스크립트 (skill이 호출)
 scripts/uninstall.mjs  제거 스크립트
 scripts/lib/           wrapper 템플릿 + 의존성

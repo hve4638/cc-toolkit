@@ -1,11 +1,9 @@
 /**
  * OMC HUD - Main Renderer
  *
- * Composes the statusline output. Produces a single-line layout plus
- * optional agent tree:
+ * Composes the statusline output as a single line:
  *
- *   Line 1: 📁 {cwd} | ⏳5h:... wk:... | 🍵 Context: {pct}% | 💻 {model}
- *   Line 2+: agents multiline tree (omitted when no agents are running)
+ *   📁 {cwd} | 🌿 {branch} | ⏳ 5h:... wk:... | 📦 context:{pct}% | 💻 {model}
  */
 import type { HudRenderContext, HudConfig } from "./types.js";
 /**

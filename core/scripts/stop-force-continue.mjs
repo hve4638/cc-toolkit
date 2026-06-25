@@ -176,6 +176,11 @@ async function main() {
   if (!transcriptPath || !existsSync(transcriptPath)) return ok();
 
   const projectRoot = getProjectRoot(data);
+  // WHY: 워크스페이스 (.agent-memory 를 담을 상위 폴더) 가 이미 삭제된 경우
+  //      (wt-destroy 등) mkdir -p 가 죽은 워크스페이스를 빈 폴더로 되살리지
+  //      않도록 즉시 종료. 이후 디버그 tail 저장·상태 기록도 모두 건너뛴다.
+  if (!existsSync(projectRoot)) return ok();
+
   const tailN = parseInt(process.env.FRAME_FORCE_CONTINUE_TAIL_LINES ?? '', 10) || TAIL_LINES_DEFAULT;
   const tailContent = tailLines(transcriptPath, tailN);
   saveDebugTail(projectRoot, tailContent);

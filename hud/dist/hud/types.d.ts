@@ -1,35 +1,10 @@
 /**
  * OMC HUD Type Definitions
  *
- * Type definitions for the HUD state, configuration, and rendering.
+ * Type definitions for the HUD configuration and rendering.
  */
-import type { AutopilotStateForHud } from './elements/autopilot.js';
-import type { ApiKeySource } from './elements/api-key-source.js';
-import type { SessionSummaryState } from './elements/session-summary.js';
-import type { MissionBoardConfig, MissionBoardState } from './mission-board.js';
-export type { AutopilotStateForHud, ApiKeySource, SessionSummaryState };
-export interface BackgroundTask {
-    id: string;
-    description: string;
-    agentType?: string;
-    startedAt: string;
-    completedAt?: string;
-    status: 'running' | 'completed' | 'failed';
-    startTime?: string;
-    exitCode?: number;
-}
-export interface OmcHudState {
-    timestamp: string;
-    backgroundTasks: BackgroundTask[];
-    /** Persisted session start time to survive tail-parsing resets */
-    sessionStartTimestamp?: string;
-    /** Session ID that owns the persisted sessionStartTimestamp */
-    sessionId?: string;
-    /** Timestamp of last user prompt submission (ISO 8601) */
-    lastPromptTimestamp?: string;
-}
 export interface StatuslineStdin {
-    /** Transcript path for parsing conversation history */
+    /** Transcript path (used only as a context-stream identity key, never read) */
     transcript_path?: string;
     /** Current working directory */
     cwd?: string;
@@ -59,75 +34,6 @@ export interface StatuslineStdin {
             resets_at?: number | string;
         };
     };
-}
-export interface TodoItem {
-    content: string;
-    status: 'pending' | 'in_progress' | 'completed';
-    activeForm?: string;
-}
-export interface ActiveAgent {
-    id: string;
-    type: string;
-    model?: string;
-    description?: string;
-    status: 'running' | 'completed';
-    startTime: Date;
-    endTime?: Date;
-}
-export interface SkillInvocation {
-    name: string;
-    args?: string;
-    timestamp: Date;
-}
-export interface PendingPermission {
-    toolName: string;
-    targetSummary: string;
-    timestamp: Date;
-}
-export interface ThinkingState {
-    active: boolean;
-    lastSeen?: Date;
-}
-export interface SessionHealth {
-    durationMinutes: number;
-    messageCount: number;
-    health: 'healthy' | 'warning' | 'critical';
-}
-export interface LastRequestTokenUsage {
-    inputTokens: number;
-    outputTokens: number;
-    reasoningTokens?: number;
-}
-export interface TranscriptData {
-    agents: ActiveAgent[];
-    todos: TodoItem[];
-    sessionStart?: Date;
-    lastActivatedSkill?: SkillInvocation;
-    pendingPermission?: PendingPermission;
-    thinkingState?: ThinkingState;
-    lastRequestTokenUsage?: LastRequestTokenUsage;
-    sessionTotalTokens?: number;
-    toolCallCount: number;
-    agentCallCount: number;
-    skillCallCount: number;
-    /** Name of the last tool_use block seen in transcript */
-    lastToolName: string | null;
-}
-export interface RalphStateForHud {
-    active: boolean;
-    iteration: number;
-    maxIterations: number;
-    prdMode?: boolean;
-    currentStoryId?: string;
-}
-export interface UltraworkStateForHud {
-    active: boolean;
-    reinforcementCount: number;
-}
-export interface PrdStateForHud {
-    currentStoryId: string | null;
-    completed: number;
-    total: number;
 }
 export interface RateLimits {
     /** 5-hour rolling window usage percentage (0-100) - all models combined */
@@ -242,83 +148,16 @@ export interface HudRenderContext {
     contextDisplayScope?: string | null;
     /** Model display name */
     modelName: string;
-    /** Ralph loop state */
-    ralph: RalphStateForHud | null;
-    /** Ultrawork state */
-    ultrawork: UltraworkStateForHud | null;
-    /** PRD state */
-    prd: PrdStateForHud | null;
-    /** Autopilot state */
-    autopilot: AutopilotStateForHud | null;
-    /** Active subagents from transcript */
-    activeAgents: ActiveAgent[];
-    /** Todo list from transcript */
-    todos: TodoItem[];
-    /** Background tasks from HUD state */
-    backgroundTasks: BackgroundTask[];
     /** Working directory */
     cwd: string;
-    /** Mission-board snapshot (opt-in) */
-    missionBoard?: MissionBoardState | null;
-    /** Last activated skill from transcript */
-    lastSkill: SkillInvocation | null;
+    /** True when the launch base cwd (stdin.cwd) no longer exists on disk */
+    cwdMissing?: boolean;
     /** Rate limits result from built-in Anthropic/z.ai providers (includes error state) */
     rateLimitsResult: UsageResult | null;
-    /** Error reason when built-in rate limit API call fails (undefined on success or no credentials) */
-    rateLimitsError?: UsageErrorReason;
     /** Custom rate limit buckets from rateLimitsProvider command (null when not configured) */
     customBuckets: CustomProviderResult | null;
-    /** Pending permission state (heuristic-based) */
-    pendingPermission: PendingPermission | null;
-    /** Extended thinking state */
-    thinkingState: ThinkingState | null;
-    /** Session health metrics */
-    sessionHealth: SessionHealth | null;
-    /** Last-request token usage parsed from transcript message.usage */
-    lastRequestTokenUsage?: LastRequestTokenUsage | null;
-    /** Session token total (input + output) when transcript parsing is reliable enough to calculate it */
-    sessionTotalTokens?: number | null;
-    /** Installed OMC version (e.g. "4.1.10") */
-    omcVersion: string | null;
-    /** Latest available version from npm registry (null if up to date or unknown) */
-    updateAvailable: string | null;
-    /** Total tool_use blocks seen in transcript */
-    toolCallCount: number;
-    /** Total Task/proxy_Task calls seen in transcript */
-    agentCallCount: number;
-    /** Total Skill/proxy_Skill calls seen in transcript */
-    skillCallCount: number;
-    /** Last prompt submission time (from HUD state) */
-    promptTime: Date | null;
-    /** API key source: 'project', 'global', or 'env' */
-    apiKeySource: ApiKeySource | null;
-    /** Active profile name (derived from CLAUDE_CONFIG_DIR), null if default */
-    profileName: string | null;
-    /** Cached session summary state (generated by scripts/session-summary.mjs) */
-    sessionSummary: SessionSummaryState | null;
-    /** Name of the last tool called in this session */
-    lastToolName?: string | null;
 }
 export type HudPreset = 'default';
-/**
- * Agent display format options:
- * - count: agents:2
- * - codes: agents:Oes (type-coded with model tier casing)
- * - codes-duration: agents:O(2m)es (codes with duration)
- * - detailed: agents:[architect(2m),explore,exec]
- * - descriptions: O:analyzing code | e:searching (codes + what they're doing)
- * - tasks: [analyzing code, searching...] (just descriptions - most readable)
- * - multiline: Multi-line display with full agent details on separate lines
- */
-export type AgentsFormat = 'count' | 'codes' | 'codes-duration' | 'detailed' | 'descriptions' | 'tasks' | 'multiline';
-/**
- * Thinking indicator format options:
- * - bubble: 💭 (thought bubble emoji)
- * - brain: 🧠 (brain emoji)
- * - face: 🤔 (thinking face emoji)
- * - text: "thinking" (full text)
- */
-export type ThinkingFormat = 'bubble' | 'brain' | 'face' | 'text';
 /**
  * CWD path format options:
  * - relative: ~/workspace/dotfiles (home-relative)
@@ -333,47 +172,15 @@ export type CwdFormat = 'relative' | 'absolute' | 'folder';
  * - full: raw model ID like 'claude-opus-4-7-20260416'
  */
 export type ModelFormat = 'short' | 'versioned' | 'full';
-export type CallCountsFormat = 'auto' | 'emoji' | 'ascii';
 export interface HudElementConfig {
     cwd: boolean;
     cwdFormat: CwdFormat;
     useHyperlinks?: boolean;
-    gitRepo: boolean;
     gitBranch: boolean;
-    gitStatus: boolean;
-    gitInfoPosition: 'above' | 'below';
     model: boolean;
     modelFormat: ModelFormat;
-    omcLabel: boolean;
     rateLimits: boolean;
-    ralph: boolean;
-    autopilot: boolean;
-    prdStory: boolean;
-    activeSkills: boolean;
-    lastSkill: boolean;
     contextBar: boolean;
-    agents: boolean;
-    agentsFormat: AgentsFormat;
-    agentsMaxLines: number;
-    backgroundTasks: boolean;
-    todos: boolean;
-    permissionStatus: boolean;
-    thinking: boolean;
-    thinkingFormat: ThinkingFormat;
-    apiKeySource: boolean;
-    hostname: boolean;
-    profile: boolean;
-    missionBoard?: boolean;
-    promptTime: boolean;
-    sessionHealth: boolean;
-    showSessionDuration?: boolean;
-    showHealthIndicator?: boolean;
-    showTokens?: boolean;
-    useBars: boolean;
-    showCallCounts?: boolean;
-    callCountsFormat?: CallCountsFormat;
-    showLastTool?: boolean;
-    sessionSummary: boolean;
     maxOutputLines: number;
     safeMode: boolean;
 }
@@ -384,8 +191,6 @@ export interface HudThresholds {
     contextCompactSuggestion: number;
     /** Context percentage that triggers critical color (default: 85) */
     contextCritical: number;
-    /** Ralph iteration that triggers warning color (default: 7) */
-    ralphWarning: number;
 }
 export interface ContextLimitWarningConfig {
     /** Context percentage threshold that triggers the warning banner (default: 80) */
@@ -396,7 +201,6 @@ export interface ContextLimitWarningConfig {
 /**
  * Layout configuration for HUD element ordering.
  * Each group is an ordered array of element names.
- * Elements can be moved between groups (e.g., contextBar from main to line1).
  * Presets control on/off; layout controls order and placement.
  */
 export interface LayoutConfig {
@@ -407,19 +211,11 @@ export interface LayoutConfig {
     /** Elements rendered as separate detail lines below the main line */
     detail?: string[];
 }
-/**
- * Default element order matching the current hardcoded order in render.ts.
- * Used as fallback when no layout is configured.
- */
-export declare const DEFAULT_ELEMENT_ORDER: Required<LayoutConfig>;
 export interface HudConfig {
     preset: HudPreset;
     elements: HudElementConfig;
     thresholds: HudThresholds;
-    staleTaskThresholdMinutes: number;
     contextLimitWarning: ContextLimitWarningConfig;
-    /** Mission-board collection/rendering settings. */
-    missionBoard?: MissionBoardConfig;
     /** Built-in usage API polling interval / success-cache TTL in milliseconds. */
     usageApiPollIntervalMs: number;
     /** Optional custom rate limit provider; omit to use built-in Anthropic/z.ai */

@@ -1,8 +1,16 @@
-import { readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { atomicWriteFileSync, ensureDirSync } from './atomic-write.mjs';
 
 const CACHE_SUBDIR = '.agent-memory/inlay-cache';
+
+// WHY: 워크스페이스 (.agent-memory 의 상위 = projectRoot) 가 이미 삭제됐으면
+//      (wt-destroy 등) 캐시 디렉터리를 만들거나 쓰지 않는다. mkdir -p 가 죽은
+//      워크스페이스를 빈 폴더로 되살리는 것을 막는다. 읽기 (loadCache) 는
+//      어차피 존재하지 않는 파일을 빈 상태로 흡수하므로 가드 불필요.
+function workspaceMissing(projectRoot) {
+  return !existsSync(projectRoot);
+}
 
 // WHY: session_id = UUID v4, agent_id = 짧은 hex (≥6 자). 사용자가 수동으로
 //      둔 다른 *.json 파일은 cleanup 대상에서 제외해야 한다.
@@ -77,6 +85,7 @@ export function loadOwnCache({ projectRoot, sessionId, agentId }) {
 }
 
 export function saveCache(updates, { projectRoot, sessionId, agentId }) {
+  if (workspaceMissing(projectRoot)) return;
   // WHY: 서브에이전트는 own 파일만 atomic write. base 를 건드리면 메인과
   //      서브의 race window 가 생기고 격리 모델이 깨진다.
   const path = targetFile(projectRoot, sessionId, agentId);
@@ -100,6 +109,7 @@ export function clearTracking({ projectRoot, sessionId, agentId }) {
 }
 
 export function compactReset({ projectRoot, sessionId, agentId }) {
+  if (workspaceMissing(projectRoot)) return;
   const path = targetFile(projectRoot, sessionId, agentId);
   const cur = readJsonOrEmpty(path);
   // WHY: 압축 후 inlay 메시지가 사라졌으므로 다음 PreToolUse 가 풀 chain
@@ -141,6 +151,7 @@ export function cleanupOrphans({ projectRoot, ttlMs = DEFAULT_TTL_MS }) {
 }
 
 export function ensureCacheDir(projectRoot) {
+  if (workspaceMissing(projectRoot)) return;
   ensureDirSync(getCacheDir(projectRoot));
 }
 

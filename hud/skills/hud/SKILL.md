@@ -55,8 +55,6 @@ Then tell the user to restart Claude Code.
 
 ```
 📁 cc-plugin | 🌿 main | ⏳ 5h:10%(4d12h) wk:40%(2d12h) | 📦 context:24% | 💻 Opus 4.7 (1M context)
-├─ O architect    2m   analyzing architecture patterns...
-└─ e explore     45s   searching for test files
 ```
 
 ## Configuration
@@ -68,8 +66,7 @@ Settings live in `~/.claude/settings.json` under `hveHud`:
   "hveHud": {
     "elements": {
       "cwd": true, "gitBranch": true, "rateLimits": true,
-      "contextBar": true, "model": true, "agents": true,
-      "agentsFormat": "multiline", "agentsMaxLines": 5
+      "contextBar": true, "model": true
     },
     "thresholds": { "contextWarning": 70, "contextCritical": 85 }
   }

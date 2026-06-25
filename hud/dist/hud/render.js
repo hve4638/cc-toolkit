@@ -1,20 +1,18 @@
 /**
  * OMC HUD - Main Renderer
  *
- * Composes the statusline output. Produces a single-line layout plus
- * optional agent tree:
+ * Composes the statusline output as a single line:
  *
- *   Line 1: 📁 {cwd} | ⏳5h:... wk:... | 🍵 Context: {pct}% | 💻 {model}
- *   Line 2+: agents multiline tree (omitted when no agents are running)
+ *   📁 {cwd} | 🌿 {branch} | ⏳ 5h:... wk:... | 📦 context:{pct}% | 💻 {model}
  */
 import { DEFAULT_HUD_CONFIG } from "./types.js";
 import { stringWidth, getCharWidth } from "../utils/string-width.js";
-import { renderAgentsMultiLine } from "./elements/agents.js";
 import { renderContext } from "./elements/context.js";
 import { renderRateLimitsCompactCustom, renderRateLimitsError, } from "./elements/limits.js";
 import { renderCwd } from "./elements/cwd.js";
 import { renderGitBranch } from "./elements/git.js";
 import { renderModel } from "./elements/model.js";
+import { red } from "./colors.js";
 /**
  * ANSI escape sequence regex (matches SGR and other CSI sequences).
  * Used to skip escape codes when measuring/truncating visible width.
@@ -86,12 +84,24 @@ function joinElements(parts) {
 export async function render(context, config) {
     const { elements: enabledElements } = config;
     // ── Line 1: cwd | git | model ───────────────────────────────────────
-    const cwdElement = enabledElements.cwd
-        ? renderCwd(context.cwd, enabledElements.cwdFormat || "relative", enabledElements.useHyperlinks ?? false)
-        : null;
-    const gitElement = enabledElements.gitBranch
-        ? renderGitBranch(context.cwd)
-        : null;
+    // WHY: when the launch base cwd no longer exists (e.g. its worktree was
+    //      destroyed), cwd basename and git branch are meaningless/misleading
+    //      (git would resolve a fallback dir). Replace both with a single
+    //      "📁 missing" indicator.
+    let cwdElement;
+    let gitElement;
+    if (context.cwdMissing) {
+        cwdElement = `📁 ${red("missing")}`;
+        gitElement = null;
+    }
+    else {
+        cwdElement = enabledElements.cwd
+            ? renderCwd(context.cwd, enabledElements.cwdFormat || "relative", enabledElements.useHyperlinks ?? false)
+            : null;
+        gitElement = enabledElements.gitBranch
+            ? renderGitBranch(context.cwd)
+            : null;
+    }
     const modelElement = enabledElements.model && context.modelName
         ? renderModel(context.modelName, enabledElements.modelFormat)
         : null;
@@ -116,19 +126,10 @@ export async function render(context, config) {
         contextElement,
         modelElement,
     ]);
-    // ── Agent tree (optional, below main line) ──────────────────────────
-    let agentDetailLines = [];
-    if (enabledElements.agents) {
-        const maxLines = enabledElements.agentsMaxLines || 5;
-        const result = renderAgentsMultiLine(context.activeAgents, maxLines);
-        agentDetailLines = result.detailLines;
-    }
     // ── Compose final output ────────────────────────────────────────────
     const outputLines = [];
     if (mainLine)
         outputLines.push(mainLine);
-    if (agentDetailLines.length > 0)
-        outputLines.push(...agentDetailLines);
     // Respect maxOutputLines to avoid input field shrinkage.
     const limitedLines = limitOutputLines(outputLines, config.elements.maxOutputLines);
     // Apply maxWidth truncation when configured.
