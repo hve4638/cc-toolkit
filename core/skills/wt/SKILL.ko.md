@@ -33,7 +33,7 @@ disable-model-invocation: true
 ./mkwt.sh <브랜치명>     # 예: ./mkwt.sh feat/login
 ```
 
-repo 의 현재 HEAD 에서 새 워크트리를 분기하고, `<브랜치명>` 을 유효 슬러그로 정리해(`/` → `-`, git 금지문자 제거) 이름 짓고, 항상 repo 옆 `<repo>.worktrees/<슬러그>` 에 만든다. `wt-land`·`wt-destroy` 를 그 워크트리에 떨군다.
+repo 의 현재 HEAD 에서 새 워크트리를 분기한다. 브랜치는 준 이름을 그대로 쓰고 — `feat/login` 은 `feat/login` 유지 — 워크트리 폴더만 파일시스템용 슬러그로 정리해(`/` → `-`, git 금지문자 제거) 항상 repo 옆 `<repo>.worktrees/<슬러그>` 에 만든다(예: `feat-login`). `wt-land`·`wt-destroy` 를 그 워크트리에 떨군다.
 - tmux 안 + 대화형 터미널: 워크트리를 초기 pwd 로 하는 새 tmux 윈도우를 열고, 윈도우명은 브랜치명으로.
 - 그 외(비대화형 — 출력이 파이프/캡처): cd 할 워크트리 경로를 출력.
 

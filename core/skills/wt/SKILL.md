@@ -33,7 +33,7 @@ Then, from the chosen drop directory, run the assembler with that value:
 ./mkwt.sh <branch-name>     # e.g. ./mkwt.sh feat/login
 ```
 
-It branches a new worktree off the repo's current HEAD, names it from `<branch-name>` (sanitized to a valid slug — `/` becomes `-`, git-forbidden characters dropped), and always places it at `<repo>.worktrees/<slug>` next to the repo. It drops `wt-land`/`wt-destroy` into the worktree.
+It branches a new worktree off the repo's current HEAD. The branch keeps the name you give — `feat/login` stays `feat/login`; only the worktree folder is sanitized to a filesystem-safe slug (`/` → `-`, git-forbidden characters dropped) and always placed at `<repo>.worktrees/<slug>` next to the repo (e.g. `feat-login`). It drops `wt-land`/`wt-destroy` into the worktree.
 - Inside tmux at an interactive terminal: opens a new tmux window rooted at the worktree, named after the branch.
 - Otherwise (run non-interactively — output piped or captured): prints the worktree path to cd into.
 
