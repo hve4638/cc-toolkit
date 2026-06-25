@@ -1,6 +1,6 @@
 {
   "name": "core",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Base bundle — runtime hooks, MCP (LSP + AST grep), generic agents, and common slash skills (commit/PR, review, handoff, docs, rules)",
   "author": {
     "name": "Hve"

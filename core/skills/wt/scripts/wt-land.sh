@@ -2,7 +2,7 @@
 #
 # wt-land — squash-merge THIS worktree's branch into its parent (or an --into
 # target) as a single commit, then remove the worktree and its branch. Dropped
-# into each worktree by wt-new; self-locates via its own path, so it needs no
+# into each worktree by mkwt; self-locates via its own path, so it needs no
 # path argument.
 #
 # Usage (call by path from outside the worktree; it self-locates via its own path):

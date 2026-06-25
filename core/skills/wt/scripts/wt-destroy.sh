@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # wt-destroy — remove THIS worktree (the one this script file lives in) and its
-# branch, discarding its work. Dropped into each worktree by wt-new; self-locates,
+# branch, discarding its work. Dropped into each worktree by mkwt; self-locates,
 # so it needs no path argument. To keep the work instead, use wt-land.
 #
 # Usage (call by path from outside the worktree; it self-locates via its own path):
@@ -36,21 +36,25 @@ common_dir="$(cd "$(git -C "$wt" rev-parse --git-common-dir)" && pwd)"
 main_repo="$(dirname "$common_dir")"
 branch="$(git -C "$wt" symbolic-ref --quiet --short HEAD || true)"
 head="$(git -C "$wt" rev-parse HEAD)"
-base="$(cat "$git_dir/wt-base" 2>/dev/null || true)"   # fork point recorded by wt-new
+base="$(cat "$git_dir/wt-base" 2>/dev/null || true)"   # fork point recorded by mkwt
 
 statekey() {
+  local hash=sha256sum
+  command -v sha256sum >/dev/null 2>&1 || hash="shasum -a 256"
   {
     git -C "$wt" rev-parse HEAD
     git -C "$wt" status --porcelain=v1
     git -C "$wt" diff HEAD
+    # Hash each untracked file's path+content. A per-file loop avoids xargs -r
+    # (GNU-only) and the `--` guards against a file named like an option.
     git -C "$wt" ls-files --others --exclude-standard -z \
-      | ( cd "$wt" && xargs -0 -r sha256sum )
-  } | sha256sum | cut -c1-5
+      | ( cd "$wt" && while IFS= read -r -d '' f; do $hash -- "$f"; done )
+  } | $hash | cut -c1-5
 }
 
 is_clean() { [ -z "$(git -C "$wt" status --porcelain)" ]; }
 
-# True only when nothing was done since wt-new created this worktree: still on a
+# True only when nothing was done since mkwt created this worktree: still on a
 # branch at the recorded fork point with a clean tree (no commits, no changes). A
 # detached HEAD never qualifies — it routes through the key path for a human look.
 untouched() { [ -n "$branch" ] && [ -n "$base" ] && [ "$head" = "$base" ] && is_clean; }

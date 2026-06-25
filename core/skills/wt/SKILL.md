@@ -1,64 +1,52 @@
 ---
 name: wt
-description: "Create a git worktree branched off the current branch (HEAD) in a separate folder"
+description: "Drop a ./mkwt.sh into the project so the user can spin up git worktrees (branched off HEAD) with one command"
 disable-model-invocation: true
-argument-hint: "[name] [base-ref]"
 ---
 
 <wt_instruction>
-# wt
+# wt — set up ./mkwt.sh
 
-Create a new git worktree branched off the current branch (HEAD), placed to match the project layout. When the work is done, land it onto the parent branch as one squashed commit, or discard it.
+`/wt` is a one-time setup. It drops a self-contained `./mkwt.sh` into the project root and hides it from git. From then on the user creates worktrees themselves by running `./mkwt.sh <branch>`.
 
-## Create
+## Decide where the repo is, then assemble
 
-Run from the project root:
+You decide one thing: `<repo-rel>` — the path from the directory where `mkwt.sh` is dropped to the repo it drives. Pick the drop directory and `<repo-rel>` from the project shape:
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/wt/scripts/wt-new.sh" <name> [base-ref]
-```
+- The project root is itself the repo → drop there, `<repo-rel>` is `.`
+- The project root is a container holding the repo as a subfolder → drop at the container, `<repo-rel>` is that subfolder's name
+- The user named a specific repo/location → use it
 
-- `<name>` — worktree / branch slug. The script sanitizes whitespace and git-forbidden characters, and rejects a slug that reduces to empty.
-- `[base-ref]` — start point to branch from. Omitted: branch off current HEAD and record that current branch as the land target. Given: the parent is ambiguous, so wt-land then needs `--into`.
+When it is ambiguous (several repos present, unclear which directory is the root), ask the user rather than guessing.
 
-The script decides the location:
-- Project root is a repo (git toplevel exists) → `<repo-parent>/<repo>.worktrees/<slug>/`
-- Project root is a container holding a single repo → `<project-root>/<repo>-<slug>/`
-
-The script prints only the new worktree's absolute path to stdout (progress goes to stderr). Report that path to the user. Unless told otherwise, the new worktree is the default workspace from here on, so `cd <path>` and work there.
-
-The worktree carries `wt-land` and `wt-destroy` executables (hidden from `git status`).
-
-## Finish — wt-land
-
-After committing freely in the worktree, land the accumulated result onto the parent branch as one squashed commit and clean up. It acts on the worktree it lives in regardless of the current directory.
+Then, from the chosen drop directory, run the assembler with that value:
 
 ```bash
-<worktree-path>/wt-land -m "feat: ..."                  # land into the recorded parent
-<worktree-path>/wt-land -m "feat: ..." --into=<branch>  # land into another branch
+"${CLAUDE_PLUGIN_ROOT}/skills/wt/scripts/wt-init.sh" <repo-rel>
 ```
 
-- With no `-m` it prints usage.
-- It squashes the worktree's commits onto the target as one commit carrying the `-m` message. The target branch's history gains only that single commit — no WIP commits, no merge commit. On success it removes this worktree and its branch.
-- The target branch must be checked out cleanly somewhere (usually the main worktree). If it is dirty or not checked out, wt-land stops.
+`wt-init.sh` is mechanical: it bakes `<repo-rel>` and the `wt-land`/`wt-destroy` helpers (base64) into a self-contained `mkwt.sh`, makes it executable, and registers `/mkwt.sh` in `.git/info/exclude` when `<repo-rel>` is `.`. It decides nothing — if `<repo-rel>` doesn't point at a repo root it errors. Report its output to the user. To regenerate after a template change, remove `mkwt.sh` and re-run.
 
-On a merge conflict wt-land touches nothing and stops, naming the conflicted files. Reconcile inside that worktree with `git merge <target>`, resolving so both intents survive — this worktree's work and whatever landed on the parent meanwhile. When it is genuinely ambiguous which side is right, defer to the user. After resolving, state what was merged and how, commit, and re-run wt-land.
-
-## Discard — wt-destroy
-
-Use this to throw away a worktree's work and remove it.
+## What the user runs
 
 ```bash
-<worktree-path>/wt-destroy          # inspect, then delete if safe, else issue a key
-<worktree-path>/wt-destroy <key>    # force-delete after the key is confirmed
+./mkwt.sh <branch-name>     # e.g. ./mkwt.sh feat/login
 ```
 
-- No new commits and no changes since it was created (an untouched worktree) → removed immediately.
-- Otherwise it touches nothing, prints the refusal reason plus a confirmation key (derived from the current state), and stops. The key is bound to the worktree state at that moment, so if the state changes the old key is refused and a new one is shown.
+It branches a new worktree off the repo's current HEAD, names it from `<branch-name>` (sanitized to a valid slug — `/` becomes `-`, git-forbidden characters dropped), and always places it at `<repo>.worktrees/<slug>` next to the repo. It drops `wt-land`/`wt-destroy` into the worktree.
+- Inside tmux at an interactive terminal: opens a new tmux window rooted at the worktree, named after the branch.
+- Otherwise (run non-interactively — output piped or captured): prints the worktree path to cd into.
 
-When `wt-destroy` stops with a key, do not re-run with that key right away. Relay the warning to the user, confirm the intent to delete, and only then re-run with the command it prints.
+`mkwt.sh` is primarily the user's command — relay it rather than running it unprompted (running it creates a branch + worktree). If you do run it, it is tmux-safe: with stdout not a terminal (a tool call or `$(...)`), it skips the tmux window and just prints the worktree path.
 
-Manual cleanup when the scripts are gone: `git worktree remove <path>` → `git worktree prune` → `git branch -d <slug>`.
+## Finish / discard
+
+Each worktree carries the two helpers (hidden from `git status`); call them by path from outside the worktree:
+
+```bash
+<worktree>/wt-land -m "feat: ..."     # squash the worktree's commits onto the parent branch, then remove it
+<worktree>/wt-destroy                 # discard the worktree (prints a confirmation key if it holds work)
+```
+
+When `wt-destroy` stops with a key, relay the warning and confirm intent with the user before re-running with the key. See README.md for the full wt-land / wt-destroy mechanics.
 </wt_instruction>
-
-$ARGUMENTS
