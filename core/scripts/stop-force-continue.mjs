@@ -7,9 +7,11 @@
  * State: <projectRoot>/.agent-memory/unexpected-stop/<session_id>.json
  *   { "stops": ["<ISO>", ...] }
  *
- * Debug: every Stop invocation that passes the guards saves the transcript
- *   tail to <projectRoot>/.agent-memory/stop/transcript_<epochMs>_<pid>.jsonl
- *   (rotation: oldest deleted when count exceeds STOP_DEBUG_MAX).
+ * Debug (opt-in): when FRAME_FORCE_CONTINUE_DEBUG is set, every Stop invocation
+ *   that passes the guards saves the transcript tail to
+ *   <projectRoot>/.agent-memory/stop/transcript_<epochMs>_<pid>.jsonl
+ *   (rotation: oldest deleted when count exceeds STOP_DEBUG_MAX). Off by default
+ *   so a live workspace does not accumulate a file every turn.
  *
  * Decision matrix (only when payload guards pass and an unexpected stop is
  * detected from the transcript tail):
@@ -27,6 +29,7 @@
  *
  * Tunables (env):
  *   FRAME_FORCE_CONTINUE_TAIL_LINES  transcript tail lines to scan (default: 50)
+ *   FRAME_FORCE_CONTINUE_DEBUG       save transcript tail to .agent-memory/stop (default: off)
  */
 
 import { execSync } from 'node:child_process';
@@ -47,6 +50,9 @@ const TOOL_RESULT_RACE_GUARD_MS = 100;
 const STOP_DEBUG_SUBDIR = '.agent-memory/stop';
 const STOP_DEBUG_MAX = 50;
 const STOP_DEBUG_FILE_PATTERN = /^transcript_(\d+)(?:_\d+)?\.jsonl$/;
+// WHY: 디버그 tail 저장은 기본 OFF. 살아있는 워크스페이스가 매 턴
+//      .agent-memory/stop 파일을 쌓지 않도록, env 가 켜졌을 때만 저장한다.
+const STOP_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(process.env.FRAME_FORCE_CONTINUE_DEBUG ?? '');
 
 const NOISE_TYPES = new Set([
   'attachment',
@@ -183,7 +189,7 @@ async function main() {
 
   const tailN = parseInt(process.env.FRAME_FORCE_CONTINUE_TAIL_LINES ?? '', 10) || TAIL_LINES_DEFAULT;
   const tailContent = tailLines(transcriptPath, tailN);
-  saveDebugTail(projectRoot, tailContent);
+  if (STOP_DEBUG_ENABLED) saveDebugTail(projectRoot, tailContent);
 
   const [last, prev] = findLastSubstantiveEntries(tailContent, 2);
 
