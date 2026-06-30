@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 #
 # wt-land — squash-merge THIS worktree's branch into its parent (or an --into
-# target) as a single commit, then remove the worktree and its branch. Dropped
-# into each worktree by mkwt; self-locates via its own path, so it needs no
-# path argument.
+# target) as a single commit, then remove the worktree and its branch (unless
+# --keep). Dropped into each worktree by mkwt; self-locates via its own path, so
+# it needs no path argument.
 #
 # Usage (call by path from outside the worktree; it self-locates via its own path):
 #   <worktree>/wt-land -m "<message>"                  squash into the recorded parent
 #   <worktree>/wt-land -m "<message>" --into=<branch>  squash into <branch> instead
+#   <worktree>/wt-land -m "<message>" --keep           squash but keep the worktree
 #   <worktree>/wt-land                                 print usage
 #
 # The squash leaves a single clean commit on the target (no merge commit, no WIP
 # history). On a merge conflict it changes nothing and stops, listing the
 # conflicted files; reconcile inside this worktree (git merge <target>, resolve,
 # commit) and re-run.
+#
+# --keep skips the teardown so the same worktree can land more than once (do work,
+# land --keep, do more work, land again). The final land can drop --keep to clean
+# up, or use wt-destroy.
 
 set -euo pipefail
 
@@ -26,6 +31,7 @@ branched from) as one commit, then remove this worktree and its branch.
 
   -m <message>     commit message for the squashed commit (required)
   --into=<branch>  land into <branch> instead of the recorded parent
+  --keep           keep the worktree and branch after landing (for more lands)
 EOF
   exit "${1:-1}"
 }
@@ -47,13 +53,14 @@ feature="$(git -C "$wt" symbolic-ref --quiet --short HEAD)" \
   || die "HEAD is detached; cannot land a detached worktree"
 
 # Parse args.
-msg=""; into=""
+msg=""; into=""; keep=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -m)        shift; [ $# -gt 0 ] || die "-m needs a message"; msg="$1" ;;
     -m*)       msg="${1#-m}" ;;
     --into)    shift; [ $# -gt 0 ] || die "--into needs a branch"; into="$1" ;;
     --into=*)  into="${1#--into=}" ;;
+    --keep)    keep=1 ;;
     -h|--help) usage 0 ;;
     *)         die "unknown argument: $1" ;;
   esac
@@ -114,6 +121,12 @@ fi
 git -C "$tw" commit -q -m "$msg" \
   || { restore; die "commit in target worktree '$tw' failed (hook or signing?); target restored, nothing landed"; }
 landed="$(git -C "$tw" rev-parse --short HEAD)"
+
+# --keep: leave the worktree and branch in place so more work can land later.
+if [ "$keep" = 1 ]; then
+  printf 'landed %s onto %s as %s; kept worktree %s (--keep)\n' "$feature" "$target" "$landed" "$wt"
+  exit 0
+fi
 
 # Landed — the content is now in <target>, so removing this worktree loses nothing.
 cd "$main_repo"

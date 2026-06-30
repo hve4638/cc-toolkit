@@ -3,6 +3,7 @@
 #   REPO_REL         relative path from this script's dir to the repo
 #   WT_LAND_B64      base64 of wt-land.sh
 #   WT_DESTROY_B64   base64 of wt-destroy.sh
+#   WT_CLAUDE        1 = auto-launch `claude` in the tmux window, else 0
 # Run (do not source): ./mkwt.sh <branch-name>
 set -euo pipefail
 
@@ -96,7 +97,15 @@ printf 'discard: %s/wt-destroy\n' "$target" >&2
 # worktree, named after the branch. Otherwise — piped/captured/redirected, e.g. an
 # agent tool call or $(...) — stdout is not a TTY, so print the path instead and
 # leave the user's tmux untouched. (Same fallback if tmux refuses.)
-if [ -n "${TMUX:-}" ] && [ -t 1 ] && tmux new-window -c "$target" -n "$branch" 2>/dev/null; then
+win=""
+if [ -n "${TMUX:-}" ] && [ -t 1 ]; then
+  win="$(tmux new-window -P -F '#{window_id}' -c "$target" -n "$branch" 2>/dev/null || true)"
+fi
+if [ -n "$win" ]; then
+  # WT_CLAUDE (baked by wt-init): type `claude` into the new window's interactive
+  # shell via send-keys, not `new-window <cmd>` — the latter runs a non-interactive
+  # shell and would skip the user's aliases/functions. Only reached interactively.
+  if [ "${WT_CLAUDE:-0}" = 1 ]; then tmux send-keys -t "$win" 'claude' Enter; fi
   printf 'opened tmux window "%s"\n' "$branch" >&2
 else
   printf '%s\n' "$target"
