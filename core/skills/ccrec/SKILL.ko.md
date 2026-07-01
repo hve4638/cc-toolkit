@@ -1,7 +1,6 @@
 ---
 name: ccrec
 description: "현재 Claude Code 세션 transcript를 턴 단위로 조회·추출 (count/search/clip/filter)"
-disable-model-invocation: true
 argument-hint: "[추출·검색 대상 — 작업 설명이나 세션에 대한 질문]"
 ---
 

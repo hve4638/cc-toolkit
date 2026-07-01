@@ -1,7 +1,6 @@
 ---
 name: ccrec
 description: "Query and extract the current Claude Code session transcript by turn (count/search/clip/filter)"
-disable-model-invocation: true
 argument-hint: "[what to extract or find — a task description or a question about the session]"
 ---
 

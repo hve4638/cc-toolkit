@@ -51,6 +51,11 @@
       "name": "wiki",
       "source": "./wiki",
       "description": "Persistent markdown knowledge base (Karpathy LLM Wiki) — MCP tools + SessionStart/PreCompact/Stop hooks"
+    },
+    {
+      "name": "plugin-devtool",
+      "source": "./plugin-devtool",
+      "description": "Plugin-author tooling for this marketplace — get-ticket queries the global feedback tickets that core:ticket publishes. Not needed in ordinary sessions"
     }
   ]
 }
