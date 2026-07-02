@@ -20,6 +20,7 @@ import { findMarkerDir, resolveCwd } from './lib/markers.mjs';
 const GUARDRAILS = [
   { name: 'inlay', marker: '.inlay' },
   { name: 'ponytail', marker: '.ponytail' },
+  { name: 'showcase', marker: '.showcase' },
 ];
 
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
