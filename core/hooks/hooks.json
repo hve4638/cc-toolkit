@@ -1,5 +1,5 @@
 {
-  "description": "frame hook chain — SessionStart instruction inject, PreToolUse rule reminder, Stop force-continue",
+  "description": "core hook chain — SessionStart instruction inject, PreToolUse rule reminder, Stop force-continue, PostToolUse skill-hook dispatcher",
   "hooks": {
     "SessionStart": [
       {
@@ -33,6 +33,18 @@
             "type": "command",
             "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/stop-force-continue.mjs",
             "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/hooks.mjs PostToolUse",
+            "timeout": 5
           }
         ]
       }
