@@ -34,7 +34,7 @@
 | | `/docs-skills` | Claude Code skills 작성·배포 docs 링크 |
 | 도메인 지식 | `/knowledge-fsonl` | FSONL (Function-Styled Object Notation Lines) 포맷 스펙 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
-| 스펙 | `/interview` | Socratic 질의응답으로 모호한 아이디어 → spec 파일. brownfield/greenfield 판정에 `explore` 에이전트 사용 |
+| 스펙 | `/interview` | Socratic 질의응답으로 모호한 아이디어 → spec 파일. brownfield/greenfield 판정에 내장 `Explore` 에이전트 사용 |
 
 ## 자동 규약
 
@@ -51,14 +51,13 @@
 
 ### 1. 범용 에이전트 카탈로그
 
-19 개 plugin-independent 서브에이전트. 다른 플러그인·스킬에서 `Task(subagent_type="<name>", ...)` 로 호출 가능.
+13 개 plugin-independent 서브에이전트. 다른 플러그인·스킬에서 `Agent(subagent_type="<name>", ...)` 로 호출 가능.
 
 | 카테고리 | 에이전트 |
 |---|---|
-| 탐색·계획 | explore, analyst, planner, architect |
-| 구현 | executor, code-simplifier, designer, writer |
-| 검증 | verifier, critic, code-reviewer, security-reviewer, test-engineer |
-| 디버깅·분석 | debugger, tracer, qa-tester, scientist |
+| 탐색·계획 | analyst, planner, architect |
+| 구현 | executor, code-simplifier |
+| 검증 | verifier, critic, code-reviewer, security-reviewer, test-engineer, tdd-adversary |
 | 기타 | document-specialist, git-master |
 
 ### 2. 툴 사용 규율 리마인더

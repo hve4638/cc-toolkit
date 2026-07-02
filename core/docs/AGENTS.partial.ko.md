@@ -10,8 +10,8 @@ SDK 사용이 불확실하면 `document-specialist`.
 </delegation_rules>
 
 <model_routing>
-- `haiku` — 빠른 조회, 짧은 글쓰기 (explore, writer)
-- `sonnet` — 표준 구현·리뷰·디버깅 (executor, debugger, verifier, test-engineer 등)
+- `haiku` — 빠른 조회
+- `sonnet` — 표준 구현·리뷰·디버깅 (executor, verifier, test-engineer 등)
 - `opus` — 깊은 분석, 아키텍처, 비판적 리뷰 (analyst, planner, architect, critic, code-reviewer, security-reviewer, code-simplifier)
 </model_routing>
 
@@ -19,11 +19,9 @@ SDK 사용이 불확실하면 `document-specialist`.
 계획·분석 (opus): analyst, planner, architect, critic
 구현 (sonnet): executor (복잡 시 opus 권장)
 리뷰 (opus): code-reviewer, security-reviewer, code-simplifier
-디버깅 (sonnet): debugger, tracer
-테스트 (sonnet): test-engineer, qa-tester, verifier
-탐색·조사: explore (haiku), document-specialist (sonnet), scientist (sonnet)
-문서화 (haiku): writer
-특수 (sonnet): designer, git-master
+테스트 (sonnet): test-engineer, verifier
+탐색·조사: document-specialist (sonnet)
+특수 (sonnet): git-master
 </agent_catalog>
 
 <tools>

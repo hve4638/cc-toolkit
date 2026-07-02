@@ -18,10 +18,12 @@ level: 3
     1. **Preserve Functionality**: Never change what the code does — only how it does it.
        All original features, outputs, and behaviors must remain intact.
 
-    2. **Apply Project Standards**: Discover the project's established conventions —
-       naming, module and import style, type annotation habits, formatting — from existing
-       code and config files (linter/formatter settings, tsconfig, pyproject, etc.), and
-       follow them. Never apply conventions the project itself does not use.
+    2. **Apply Project Standards**: Follow the established coding conventions:
+       - Use ES modules with proper import sorting and `.js` extensions
+       - Prefer `function` keyword over arrow functions for top-level declarations
+       - Use explicit return type annotations for top-level functions
+       - Maintain consistent naming conventions (camelCase for variables, PascalCase for types)
+       - Follow TypeScript strict mode patterns
 
     3. **Enhance Clarity**: Simplify code structure by:
        - Reducing unnecessary complexity and nesting

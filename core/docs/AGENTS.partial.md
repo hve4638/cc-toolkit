@@ -10,8 +10,8 @@ For uncertain SDK usage, route to `document-specialist`.
 </delegation_rules>
 
 <model_routing>
-- `haiku` — quick lookups, short writing (explore, writer)
-- `sonnet` — standard implementation, review, debugging (executor, debugger, verifier, test-engineer, etc.)
+- `haiku` — quick lookups
+- `sonnet` — standard implementation, review, debugging (executor, verifier, test-engineer, etc.)
 - `opus` — deep analysis, architecture, critical review (analyst, planner, architect, critic, code-reviewer, security-reviewer, code-simplifier)
 </model_routing>
 
@@ -19,11 +19,9 @@ For uncertain SDK usage, route to `document-specialist`.
 Planning/analysis (opus): analyst, planner, architect, critic
 Implementation (sonnet): executor (opus recommended for complex work)
 Review (opus): code-reviewer, security-reviewer, code-simplifier
-Debugging (sonnet): debugger, tracer
-Testing (sonnet): test-engineer, qa-tester, verifier
-Search/research: explore (haiku), document-specialist (sonnet), scientist (sonnet)
-Documentation (haiku): writer
-Specialized (sonnet): designer, git-master
+Testing (sonnet): test-engineer, verifier
+Search/research: document-specialist (sonnet)
+Specialized (sonnet): git-master
 </agent_catalog>
 
 <tools>

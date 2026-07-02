@@ -35,7 +35,7 @@ Inspired by the [Ouroboros project](https://github.com/Q00/ouroboros) which demo
 - Ask ONE question at a time -- never batch multiple questions
 - Target the WEAKEST clarity dimension with each question
 - Make weakest-dimension targeting explicit every round: name the weakest dimension, state its score/gap, and explain why the next question is aimed there
-- Gather codebase facts via `explore` agent BEFORE asking the user about them
+- Gather codebase facts via `Explore` agent BEFORE asking the user about them
 - For brownfield confirmation questions, cite the repo evidence that triggered the question (file path, symbol, or pattern) instead of asking the user to rediscover it
 - Score ambiguity after every answer -- display the score transparently
 - Do not proceed to spec crystallization until ambiguity ≤ threshold (default 0.2)
@@ -50,10 +50,10 @@ Inspired by the [Ouroboros project](https://github.com/Q00/ouroboros) which demo
 
 1. **Parse the user's idea** from the task input at the end of this skill
 2. **Detect brownfield vs greenfield**:
-   - Run `explore` agent (haiku): check if cwd has existing source code, package files, or git history
+   - Run `Explore` agent: check if cwd has existing source code, package files, or git history
    - If source files exist AND the user's idea references modifying/extending something: **brownfield**
    - Otherwise: **greenfield**
-3. **For brownfield**: Run `explore` agent to map relevant codebase areas, store as `codebase_context`
+3. **For brownfield**: Run `Explore` agent to map relevant codebase areas, store as `codebase_context`
 4. **Initialize state** by writing JSON to `.agent-memory/state/interview-state.json`:
 
 ```json
@@ -292,7 +292,7 @@ Spec structure:
 | {assumption} | {how it was questioned} | {what was decided} |
 
 ## Technical Context
-{brownfield: relevant codebase findings from explore agent}
+{brownfield: relevant codebase findings from Explore agent}
 {greenfield: technology choices and constraints}
 
 ## Ontology (Key Entities)
@@ -348,7 +348,7 @@ Then clean up: delete `.agent-memory/state/interview-state.json` (interview is c
 
 <Tool_Usage>
 - Use `AskUserQuestion` for each interview question — provides clickable UI with contextual options
-- Use `Task(subagent_type="explore", model="haiku")` for brownfield codebase exploration (run BEFORE asking user about codebase)
+- Use `Agent(subagent_type="Explore")` for brownfield codebase exploration (run BEFORE asking user about codebase)
 - Use opus model (temperature 0.1) for ambiguity scoring — consistency is critical
 - Use `Write` tool to persist interview state JSON to `.agent-memory/state/interview-state.json` between rounds; `Read` when resuming
 - Use `Write` tool to save the final spec to `.agent-memory/specs/`
@@ -371,10 +371,10 @@ Why good: Identifies weakest dimension, explains why it is now the bottleneck, a
 <Good>
 Gathering codebase facts before asking:
 ```
-[spawns explore agent: "find authentication implementation"]
+[spawns Explore agent: "find authentication implementation"]
 [receives: "Auth is in src/auth/ using JWT with passport.js"]
 
-Question: "I found JWT authentication with passport.js in `src/auth/` (pattern match from explore).
+Question: "I found JWT authentication with passport.js in `src/auth/` (pattern match from Explore).
 For this new feature, should we extend the existing auth middleware or create
 a separate authentication flow?"
 ```
@@ -444,7 +444,7 @@ Asking about codebase facts:
 ```
 "What database does your project use?"
 ```
-Why bad: Should have spawned explore agent to find this. Never ask the user what the code already tells you.
+Why bad: Should have spawned Explore agent to find this. Never ask the user what the code already tells you.
 </Bad>
 
 <Bad>

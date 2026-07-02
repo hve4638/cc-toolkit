@@ -1,0 +1,13 @@
+{
+  "name": "usefable",
+  "version": "0.1.0",
+  "description": "Fable-tier agents — fable variants of core's planning/analysis and implementation/review agents",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin"
+  ]
+}
