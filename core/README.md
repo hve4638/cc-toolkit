@@ -65,7 +65,7 @@
 
 **메커니즘**: PreToolUse 훅 (`scripts/pre-tool-enforcer.mjs`, matcher `*`, timeout 3s)
 
-모든 툴 호출 직전 `<system-reminder>` 주입. dedup 없음 — 매 호출마다 주입.
+모든 툴 호출 직전 `<system-reminder>` 주입. 같은 메시지는 세션별 5분 쿨다운으로 스로틀 (`FRAME_PRETOOL_ADVISORY_COOLDOWN_MS` 로 조정, 0 이하 → 매 호출 주입).
 
 | 툴 | 주입되는 규칙 |
 |---|---|
@@ -75,17 +75,7 @@
 | `Write` / `Edit` | Verify the change after writing. Prefer Edit over Write for existing files. |
 | 그 외 | 주입 없음 (`suppressOutput`) |
 
-### 3. 컨텍스트 가드
-
-**메커니즘**: Stop 훅 (`scripts/context-guard-stop.mjs`, matcher `*`, timeout 5s)
-
-세션 Stop 지점에서 트랜스크립트 파일 크기 측정.
-
-- `CORE_CONTEXT_GUARD_BYTES` (기본 500000) 초과 → `additionalContext` 로 경고 주입
-- 컴팩터·사용자 취소 stop → 간섭 없음
-- 스크립트 내 `BLOCK_WHEN_OVER = true` 로 바꾸면 Stop 차단
-
-### 4. 코드 인텔리전스 (LSP)
+### 3. 코드 인텔리전스 (LSP)
 
 **메커니즘**: MCP 서버 `t` (`bridge/mcp-server.cjs`, `.mcp.json` 으로 등록)
 
@@ -93,9 +83,9 @@
 
 **의존**: 사용자 `PATH` 의 언어 서버 (`gopls`, `typescript-language-server`, `pyright` 등). 설치 안 된 언어는 해당 LSP 호출 시 에러 반환.
 
-### 5. 구조 검색·치환 (AST Grep)
+### 4. 구조 검색·치환 (AST Grep)
 
-**메커니즘**: MCP 서버 `t` (#4 와 동일 서버 공유)
+**메커니즘**: MCP 서버 `t` (#3 와 동일 서버 공유)
 
 AST 패턴 기반 2 개 툴: `ast_grep_search`, `ast_grep_replace`. 정규식의 구문 인식 한계를 극복.
 
