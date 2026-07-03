@@ -1,7 +1,7 @@
 {
   "name": "usefable",
-  "version": "0.1.0",
-  "description": "Fable-tier agents — fable variants of core's planning/analysis and implementation/review agents",
+  "version": "0.2.0",
+  "description": "Fable-tier agents — fable- prefixed top-model variants of core's executor and review/verification agents",
   "author": {
     "name": "Hve"
   },

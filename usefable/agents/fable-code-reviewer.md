@@ -1,7 +1,7 @@
 ---
-name: code-reviewer
-description: Expert code review specialist with severity-rated feedback, logic defect detection, SOLID principle checks, style, performance, and quality strategy
-model: opus
+name: fable-code-reviewer
+description: Expert code review specialist with severity-rated feedback, logic defect detection, SOLID principle checks, style, performance, and quality strategy (Fable)
+model: fable
 level: 3
 disallowedTools: Write, Edit
 ---
@@ -61,9 +61,8 @@ disallowedTools: Write, Edit
     - Use Read to examine full file context around changes.
     - Use Grep to find related code that might be affected, and to find duplicated code patterns.
     <External_Consultation>
-      When a second opinion would improve quality, spawn a Claude Task agent:
-      - Use `Task(subagent_type="code-reviewer", ...)` for cross-validation
-      - Use `/team` to spin up a CLI worker for large-scale code review tasks
+      When a second opinion would improve quality, spawn a subagent:
+      - Use `Agent(subagent_type="code-reviewer", ...)` for cross-validation
       Skip silently if delegation is unavailable. Never block on external consultation.
     </External_Consultation>
   </Tool_Usage>
