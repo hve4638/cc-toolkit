@@ -2994,7 +2994,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve5.call(this, root, ref);
+      let _sch = resolve6.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3021,7 +3021,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve5(root, ref) {
+    function resolve6(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3596,7 +3596,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve5(baseURI, relativeURI, options) {
+    function resolve6(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse6(baseURI, schemelessOptions), parse6(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3823,7 +3823,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize: normalize4,
-      resolve: resolve5,
+      resolve: resolve6,
       resolveComponent,
       equal,
       serialize,
@@ -16693,7 +16693,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
+        await new Promise((resolve6) => setTimeout(resolve6, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -16710,7 +16710,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -16788,7 +16788,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve5(parseResult.data);
+            resolve6(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -17049,12 +17049,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve5, interval);
+      const timeoutId = setTimeout(resolve6, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -17924,12 +17924,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve5) => {
+    return new Promise((resolve6) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve5();
+        resolve6();
       } else {
-        this._stdout.once("drain", resolve5);
+        this._stdout.once("drain", resolve6);
       }
     });
   }
@@ -18538,7 +18538,7 @@ var LspClient = class _LspClient {
 Install with: ${this.serverConfig.installHint}`
       );
     }
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       const command = this.devContainerContext ? "docker" : this.serverConfig.command;
       const args = this.devContainerContext ? ["exec", "-i", "-w", this.devContainerContext.containerWorkspaceRoot, this.devContainerContext.containerId, this.serverConfig.command, ...this.serverConfig.args] : this.serverConfig.args;
       this.process = (0, import_child_process3.spawn)(command, args, {
@@ -18565,7 +18565,7 @@ Install with: ${this.serverConfig.installHint}`
       });
       this.initialize().then(() => {
         this.initialized = true;
-        resolve5();
+        resolve6();
       }).catch(reject);
     });
   }
@@ -18709,13 +18709,13 @@ Install with: ${this.serverConfig.installHint}`
     const message = `Content-Length: ${Buffer.byteLength(content)}\r
 \r
 ${content}`;
-    return new Promise((resolve5, reject) => {
+    return new Promise((resolve6, reject) => {
       const timeoutHandle = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new Error(`LSP request '${method}' timed out after ${effectiveTimeout}ms`));
       }, effectiveTimeout);
       this.pendingRequests.set(id, {
-        resolve: resolve5,
+        resolve: resolve6,
         reject,
         timeout: timeoutHandle
       });
@@ -18791,7 +18791,7 @@ ${content}`;
       }
     });
     this.openDocuments.add(hostUri);
-    await new Promise((resolve5) => setTimeout(resolve5, 100));
+    await new Promise((resolve6) => setTimeout(resolve6, 100));
   }
   /**
    * Close a document
@@ -18952,13 +18952,13 @@ ${content}`;
     if (this.diagnostics.has(uri)) {
       return Promise.resolve();
     }
-    return new Promise((resolve5) => {
+    return new Promise((resolve6) => {
       let resolved = false;
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           this.diagnosticWaiters.delete(uri);
-          resolve5();
+          resolve6();
         }
       }, timeoutMs);
       const existing = this.diagnosticWaiters.get(uri) || [];
@@ -18966,7 +18966,7 @@ ${content}`;
         if (!resolved) {
           resolved = true;
           clearTimeout(timer);
-          resolve5();
+          resolve6();
         }
       });
       this.diagnosticWaiters.set(uri, existing);
@@ -20247,13 +20247,13 @@ function validateToolPath(inputPath) {
   if (!isToolPathRestricted()) {
     return resolved;
   }
-  const projectRoot = getWorktreeRoot() || process.cwd();
-  const normalizedRoot = (0, import_path12.normalize)(projectRoot);
+  const projectRoot2 = getWorktreeRoot() || process.cwd();
+  const normalizedRoot = (0, import_path12.normalize)(projectRoot2);
   const normalizedPath = (0, import_path12.normalize)(resolved);
   const rel = (0, import_path12.relative)(normalizedRoot, normalizedPath);
   if (rel.startsWith("..") || (0, import_path12.isAbsolute)(rel)) {
     throw new Error(
-      `Path restricted: '${inputPath}' is outside the project root '${projectRoot}'. Disable via security.restrictToolPaths in .claude/omc.jsonc or unset OMC_SECURITY.`
+      `Path restricted: '${inputPath}' is outside the project root '${projectRoot2}'. Disable via security.restrictToolPaths in .claude/omc.jsonc or unset OMC_SECURITY.`
     );
   }
   return resolved;
@@ -20675,10 +20675,255 @@ Replacement: ${replacement}
 };
 var astTools = [astGrepSearchTool, astGrepReplaceTool];
 
+// src/tools/codex-tools.ts
+var import_child_process6 = require("child_process");
+var import_fs11 = require("fs");
+var import_os4 = require("os");
+var import_path13 = require("path");
+var NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+var DEFAULT_TIMEOUT_SEC = 1800;
+function projectRoot() {
+  return process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+}
+function stateDir() {
+  const sid = process.env.CLAUDE_CODE_SESSION_ID ?? "no-session";
+  return (0, import_path13.join)(projectRoot(), ".agent-memory", "codex", sid);
+}
+function stateFile(name) {
+  return (0, import_path13.join)(stateDir(), `${name}.json`);
+}
+function readState(name) {
+  try {
+    return JSON.parse((0, import_fs11.readFileSync)(stateFile(name), "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function writeState(name, state) {
+  (0, import_fs11.mkdirSync)(stateDir(), { recursive: true });
+  (0, import_fs11.writeFileSync)(stateFile(name), JSON.stringify(state, null, 2) + "\n", "utf-8");
+}
+function textResult(text, isError = false) {
+  return { content: [{ type: "text", text }], isError };
+}
+function invalidName(name) {
+  return textResult(
+    `invalid name "${name}": must match ${NAME_PATTERN.source}`,
+    true
+  );
+}
+function runCodexExec(opts) {
+  const tmpDir = (0, import_fs11.mkdtempSync)((0, import_path13.join)((0, import_os4.tmpdir)(), "codex-mcp-"));
+  const lastMessageFile = (0, import_path13.join)(tmpDir, "last-message.txt");
+  const args = ["exec"];
+  if (opts.resumeUuid) args.push("resume", opts.resumeUuid);
+  args.push(
+    "--json",
+    "--output-last-message",
+    lastMessageFile,
+    "--dangerously-bypass-approvals-and-sandbox",
+    "--skip-git-repo-check"
+  );
+  if (opts.model) args.push("-m", opts.model);
+  args.push("-");
+  return new Promise((resolvePromise) => {
+    const child = (0, import_child_process6.spawn)("codex", args, {
+      cwd: projectRoot(),
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let stdoutBuf = "";
+    let stderrBuf = "";
+    let threadId = null;
+    const agentMessages = [];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, opts.timeoutSec * 1e3);
+    const processLine = (line) => {
+      if (!line) return;
+      try {
+        const event = JSON.parse(line);
+        if (event.type === "thread.started" && typeof event.thread_id === "string") {
+          threadId = event.thread_id;
+        } else if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") {
+          agentMessages.push(event.item.text);
+        }
+      } catch {
+      }
+    };
+    child.stdout.on("data", (chunk) => {
+      stdoutBuf += chunk.toString("utf-8");
+      let nl;
+      while ((nl = stdoutBuf.indexOf("\n")) !== -1) {
+        const line = stdoutBuf.slice(0, nl).trim();
+        stdoutBuf = stdoutBuf.slice(nl + 1);
+        processLine(line);
+      }
+    });
+    child.stderr.on("data", (chunk) => {
+      stderrBuf = (stderrBuf + chunk.toString("utf-8")).slice(-4e3);
+    });
+    const finish = (exitCode) => {
+      clearTimeout(timer);
+      processLine(stdoutBuf.trim());
+      let lastMessage = "";
+      try {
+        lastMessage = (0, import_fs11.readFileSync)(lastMessageFile, "utf-8");
+      } catch {
+      }
+      (0, import_fs11.rmSync)(tmpDir, { recursive: true, force: true });
+      resolvePromise({
+        exitCode,
+        timedOut,
+        threadId,
+        agentMessages,
+        lastMessage,
+        stderrTail: stderrBuf.trim()
+      });
+    };
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      (0, import_fs11.rmSync)(tmpDir, { recursive: true, force: true });
+      resolvePromise({
+        exitCode: null,
+        timedOut: false,
+        threadId: null,
+        agentMessages: [],
+        lastMessage: "",
+        stderrTail: `failed to spawn codex: ${err.message}`
+      });
+    });
+    child.on("close", finish);
+    child.stdin.on("error", () => {
+    });
+    child.stdin.write(opts.message);
+    child.stdin.end();
+  });
+}
+function deliverReply(result, outputFile, meta) {
+  const body = result.lastMessage || result.agentMessages.join("\n\n");
+  if (!outputFile) {
+    return textResult(body || "(empty reply)");
+  }
+  const target = (0, import_path13.isAbsolute)(outputFile) ? outputFile : (0, import_path13.resolve)(projectRoot(), outputFile);
+  (0, import_fs11.mkdirSync)((0, import_path13.dirname)(target), { recursive: true });
+  (0, import_fs11.writeFileSync)(target, body, "utf-8");
+  return textResult(
+    `Reply from codex agent "${meta.name}" saved to ${target} (${Buffer.byteLength(body, "utf-8")} bytes)`
+  );
+}
+function execFailure(result, timeoutSec) {
+  if (result.timedOut) {
+    return textResult(`codex exec timed out after ${timeoutSec}s`, true);
+  }
+  return textResult(
+    `codex exec failed (exit ${result.exitCode})${result.stderrTail ? `:
+${result.stderrTail}` : ""}`,
+    true
+  );
+}
+var timeoutSchema = external_exports.number().int().min(1).optional().describe(`Timeout in seconds (default: ${DEFAULT_TIMEOUT_SEC})`);
+var outputFileSchema = external_exports.string().optional().describe(
+  "If set, write the reply to this file (relative paths resolve against the project root) and return only the path. Omit to return the reply inline."
+);
+var codexAgentTool = {
+  name: "codex_agent",
+  description: `Start a named GPT conversation via the Codex CLI (Agent-style, but backed by OpenAI models).
+
+Creates a new codex session, remembers name \u2192 session mapping (scoped to this Claude session), and returns the reply. Continue the conversation with codex_send using the same name.
+
+Runs with full disk access in the project directory (sandbox bypassed by design \u2014 intended for already-isolated environments).`,
+  annotations: {
+    readOnlyHint: false,
+    openWorldHint: true
+  },
+  schema: {
+    name: external_exports.string().regex(NAME_PATTERN, "must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$").describe("Name for this conversation; address it later via codex_send"),
+    message: external_exports.string().min(1).describe("First message (task/prompt) for the GPT agent"),
+    model: external_exports.string().optional().describe("OpenAI model id (e.g. gpt-5.4). Omit to use the codex config default."),
+    output_file: outputFileSchema,
+    timeout: timeoutSchema
+  },
+  handler: async (args) => {
+    if (!NAME_PATTERN.test(args.name)) {
+      return invalidName(args.name);
+    }
+    if (readState(args.name)) {
+      return textResult(
+        `codex agent "${args.name}" already exists in this session. Use codex_send to continue it, or pick another name.`,
+        true
+      );
+    }
+    const timeoutSec = args.timeout ?? DEFAULT_TIMEOUT_SEC;
+    const model = args.model ?? null;
+    const result = await runCodexExec({ model, message: args.message, timeoutSec });
+    if (result.timedOut || result.exitCode !== 0) {
+      return execFailure(result, timeoutSec);
+    }
+    if (!result.threadId) {
+      return textResult(
+        "codex exec succeeded but no thread.started event was found in the --json stream; cannot persist the session mapping. Raw reply:\n" + (result.lastMessage || result.agentMessages.join("\n\n")),
+        true
+      );
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    writeState(args.name, {
+      uuid: result.threadId,
+      model,
+      createdAt: now,
+      lastUsedAt: now
+    });
+    return deliverReply(result, args.output_file, { name: args.name });
+  }
+};
+var codexSendTool = {
+  name: "codex_send",
+  description: `Continue a named GPT conversation created by codex_agent (SendMessage-style).
+
+Resumes the underlying codex session with its original model; prior context is retained.`,
+  annotations: {
+    readOnlyHint: false,
+    openWorldHint: true
+  },
+  schema: {
+    name: external_exports.string().regex(NAME_PATTERN, "must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$").describe("Name of the conversation to continue (as given to codex_agent)"),
+    message: external_exports.string().min(1).describe("Next message for the GPT agent"),
+    output_file: outputFileSchema,
+    timeout: timeoutSchema
+  },
+  handler: async (args) => {
+    if (!NAME_PATTERN.test(args.name)) {
+      return invalidName(args.name);
+    }
+    const state = readState(args.name);
+    if (!state) {
+      return textResult(
+        `No codex agent named "${args.name}" in this session. Create it first with codex_agent.`,
+        true
+      );
+    }
+    const timeoutSec = args.timeout ?? DEFAULT_TIMEOUT_SEC;
+    const result = await runCodexExec({
+      resumeUuid: state.uuid,
+      model: state.model,
+      message: args.message,
+      timeoutSec
+    });
+    if (result.timedOut || result.exitCode !== 0) {
+      return execFailure(result, timeoutSec);
+    }
+    writeState(args.name, { ...state, lastUsedAt: (/* @__PURE__ */ new Date()).toISOString() });
+    return deliverReply(result, args.output_file, { name: args.name });
+  }
+};
+var codexTools = [codexAgentTool, codexSendTool];
+
 // src/mcp/tool-registry.ts
 var allTools = [
   ...lspTools,
-  ...astTools
+  ...astTools,
+  ...codexTools
 ];
 function zodTypeToJsonSchema(zodType) {
   const result = {};

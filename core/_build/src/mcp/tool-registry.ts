@@ -15,6 +15,7 @@
 
 import { lspTools } from '../tools/lsp-tools.js';
 import { astTools } from '../tools/ast-tools.js';
+import { codexTools } from '../tools/codex-tools.js';
 import { z } from 'zod';
 
 /** Minimal tool definition shape shared across all tool families. */
@@ -37,6 +38,7 @@ export interface ToolDef {
 export const allTools: ToolDef[] = [
   ...(lspTools as unknown as ToolDef[]),
   ...(astTools as unknown as ToolDef[]),
+  ...(codexTools as unknown as ToolDef[]),
 ];
 
 // ---------------------------------------------------------------------------
