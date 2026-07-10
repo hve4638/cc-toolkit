@@ -10,6 +10,7 @@
  * Identical reminders are throttled per session (SHA-256 of the message,
  * 5-min cooldown) so the same nudge is not re-injected on every tool call.
  * State: <projectRoot>/.agent-memory/pre-tool-advisory/<session_id>.json
+ * (IO via lib/agent-memory.mjs — 워크스페이스가 없으면 아무것도 만들지 않는다)
  *
  * Hook contract (docs/claude-code-plugin-mechanics.md):
  *   stdin  : JSON { tool_name, tool_input, session_id, cwd, ... }
@@ -18,8 +19,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readJson, resolveProjectRoot, writeFileAtomic } from './lib/agent-memory.mjs';
 import { readStdin } from './lib/stdin.mjs';
 
 function rulesForTool(toolName) {
@@ -39,7 +39,7 @@ function rulesForTool(toolName) {
 }
 
 // --- advisory throttle (omc #3163) -------------------------------------------
-const THROTTLE_SUBDIR = '.agent-memory/pre-tool-advisory';
+const THROTTLE_SUBDIR = 'pre-tool-advisory';
 const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000;
 
 function cooldownMs() {
@@ -54,49 +54,36 @@ function nowMs() {
   return Number.isFinite(raw) ? raw : Date.now();
 }
 
-function getProjectRoot(data) {
-  return process.env.CLAUDE_PROJECT_DIR ?? data?.cwd ?? process.cwd();
-}
-
-function throttleStatePath(projectRoot, sessionId) {
+function throttleStateRel(sessionId) {
   // WHY: sessionId 가 파일명에 들어가므로 경로 조작 방지로 화이트리스트.
   const safe = typeof sessionId === 'string' && /^[A-Za-z0-9._-]+$/.test(sessionId)
     ? sessionId
     : '_global';
-  return join(projectRoot, THROTTLE_SUBDIR, `${safe}.json`);
+  return `${THROTTLE_SUBDIR}/${safe}.json`;
 }
 
 // 발사해야 하면 true 를 돌려주며 상태를 갱신한다. 쿨다운 안이면 false.
 // WHY: 우리 메시지는 정적 rulesForTool 결과뿐이라 키 수가 도구 종류로
 //      제한된다 — 업스트림 같은 엔트리 pruning 없이도 파일이 커지지 않는다.
-function shouldEmitAdvisory(statePath, message) {
+function shouldEmitAdvisory(projectRoot, relPath, message) {
   const cooldown = cooldownMs();
   if (cooldown <= 0) return true;
 
   const now = nowMs();
   const key = createHash('sha256').update(message).digest('hex');
-  try {
-    let entries = {};
-    try {
-      const parsed = JSON.parse(readFileSync(statePath, 'utf-8'));
-      if (parsed?.entries && typeof parsed.entries === 'object') entries = parsed.entries;
-    } catch { /* 없거나 깨진 상태 → 빈 것으로 시작 */ }
+  const parsed = readJson(projectRoot, relPath);
+  const entries = parsed?.entries && typeof parsed.entries === 'object' ? parsed.entries : {};
 
-    const last = Number(entries[key]);
-    // 처음이거나 · 시계 역행이거나 · 쿨다운 경과 시 발사
-    const emit = !Number.isFinite(last) || last > now || now - last >= cooldown;
-    if (!emit) return false;
+  const last = Number(entries[key]);
+  // 처음이거나 · 시계 역행이거나 · 쿨다운 경과 시 발사
+  const emit = !Number.isFinite(last) || last > now || now - last >= cooldown;
+  if (!emit) return false;
 
-    entries[key] = now;
-    mkdirSync(dirname(statePath), { recursive: true });
-    const tmp = `${statePath}.tmp.${process.pid}`;
-    writeFileSync(tmp, JSON.stringify({ entries }), { mode: 0o600 });
-    renameSync(tmp, statePath);
-    return true;
-  } catch {
-    // fail-open: 상태 IO 실패가 안전 출력을 침묵시켜선 안 된다. 차라리 재발사.
-    return true;
-  }
+  entries[key] = now;
+  // fail-open: 워크스페이스 부재·IO 실패로 상태를 못 남겨도 발사는 한다 —
+  // 상태 IO 가 안전 출력을 침묵시켜선 안 된다.
+  writeFileAtomic(projectRoot, relPath, JSON.stringify({ entries }));
+  return true;
 }
 
 async function main() {
@@ -112,8 +99,7 @@ async function main() {
     return;
   }
 
-  const statePath = throttleStatePath(getProjectRoot(data), data?.session_id);
-  if (!shouldEmitAdvisory(statePath, rule)) {
+  if (!shouldEmitAdvisory(resolveProjectRoot(data), throttleStateRel(data?.session_id), rule)) {
     process.stdout.write(JSON.stringify({ continue: true, suppressOutput: true }));
     return;
   }

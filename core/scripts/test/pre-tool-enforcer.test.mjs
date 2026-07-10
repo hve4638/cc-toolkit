@@ -125,6 +125,16 @@ test('session_id with path separators falls back to _global (no traversal)', asy
   });
 });
 
+// 가드레일: wt-destroy 등으로 사라진 워크스페이스를 mkdir -p 로 되살리지 않는다.
+test('missing project root emits but creates nothing (no dead-workspace revival)', async () => {
+  await withTmpDir(async (dir) => {
+    const gone = join(dir, 'destroyed-worktree');
+    const r = await runHook({ toolName: 'Bash', sessionId: 's1', projectDir: gone, nowMs: 1_000_000 });
+    assert.match(emitted(r), /Prefer dedicated tools/);
+    assert.equal(existsSync(gone), false);
+  });
+});
+
 test('corrupted state file still emits (fail-open)', async () => {
   await withTmpDir(async (dir) => {
     mkdirSync(throttleDir(dir), { recursive: true });

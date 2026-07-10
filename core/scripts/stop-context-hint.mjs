@@ -15,22 +15,14 @@
  * Fail-open everywhere: any error → { continue:true, suppressOutput:true }.
  */
 
-import { existsSync, readFileSync, unlinkSync } from 'node:fs';
-import { basename, isAbsolute, join, relative } from 'node:path';
+import { basename, isAbsolute, relative } from 'node:path';
+import { readText, removeFile, resolveProjectRoot } from './lib/agent-memory.mjs';
 import { readStdin } from './lib/stdin.mjs';
 
-const FLAG_SUBDIR = '.agent-memory/context-hint';
+const FLAG_SUBDIR = 'context-hint';
 
 function ok() {
   process.stdout.write(JSON.stringify({ continue: true, suppressOutput: true }));
-}
-
-// WHY: hook payload.cwd 는 훅 발화 시점 cwd 라 사용자 cd 나 서브에이전트
-//      호출 위치에 휩쓸린다. CLAUDE_PROJECT_DIR 우선 (stop-force-continue 와 동일).
-function getProjectRoot(hookInput) {
-  return process.env.CLAUDE_PROJECT_DIR
-    ?? hookInput?.cwd
-    ?? process.cwd();
 }
 
 function displayPath(projectRoot, p) {
@@ -47,19 +39,14 @@ async function main() {
   if (data?.hook_event_name !== 'Stop') return ok();
   if (!data?.session_id) return ok();
 
-  const projectRoot = getProjectRoot(data);
-  const flagPath = join(projectRoot, FLAG_SUBDIR, `${data.session_id}.jsonl`);
-  if (!existsSync(flagPath)) return ok();
-
-  let lines;
-  try {
-    lines = readFileSync(flagPath, 'utf-8').split('\n');
-  } catch {
-    return ok();
-  }
+  const projectRoot = resolveProjectRoot(data);
+  const flagRel = `${FLAG_SUBDIR}/${data.session_id}.jsonl`;
+  const flagContent = readText(projectRoot, flagRel);
+  if (flagContent === null) return ok();
+  const lines = flagContent.split('\n');
   // WHY: 메시지 구성 전에 지운다 — 이후 어디서 실패하든 낡은 플래그가
   //      다음 Stop 마다 같은 힌트를 반복하지 않는다.
-  try { unlinkSync(flagPath); } catch { /* best-effort */ }
+  removeFile(projectRoot, flagRel);
 
   const groups = new Map();
   for (const line of lines) {

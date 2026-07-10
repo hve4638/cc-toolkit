@@ -83,6 +83,10 @@
 
 ## 플러그인 작업 규칙
 
+### 프로젝트 스코프 `.agent-memory` 쓰기는 lib 경유
+
+`<projectRoot>/.agent-memory/` 아래에 상태 파일을 만드는 core 코드는 `core/scripts/lib/agent-memory.mjs` 를 경유한다 — 직접 mkdir 금지. "워크스페이스가 없으면 아무것도 만들지 않는다" 가드 (wt-destroy 된 워크트리 부활 방지) 를 이 lib 한 곳이 보장한다. lib 을 import 할 수 없는 곳 (타 플러그인, TS 번들) 은 같은 가드를 자체 구현하고 WHY 주석으로 명시한다.
+
 ### /stage 호출 시 버전 bump 확인
 
 `/stage` (`core:stage`) 호출 시, 변경된 파일이 특정 플러그인 디렉터리 (예: `core/`, `oc-browser/`) 안에 있으면 해당 플러그인의 `.claude-plugin/plugin.json` 의 `version` 이 *이번 변경분에 맞춰 bump 됐는지* 먼저 확인한다. 안 했으면 적절한 단계로 bump 한 뒤 같이 스테이징한다.

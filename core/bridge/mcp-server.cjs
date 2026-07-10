@@ -20700,6 +20700,7 @@ function readState(name) {
   }
 }
 function writeState(name, state) {
+  if (!(0, import_fs11.existsSync)(projectRoot())) return;
   (0, import_fs11.mkdirSync)(stateDir(), { recursive: true });
   (0, import_fs11.writeFileSync)(stateFile(name), JSON.stringify(state, null, 2) + "\n", "utf-8");
 }

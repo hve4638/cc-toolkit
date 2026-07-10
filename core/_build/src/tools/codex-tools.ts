@@ -64,6 +64,11 @@ function readState(name: string): CodexAgentState | null {
 }
 
 function writeState(name: string, state: CodexAgentState): void {
+  // WHY: 워크스페이스가 이미 삭제됐으면 (wt-destroy 등) mkdir -p 가 죽은
+  //      워크스페이스를 되살리지 않도록 저장을 건너뛴다. 잃는 것은 resume
+  //      매핑뿐 (best-effort). mjs 훅들은 lib/agent-memory.mjs 로 같은 가드를
+  //      공유하지만 이 파일은 TS 번들이라 인라인으로 둔다.
+  if (!existsSync(projectRoot())) return;
   mkdirSync(stateDir(), { recursive: true });
   writeFileSync(stateFile(name), JSON.stringify(state, null, 2) + "\n", "utf-8");
 }
