@@ -1,5 +1,5 @@
 {
-  "description": "core hook chain — SessionStart instruction inject, PreToolUse rule reminder, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher",
+  "description": "core hook chain — SessionStart instruction inject, PreToolUse rule reminder + .banaction guard, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher",
   "hooks": {
     "SessionStart": [
       {
@@ -20,6 +20,16 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/pre-tool-enforcer.mjs",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/ban-actions.mjs",
             "timeout": 3
           }
         ]

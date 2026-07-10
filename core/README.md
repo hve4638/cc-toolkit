@@ -33,6 +33,7 @@
 | 외부 docs | `/docs-claude` | Claude Code llms.txt 링크 |
 | | `/docs-skills` | Claude Code skills 작성·배포 docs 링크 |
 | 도메인 지식 | `/knowledge-fsonl` | FSONL (Function-Styled Object Notation Lines) 포맷 스펙 |
+| | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
 | 스펙 | `/interview` | Socratic 질의응답으로 모호한 아이디어 → spec 파일. brownfield/greenfield 판정에 내장 `Explore` 에이전트 사용 |
 
@@ -95,6 +96,27 @@ AST 패턴 기반 2 개 툴: `ast_grep_search`, `ast_grep_replace`. 정규식의
 이름 기반 GPT 대화 2 개 툴: `codex_agent` (생성), `codex_send` (이어가기). 이름 → codex 세션 UUID·모델 매핑을 `<프로젝트>/.agent-memory/codex/<세션ID>/<이름>.json` 에 저장하므로 `claude --resume` 후에도 대화가 이어진다. resume 시 저장된 모델을 매번 `-m` 으로 재지정한다 (codex 는 세션 모델을 유지하지 않고 config 기본값으로 폴백).
 
 **의존**: 사용자 `PATH` 의 Codex CLI (`/core-setup` 으로 설치). 샌드박스 우회 플래그 내장 — 이미 격리된 환경에서의 사용을 전제.
+
+### 6. 액션 차단 (.banaction)
+
+**메커니즘**: PreToolUse 훅 (`scripts/ban-actions.mjs`, matcher `*`, timeout 3s)
+
+`~/.banaction` 와 `<프로젝트>/.banaction` 의 규칙을 병합해, 매칭되는 도구 호출을 실행 전에 deny 한다. 차단 시 규칙 원문이 사유로 모델에 전달되며, 규칙 파일의 이름·경로는 노출하지 않는다. 파일이 없으면 아무것도 하지 않는다.
+
+```
+# 주석
+git push --force
+Write: \.env$
+mcp__github__.*: .*
+```
+
+| 줄 형식 | 의미 |
+|---|---|
+| `<정규식>` | Bash `command` 가 매칭되면 차단 |
+| `<도구 매처>: <정규식>` | 도구명이 매처 (anchored 정규식) 에 맞고 `tool_input` 의 문자열 값 중 하나가 패턴에 매칭되면 차단. 콜론 뒤 공백 필수. 대상 도구가 Bash 면 `command` 만 검사 |
+| `# ...` | 주석 |
+
+잘못된 정규식은 폴백한다 — 패턴은 리터럴 substring 매칭, 도구 매처는 도구명 정확 일치. 백트래킹이 심한 정규식 규칙은 훅 타임아웃 (3s) 에 걸려 파일 전체가 조용히 무력화될 수 있다.
 
 ---
 
