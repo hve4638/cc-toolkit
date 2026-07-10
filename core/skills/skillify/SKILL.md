@@ -7,9 +7,9 @@ argument-hint: "[optional: short description or slug of the skill to create]"
 <skillify_instruction>
 # skillify
 
-Procedure for authoring a new skill following the [skillify-guide](../skillify-guide/SKILL.md) rules.
+Procedure for authoring a new skill following the [writing-great-skill](../writing-great-skill/SKILL.md) principles.
 
-The rules themselves (Frontmatter / Description / Body discipline) live in [skillify-guide](../skillify-guide/SKILL.md). This skill holds only the *authoring procedure*.
+The principles themselves (description, information hierarchy, pruning, local conventions) live in [writing-great-skill](../writing-great-skill/SKILL.md). This skill holds only the *authoring procedure*.
 
 ---
 
@@ -46,7 +46,7 @@ Agree with the user.
 
 ## Step 3. Write SKILL.ko.md
 
-Apply the §Frontmatter / §Description / §Body rules from [skillify-guide](../skillify-guide/SKILL.md) and save the Korean draft to `<location>/<slug>/SKILL.ko.md`.
+Apply every section of [writing-great-skill](../writing-great-skill/SKILL.md) and save the Korean draft to `<location>/<slug>/SKILL.ko.md`.
 
 ---
 

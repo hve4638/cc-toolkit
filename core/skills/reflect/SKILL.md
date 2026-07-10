@@ -145,7 +145,7 @@ description: "<trigger + WHY. Do not put rules here.>"
 <one or two cases where this rule does not apply. May be omitted entirely.>
 ```
 
-When writing the description, invoke the `skillify-guide` skill and apply its §Description rules. The WHY clause is abstracted from the `Past action` / `Signal` slots as a failure-mode generalization. The WHY clause must be written as a *trigger condition for the failure mode* (the context to be encountered again), not as a *retrospective fact* (what happened during the session).
+When writing the description, apply the description rules from [writing-great-skill](../writing-great-skill/SKILL.md). The WHY clause is abstracted from the `Past action` / `Signal` slots as a failure-mode generalization. The WHY clause must be written as a *trigger condition for the failure mode* (the context to be encountered again), not as a *retrospective fact* (what happened during the session).
 
 #### CLAUDE.md cell
 

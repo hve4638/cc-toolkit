@@ -7,9 +7,9 @@ argument-hint: "[선택사항: 만들 스킬의 짧은 설명 또는 슬러그]"
 <skillify_instruction>
 # skillify
 
-[skillify-guide](../skillify-guide/SKILL.ko.md) 규칙을 따라 새 스킬을 작성하는 절차.
+[writing-great-skill](../writing-great-skill/SKILL.ko.md) 원칙을 따라 새 스킬을 작성하는 절차.
 
-규칙 (Frontmatter / Description / Body 디시플린) 자체는 [skillify-guide](../skillify-guide/SKILL.ko.md) 를 참조한다. 이 스킬은 *작성 절차* 만 담는다.
+원칙 (description·정보 위계·가지치기·로컬 컨벤션) 자체는 [writing-great-skill](../writing-great-skill/SKILL.ko.md) 을 참조한다. 이 스킬은 *작성 절차* 만 담는다.
 
 ---
 
@@ -46,7 +46,7 @@ argument-hint: "[선택사항: 만들 스킬의 짧은 설명 또는 슬러그]"
 
 ## Step 3. SKILL.ko.md 작성
 
-[skillify-guide](../skillify-guide/SKILL.ko.md) 의 §Frontmatter / §Description / §Body 규칙을 적용해 한국어로 채워 `<location>/<slug>/SKILL.ko.md` 에 저장.
+[writing-great-skill](../writing-great-skill/SKILL.ko.md) 의 모든 절을 적용해 한국어로 채워 `<location>/<slug>/SKILL.ko.md` 에 저장.
 
 ---
 

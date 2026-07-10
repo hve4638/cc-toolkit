@@ -145,7 +145,7 @@ description: "<트리거 + WHY. 룰은 박지 않음>"
 <이 룰이 적용되지 않는 정상 케이스 1~2개. 비우면 통째 생략>
 ```
 
-description 작성 시 `skillify-guide` 스킬을 호출해 §Description 규칙을 적용한다. description 의 WHY 절은 `Past action` / `Signal` 슬롯에서 실패 유형을 추상화해 작성한다. WHY 절은 *회고 사실* (세션 중 일어난 일) 이 아니라 *실패 유형의 트리거 조건* (다시 마주칠 맥락) 으로만 쓴다.
+description 작성 시 [writing-great-skill](../writing-great-skill/SKILL.ko.md) 의 description 규칙을 적용한다. description 의 WHY 절은 `Past action` / `Signal` 슬롯에서 실패 유형을 추상화해 작성한다. WHY 절은 *회고 사실* (세션 중 일어난 일) 이 아니라 *실패 유형의 트리거 조건* (다시 마주칠 맥락) 으로만 쓴다.
 
 #### CLAUDE.md 셀
 
