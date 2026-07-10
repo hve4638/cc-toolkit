@@ -12,7 +12,7 @@ test('injects the skill body with the active banner', async () => {
   const out = await sessionstart({}, {});
   assert.ok(out && out.context, 'returns { context }');
   assert.ok(out.context.startsWith('SHOWCASE DISCIPLINE ACTIVE'));
-  assert.ok(out.context.includes('## Module loop'), 'contains the skill body');
+  assert.ok(out.context.includes('## Checkpoint loop'), 'contains the skill body');
 });
 
 test('strips frontmatter from the injected body', async () => {
