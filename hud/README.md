@@ -7,9 +7,9 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
 ## 설치
 
 ```bash
-/plugin marketplace add https://github.com/hve4638/hve-cc-marketplace
+/plugin marketplace add https://github.com/hve4638/cc-toolkit
 /plugin install hud@hve
-/hve:hud setup
+/hud setup
 ```
 
 마지막 단계가 wrapper 를 `~/.claude/hud/hud.mjs` 에 배치하고 `~/.claude/settings.json` 의
@@ -34,7 +34,7 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
 ## 제거
 
 ```bash
-/hve:hud uninstall     # wrapper + statusLine + hveHud 설정 모두 삭제
+/hud uninstall     # wrapper + statusLine + hveHud 설정 모두 삭제
 /plugin uninstall hud@hve
 ```
 

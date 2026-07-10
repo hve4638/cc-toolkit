@@ -1,5 +1,0 @@
-{
-  "name": "wiki",
-  "version": "0.1.0",
-  "description": "Persistent markdown knowledge base (Karpathy LLM Wiki) — auto-capture, session context injection, lint"
-}

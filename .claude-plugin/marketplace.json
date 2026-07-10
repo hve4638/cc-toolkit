@@ -15,12 +15,12 @@
     {
       "name": "core",
       "source": "./core",
-      "description": "Base bundle — 19 general-purpose agents + hooks (rule reminders, context guard) + MCP server (LSP + AST Grep) + common slash skills (commit/PR, review, handoff, docs, rules)"
+      "description": "Base bundle — runtime hooks, MCP (LSP + AST grep + Codex), generic agents, and common slash skills (commit/PR, review, handoff, docs, rules)"
     },
     {
       "name": "frame",
       "source": "./frame",
-      "description": "Opt-in code-work guardrails behind per-project markers (.inlay/.ponytail) — one dispatcher routes hook events to active guardrails"
+      "description": "Opt-in code-work guardrails behind per-project markers (.inlay/.ponytail/.showcase) — one dispatcher routes hook events to active guardrails"
     },
     {
       "name": "expert",
@@ -30,7 +30,7 @@
     {
       "name": "hud",
       "source": "./hud",
-      "description": "Heads-Up Display statusline — live session state (git, todos, ctx%, agents, ralph, bg tasks)"
+      "description": "Heads-Up Display statusline — live session state from Claude Code stdin (cwd, git branch, rate limits, context %, model)"
     },
     {
       "name": "oc-browser",
@@ -38,19 +38,9 @@
       "description": "Isolated headed Chromium in Docker via `oc-as <name> browser <action>` — host/vnc/headless modes, per-project containers"
     },
     {
-      "name": "inlay",
-      "source": "./inlay",
-      "description": "Code-work methodology guardrail for context preservation — INLAY.md, WHY: comments, domain terms"
-    },
-    {
       "name": "research",
       "source": "./research",
       "description": "Research workflow skills - journal, plan, report, commit"
-    },
-    {
-      "name": "wiki",
-      "source": "./wiki",
-      "description": "Persistent markdown knowledge base (Karpathy LLM Wiki) — MCP tools + SessionStart/PreCompact/Stop hooks"
     },
     {
       "name": "usefable",

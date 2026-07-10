@@ -48,8 +48,8 @@ Then tell the user to restart Claude Code.
 
 | Command | Action |
 |---|---|
-| `/hve:hud` or `/hve:hud setup` | Install wrapper and configure statusLine |
-| `/hve:hud uninstall` | Remove wrapper, `statusLine`, and `hveHud` keys |
+| `/hud` or `/hud setup` | Install wrapper and configure statusLine |
+| `/hud uninstall` | Remove wrapper, `statusLine`, and `hveHud` keys |
 
 ## Output (after setup + restart)
 
@@ -77,5 +77,5 @@ Set any element to `false` to hide it.
 
 ## Troubleshooting
 
-1. **Not showing** — Re-run `/hve:hud setup` and restart Claude Code.
-2. **Stale output** — Run `/hve:hud uninstall` then `/hve:hud setup`.
+1. **Not showing** — Re-run `/hud setup` and restart Claude Code.
+2. **Stale output** — Run `/hud uninstall` then `/hud setup`.

@@ -1,6 +1,6 @@
 {
   "name": "hud",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Heads-Up Display statusline — live session state from Claude Code stdin (cwd, git branch, rate limits, context %, model)",
   "author": {
     "name": "your-name-here"
