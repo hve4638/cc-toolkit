@@ -32,6 +32,8 @@
 | | `/pickup` | 이전 handoff 복원 후 `_archive/` 로 이동 |
 | 외부 docs | `/docs-claude` | Claude Code llms.txt 링크 |
 | | `/docs-skills` | Claude Code skills 작성·배포 docs 링크 |
+| 스킬 설명서 | `/man` | 스킬의 `MAN.md` 를 읽고 설명·질의응답. 인자 없으면 문서화된 스킬 색인 |
+| | `/mkman` | 스킬을 분석해 그 폴더에 `MAN.md` (사용자용 설명서) 생성 |
 | 도메인 지식 | `/knowledge-fsonl` | FSONL (Function-Styled Object Notation Lines) 포맷 스펙 |
 | | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
