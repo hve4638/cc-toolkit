@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+// chatrec launcher — runs the engine bundled in the skill folder (node-only, no deps).
+// core exposes <plugin-root>/bin on PATH, so `chatrec …` works anywhere.
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+await import(join(dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'chatrec', 'scripts', 'chatrec.mjs'))
+  .catch(e => { process.stderr.write(`chatrec: ${e?.message ?? e}\n`); process.exit(1); });

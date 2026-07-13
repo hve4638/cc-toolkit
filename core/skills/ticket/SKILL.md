@@ -12,16 +12,16 @@ Analyze a plugin problem that surfaced in the current session and store it as a 
 
 ## Workflow
 
-### 1. Locate the failure with ccrec
+### 1. Locate the failure with chatrec
 
-Use the `ccrec` skill to find the turns where the problem surfaced and extract just that span. That clip becomes `session.jsonl` in step 2, and its turn range fills `ccrec_range`.
+Use the `chatrec` skill to find the turns where the problem surfaced and extract just that span. That clip becomes `session.jsonl` in step 2, and its turn range fills `chatrec_range`.
 
 ### 2. Build the staging directory
 
 Create `.agent-memory/ticket/<timestamp>_<slug>/` (project-local, gitignored; timestamp from `date +"%Y-%m-%dT%H%M"`, slug kebab-case). Inside it:
 
 - `report.md` (required) — the frontmatter below plus prose.
-- `session.jsonl` (required) — the `ccrec clip` output from step 1.
+- `session.jsonl` (required) — the `chatrec clip` output from step 1.
 - `attachments/` (optional) — logs, repro files, screenshots.
 
 ### 3. Seal
@@ -47,7 +47,7 @@ confidence:       # CONFIRMED | SUSPECTED | SPECULATIVE
 summary:          # one-line title (feature + behavior + result)
 expected:         # intended behavior
 actual:           # observed behavior
-ccrec_range:      # "T<from>..T<to>"
+chatrec_range:      # "T<from>..T<to>"
 ```
 
 Do not add a `content_hash` field. Integrity comes from the archive sha256 (the filename) and `index.jsonl`.

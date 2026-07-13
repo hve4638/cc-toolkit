@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ccrec — slim, query, and extract the current Claude Code session transcript.
+// chatrec — slim, query, and extract the current Claude Code session transcript.
 // Subcommands: build | count | search | clip | filter. The engine is
 // deterministic; the model drives it via subcommands and consumes only small
 // outputs (never loading the whole transcript into context).
@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 process.stdout.on('error', err => { if (err.code === 'EPIPE') process.exit(0); throw err; });
 
 function die(msg) {
-  process.stderr.write(`ccrec: ${msg}\n`);
+  process.stderr.write(`chatrec: ${msg}\n`);
   process.exit(1);
 }
 
@@ -147,7 +147,7 @@ function buildRecords(txPath) {
 
 // ---- cache (auto, immutable) ----
 function cacheDir() {
-  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ccrec');
+  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'chatrec');
 }
 // Explicit --source keys by a hash of its resolved path (collision-resistant,
 // and never clashing with a session id); otherwise key by the unique session id.
@@ -224,7 +224,7 @@ function makeMatcher(args) {
 }
 
 function emit(recs, args) {
-  if (args.out) { writeJsonl(args.out, recs); process.stderr.write(`ccrec: wrote ${recs.length} records → ${args.out}\n`); }
+  if (args.out) { writeJsonl(args.out, recs); process.stderr.write(`chatrec: wrote ${recs.length} records → ${args.out}\n`); }
   else process.stdout.write(recs.map(r => JSON.stringify(r)).join('\n') + (recs.length ? '\n' : ''));
 }
 
@@ -236,7 +236,7 @@ function cmdBuild(args) {
   writeJsonl(cp, recs);
   if (args.out) writeJsonl(args.out, recs);
   const turns = recs.reduce((m, r) => Math.max(m, r.t || 0), 0);
-  process.stderr.write(`ccrec: built ${recs.length} records, ${turns} turns → ${cp}${args.out ? ` (+ ${args.out})` : ''}\n`);
+  process.stderr.write(`chatrec: built ${recs.length} records, ${turns} turns → ${cp}${args.out ? ` (+ ${args.out})` : ''}\n`);
 }
 
 function cmdCount(args) {
@@ -265,7 +265,7 @@ function cmdSearch(args) {
   const recs = getRecords(args).filter(makeMatcher(args));
   const lines = recs.map(r => `T${r.t}\t${r.role}\t${snippet(bodyOf(r), args.match)}`);
   if (lines.length) process.stdout.write(lines.join('\n') + '\n');
-  else process.stderr.write('ccrec: no matches\n');
+  else process.stderr.write('chatrec: no matches\n');
 }
 
 function cmdClip(args) {

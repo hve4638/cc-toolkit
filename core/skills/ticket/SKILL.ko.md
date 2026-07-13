@@ -12,16 +12,16 @@ argument-hint: "[무엇이 잘못됐나 — 문제 설명]"
 
 ## 워크플로우
 
-### 1. ccrec로 실패 구간 특정
+### 1. chatrec로 실패 구간 특정
 
-`ccrec` 스킬로 문제가 드러난 턴을 찾아 그 구간만 추출한다. 그 clip이 2단계의 `session.jsonl`이 되고, 턴 범위는 `ccrec_range`에 들어간다.
+`chatrec` 스킬로 문제가 드러난 턴을 찾아 그 구간만 추출한다. 그 clip이 2단계의 `session.jsonl`이 되고, 턴 범위는 `chatrec_range`에 들어간다.
 
 ### 2. 스테이징 디렉토리 빌드
 
 `.agent-memory/ticket/<timestamp>_<slug>/`를 만든다(프로젝트 로컬, gitignored; timestamp는 `date +"%Y-%m-%dT%H%M"`, slug은 kebab-case). 그 안에:
 
 - `report.md` (필수) — 아래 frontmatter + 산문.
-- `session.jsonl` (필수) — 1단계의 `ccrec clip` 결과.
+- `session.jsonl` (필수) — 1단계의 `chatrec clip` 결과.
 - `attachments/` (선택) — 로그, 재현 파일, 스크린샷.
 
 ### 3. 봉인
@@ -47,7 +47,7 @@ confidence:       # CONFIRMED | SUSPECTED | SPECULATIVE
 summary:          # 한 줄 제목 (기능 + 행위 + 결과)
 expected:         # 기대 동작
 actual:           # 실제 동작
-ccrec_range:      # "T<from>..T<to>"
+chatrec_range:      # "T<from>..T<to>"
 ```
 
 `content_hash` 필드는 두지 않는다. 무결성은 아카이브 sha256(파일명)과 `index.jsonl`로 일원화한다.
