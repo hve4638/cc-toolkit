@@ -1,0 +1,432 @@
+#!/usr/bin/env python3
+# vendored from /playground/00_active/vterminal (src/vterminal/cli.py) —
+# upstream is the source of truth; edit there and re-copy, not here.
+"""vt — tmux wrapper for agents.
+
+Runs everything on a dedicated tmux server (socket "vterm"), so nothing here
+can touch a human's default tmux. Sessions are addressed by a random 4-digit
+hex key handed out at creation; without the key a session cannot be targeted.
+"""
+
+import re
+import secrets
+import shlex
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+VERSION = "0.1.0"
+
+SOCKET = "vterm"
+KEY_LEN = 4
+KEY_RE = re.compile(r"^[0-9a-f]{4}$")
+HEX = "0123456789abcdef"
+SHELLS = {"bash", "zsh", "sh", "dash", "ksh", "fish"}
+HISTORY_LIMIT = "50000"
+DEFAULT_TIMEOUT = 60.0
+
+USAGE = """\
+vt — tmux for agents (isolated server, key-addressed sessions)
+
+global:
+  vt new [dir]                 create session (starts in dir, default: cwd), prints its key
+  vt ls                        list sessions: KEY  PANES  IDLE  PATH
+
+session (KEY is the 4-hex key from `vt new`):
+  vt KEY run [--timeout N] <cmd>   run cmd in the shell, wait, print output; exits with cmd's code
+  vt KEY send <text>               type text literally (no Enter appended)
+  vt KEY key <key...>              press keys: enter, esc, tab, space, up, c-c, f5, ...
+  vt KEY read [-n N | --all] [--ansi] [--pane %N]
+                                   capture screen (-n: last N scrollback lines, --all: everything)
+  vt KEY panes                     list panes: ID  ACTIVE  SIZE  COMMAND  PATH
+  vt KEY split [-h] [--at %N]      split pane (default: stacked, -h: side by side), prints new pane ID
+  vt KEY focus %N                  make pane the default target
+  vt KEY kill %N                   close one pane (refused for the last pane; use close)
+  vt KEY status                    show current path, running command, size
+  vt KEY close                     end the session
+
+key names (for `vt KEY key`):
+  enter esc tab space up down left right home end pgup pgdn bs del f1-f12
+  modifiers: c- (Ctrl), m- (Alt), s- (Shift) — e.g. c-c, m-b, c-m-x
+  anything else is passed to tmux as-is (BTab, IC, KP0-KP9, ...);
+  unknown names are typed as literal characters
+"""
+
+KEYMAP = {
+    "enter": "Enter", "esc": "Escape", "escape": "Escape", "tab": "Tab",
+    "space": "Space", "up": "Up", "down": "Down", "left": "Left",
+    "right": "Right", "bs": "BSpace", "backspace": "BSpace", "home": "Home",
+    "end": "End", "pgup": "PageUp", "pgdn": "PageDown", "del": "DC",
+}
+
+
+def die(msg, code=1):
+    print(f"vt: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def tmux(*args, check=True):
+    r = subprocess.run(
+        ["tmux", "-L", SOCKET, *args], capture_output=True, text=True
+    )
+    if check and r.returncode != 0:
+        die(r.stderr.strip() or f"tmux {args[0]} failed")
+    return r
+
+
+def session_exists(key):
+    return tmux("has-session", "-t", f"={key}", check=False).returncode == 0
+
+
+def require_session(key):
+    if not session_exists(key):
+        die(f"no session with key {key} (see `vt ls`)")
+
+
+def session_panes(key):
+    out = tmux("list-panes", "-t", f"={key}", "-F", "#{pane_id}").stdout
+    return out.split()
+
+
+def resolve_pane(key, pane):
+    """Panes are addressed by tmux pane IDs (%N), which are server-global;
+    restrict them to the session so a key can't reach another session."""
+    if pane not in session_panes(key):
+        die(f"pane {pane} is not in session {key} (see `vt {key} panes`)")
+    return pane
+
+
+def active_pane(key, fmt):
+    """Format string evaluated in the session's active pane. display-message
+    with a session target leaves pane_* variables empty; list-panes doesn't."""
+    return tmux("list-panes", "-t", f"={key}", "-f", "#{pane_active}",
+                "-F", fmt).stdout.rstrip("\n")
+
+
+def pane_state(key, pane):
+    """(shell pid, current command) of a pane, or None if the pane is gone."""
+    out = tmux("list-panes", "-t", f"={key}", "-F",
+               "#{pane_id}\t#{pane_pid}\t#{pane_current_command}", check=False).stdout
+    for line in out.splitlines():
+        pane_id, pid, cur = line.split("\t", 2)
+        if pane_id == pane:
+            return pid, cur
+    return None
+
+
+def shell_at_prompt(pid, cur):
+    """Best-effort: is the pane's shell sitting at its prompt? A shell running
+    only builtins reports itself as pane_current_command, so also check /proc:
+    at a prompt the shell sleeps (S) with no children, while a builtin loop
+    stays runnable (R). Returns False when unsure (no /proc), so `run` simply
+    falls back to its timeout."""
+    if cur not in SHELLS:
+        return False
+    try:
+        if Path(f"/proc/{pid}/task/{pid}/children").read_text().split():
+            return False
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+        return state == "S"
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------- global cmds
+
+def cmd_new(args):
+    d = Path(args[0]).resolve() if args else Path.cwd()
+    if not d.is_dir():
+        die(f"not a directory: {d}")
+    # history-limit must be in place before the first pane is created, and
+    # only a config file passed at server start can do that.
+    with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f:
+        f.write(f"set-option -g history-limit {HISTORY_LIMIT}\n")
+        conf = f.name
+    try:
+        for _ in range(100):
+            key = "".join(secrets.choice(HEX) for _ in range(KEY_LEN))
+            r = subprocess.run(
+                ["tmux", "-L", SOCKET, "-f", conf, "new-session",
+                 "-d", "-s", key, "-c", str(d), "-x", "200", "-y", "50"],
+                capture_output=True, text=True,
+            )
+            if r.returncode == 0:
+                print(key)
+                return
+            if "duplicate session" not in r.stderr:
+                die(r.stderr.strip())
+        die("could not allocate a key")
+    finally:
+        Path(conf).unlink(missing_ok=True)
+
+
+def cmd_ls():
+    r = tmux("list-sessions", "-F",
+             "#{session_name}\t#{session_path}\t#{session_activity}",
+             check=False)
+    rows = [ln.split("\t") for ln in r.stdout.splitlines()] if r.returncode == 0 else []
+    if not rows:
+        print("no sessions")
+        return
+    now = time.time()
+    print(f"{'KEY':<6}{'PANES':<7}{'IDLE':<8}PATH")
+    for name, path, activity in rows:
+        idle = int(now - int(activity))
+        idle_s = f"{idle}s" if idle < 60 else f"{idle // 60}m" if idle < 3600 else f"{idle // 3600}h"
+        print(f"{name:<6}{len(session_panes(name)):<7}{idle_s:<8}{path}")
+
+
+# --------------------------------------------------------------- session cmds
+
+def pop_flag(args, *names, value=False):
+    for i, a in enumerate(args):
+        if a in names:
+            if not value:
+                args.pop(i)
+                return True
+            if i + 1 >= len(args):
+                die(f"{a} needs a value")
+            args.pop(i)
+            return args.pop(i)
+    return None if value else False
+
+
+def cmd_run(key, args):
+    # vt's own flags are accepted only before the command; anything after the
+    # first non-flag token belongs to the command itself (`run ls -t` must
+    # reach the shell untouched).
+    timeout = DEFAULT_TIMEOUT
+    while args and args[0] in ("--timeout", "-t"):
+        if len(args) < 2:
+            die("run: --timeout needs a value")
+        try:
+            timeout = float(args[1])
+        except ValueError:
+            die(f"run: --timeout: not a number: {args[1]}")
+        args = args[2:]
+    if args and args[0] == "--":
+        args = args[1:]
+    if not args:
+        die("run: missing command")
+    cmd = " ".join(args)
+    if "\n" in cmd or "\r" in cmd:
+        die("run: multi-line commands are not supported; use send/key")
+    try:
+        shlex.split(cmd)
+    except ValueError as exc:
+        die(f"run: {exc} — this would leave the shell stuck at a continuation prompt")
+
+    pane, _, current = active_pane(
+        key, "#{pane_id}\t#{pane_current_command}").partition("\t")
+    if current not in SHELLS:
+        die(f"run: pane is busy running '{current}'; use send/key/read instead", 2)
+
+    nonce = secrets.token_hex(4)
+    begin, end, chan = f"VT>{nonce}", f"VT<{nonce}", f"vt-{nonce}"
+    composite = (
+        f" printf '%s\\n' '{begin}'; {cmd}; "
+        f"printf '{end}:%s\\n' \"$?\"; "
+        f"tmux -L {SOCKET} wait-for -S {chan}"
+    )
+    tmux("send-keys", "-t", pane, "-l", composite)
+    tmux("send-keys", "-t", pane, "Enter")
+    # Poll while waiting: the wait-for signal never comes if the command exits
+    # the shell (pane dies) or the epilogue is skipped (trailing '#', command
+    # waiting for stdin, wedged continuation prompt).
+    waiter = subprocess.Popen(["tmux", "-L", SOCKET, "wait-for", chan],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    deadline = time.monotonic() + timeout
+    idle_polls = 0
+    while True:
+        try:
+            waiter.wait(0.2)
+            break
+        except subprocess.TimeoutExpired:
+            if time.monotonic() >= deadline:
+                waiter.kill()
+                die(f"run: timed out after {timeout:g}s; the command may still be running "
+                    f"(`vt {key} read` to inspect, `vt {key} key c-c` to interrupt)", 124)
+            if not session_exists(key):
+                waiter.kill()
+                die(f"run: session {key} ended while the command was running "
+                    "(did the command exit the shell?)")
+            state = pane_state(key, pane)
+            if state is None:
+                waiter.kill()
+                die(f"run: pane {pane} closed while the command was running")
+            idle_polls = idle_polls + 1 if shell_at_prompt(*state) else 0
+            if idle_polls >= 8:  # shell has sat at a prompt ~1.6s with no signal
+                lines = tmux("capture-pane", "-p", "-J", "-t", pane,
+                             "-S", "-").stdout.splitlines()
+                # Only lines after the begin marker count: the echoed command
+                # line itself contains both marker strings.
+                if begin not in lines:
+                    waiter.kill()
+                    die(f"run: the command line never executed — the shell may be stuck "
+                        f"at a continuation prompt (`vt {key} key c-c` to reset)")
+                b = len(lines) - 1 - lines[::-1].index(begin)
+                if any(f"{end}:" in ln for ln in lines[b + 1:]):
+                    idle_polls = 0  # epilogue just ran; the signal is on its way
+                    continue
+                waiter.kill()
+                die(f"run: the shell is idle but vt's completion marker never ran — "
+                    f"trailing '#'? command waiting for input? (`vt {key} read` to inspect)")
+    if not session_exists(key):
+        die(f"run: session {key} ended while the command was running")
+
+    lines = tmux("capture-pane", "-p", "-J", "-t", pane, "-S", "-").stdout.splitlines()
+    marker = f"{end}:"
+    try:
+        b = len(lines) - 1 - lines[::-1].index(begin)
+        e = next(i for i in range(b + 1, len(lines)) if marker in lines[i])
+    except (ValueError, StopIteration):
+        die("run: output markers not found (scrollback overflow?)")
+    # Output without a trailing newline lands on the same line as the marker.
+    pos = lines[e].index(marker)
+    out_lines = lines[b + 1:e] + ([lines[e][:pos]] if pos else [])
+    if out_lines:
+        print("\n".join(out_lines))
+    rc = lines[e][pos + len(marker):].strip()
+    sys.exit(int(rc) if rc.isdigit() else 1)
+
+
+def cmd_send(key, args):
+    if not args:
+        die("send: missing text")
+    tmux("send-keys", "-t", f"={key}:", "-l", "--", " ".join(args))
+
+
+def cmd_key(key, args):
+    if not args:
+        die("key: missing key name")
+    def norm(k):
+        lk = k.lower()
+        if lk in KEYMAP:
+            return KEYMAP[lk]
+        m = re.match(r"^((?:[cms]-)+)(.+)$", lk)
+        if m:
+            return m.group(1).upper() + m.group(2)
+        if re.match(r"^f\d{1,2}$", lk):
+            return lk.upper()
+        return k
+    tmux("send-keys", "-t", f"={key}:", "--", *[norm(k) for k in args])
+
+
+def cmd_read(key, args):
+    ansi = pop_flag(args, "--ansi")
+    everything = pop_flag(args, "--all")
+    n = pop_flag(args, "-n", value=True)
+    pane = pop_flag(args, "--pane", value=True)
+    if args:
+        die(f"read: unexpected argument: {args[0]}")
+    t = resolve_pane(key, pane) if pane else f"={key}:"
+    cmd = ["capture-pane", "-p", "-J", "-t", t]
+    if ansi:
+        cmd.append("-e")
+    if everything:
+        cmd += ["-S", "-", "-E", "-"]
+    elif n:
+        try:
+            n = int(n)
+        except ValueError:
+            die(f"read: -n: not a number: {n}")
+        if n <= 0:
+            die("read: -n must be positive")
+        cmd += ["-S", f"-{n}"]
+    print(tmux(*cmd).stdout, end="")
+
+
+def cmd_panes(key):
+    out = tmux("list-panes", "-t", f"={key}", "-F",
+               "#{pane_id}\t#{?pane_active,*, }\t#{pane_width}x#{pane_height}"
+               "\t#{pane_current_command}\t#{pane_current_path}").stdout
+    print(out, end="")
+
+
+def cmd_split(key, args):
+    horizontal = pop_flag(args, "-h")
+    pop_flag(args, "-v")  # default; accepted for symmetry
+    at = pop_flag(args, "--at", value=True)
+    t = resolve_pane(key, at) if at else f"={key}:"
+    r = tmux("split-window", "-t", t, "-h" if horizontal else "-v",
+             "-c", "#{pane_current_path}", "-P", "-F", "#{pane_id}")
+    print(r.stdout.strip())
+
+
+def cmd_focus(key, args):
+    if not args:
+        die("focus: missing pane ID")
+    tmux("select-pane", "-t", resolve_pane(key, args[0]))
+
+
+def cmd_kill(key, args):
+    if not args:
+        die("kill: missing pane ID")
+    pane = resolve_pane(key, args[0])
+    if len(session_panes(key)) == 1:
+        die(f"kill: refusing to kill the last pane (use `vt {key} close`)")
+    tmux("kill-pane", "-t", pane)
+
+
+def cmd_status(key):
+    out = active_pane(key, "path:    #{pane_current_path}\n"
+                           "command: #{pane_current_command}\n"
+                           "size:    #{pane_width}x#{pane_height}")
+    print(out)
+    print(f"panes:   {len(session_panes(key))}")
+
+
+def cmd_close(key):
+    tmux("kill-session", "-t", f"={key}")
+
+
+# ----------------------------------------------------------------------- main
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(USAGE, end="")
+        return
+    if args[0] in ("--version", "version"):
+        print(f"vt {VERSION}")
+        return
+    if args[0] == "new":
+        return cmd_new(args[1:])
+    if args[0] == "ls":
+        return cmd_ls()
+    if not KEY_RE.match(args[0]):
+        die(f"unknown command or key: {args[0]} (see `vt --help`)")
+
+    key, rest = args[0], args[1:]
+    require_session(key)
+    if not rest:
+        die(f"missing subcommand for session {key} (see `vt --help`)")
+    sub, sub_args = rest[0], rest[1:]
+    if sub == "run":
+        cmd_run(key, sub_args)
+    elif sub == "send":
+        cmd_send(key, sub_args)
+    elif sub == "key":
+        cmd_key(key, sub_args)
+    elif sub == "read":
+        cmd_read(key, sub_args)
+    elif sub == "panes":
+        cmd_panes(key)
+    elif sub == "split":
+        cmd_split(key, sub_args)
+    elif sub == "focus":
+        cmd_focus(key, sub_args)
+    elif sub == "kill":
+        cmd_kill(key, sub_args)
+    elif sub == "status":
+        cmd_status(key)
+    elif sub == "close":
+        cmd_close(key)
+    else:
+        die(f"unknown subcommand: {sub} (see `vt --help`)")
+
+
+if __name__ == "__main__":
+    main()

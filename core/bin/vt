@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# vt launcher — engine lives in the skill folder.
+# core exposes <plugin-root>/bin on PATH, so `vt …` works anywhere.
+exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../skills/vt/scripts/vt" "$@"
