@@ -1,6 +1,7 @@
 ---
 name: issue-report
 description: "Write an issue report — a self-contained work order that a zero-context Claude session on a new branch can execute. Use when the user asks to distill the current session's findings into an issue report for another branch or session."
+disable-model-invocation: true
 argument-hint: "[issue topic]"
 ---
 

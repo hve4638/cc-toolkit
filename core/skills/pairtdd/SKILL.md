@@ -1,6 +1,7 @@
 ---
 name: pairtdd
 description: Use this skill when the user asks to run an adversarial pair-TDD session. Spawns a single tdd-adversary tester in the background; the main session itself is the implementer.
+disable-model-invocation: true
 argument-hint: "[task description]"
 ---
 

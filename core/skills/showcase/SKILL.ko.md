@@ -1,6 +1,7 @@
 ---
 name: showcase
 description: "데모 중심 작업 규율: 큰 코딩 작업을 demo/ 아래 실행 가능한 데모들로 만들고, 각 데모는 실물 핵심으로 불확실성 하나를 해소한다. 사용자가 'showcase' 를 말하거나, 큰 기능을 데모 우선으로 만들자고 하거나, 데모를 돌려보며 작업을 따라가고 싶어할 때 사용."
+disable-model-invocation: true
 ---
 
 # showcase

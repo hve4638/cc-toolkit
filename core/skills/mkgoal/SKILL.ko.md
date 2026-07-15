@@ -1,6 +1,7 @@
 ---
 name: mkgoal
 description: 작업 설명으로 바로 붙여넣을 수 있는 /goal 프롬프트(Goal/Context/Constraints/Done When)를 작성한다. 조건에 넣는 검증 명령은 모두 repo에서 실측한다. 사용자가 goal 조건 작성을 요청하거나 /goal로 작업을 끝까지 돌리려 할 때 사용한다.
+disable-model-invocation: true
 argument-hint: "[작업·목표 설명]"
 ---
 

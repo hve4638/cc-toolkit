@@ -1,6 +1,7 @@
 ---
 name: meta
 description: 작업 설명으로 새 프롬프트를 생성하거나 기존 프롬프트를 개선한다. 사용자가 프롬프트를 작성·다듬기·최적화하려 할 때 사용한다. 예: 'write a prompt for ...', 'improve this prompt', 'meta prompt', '프롬프트 만들어줘'.
+disable-model-invocation: true
 argument-hint: "[작업 설명 | 개선할 기존 프롬프트]"
 ---
 

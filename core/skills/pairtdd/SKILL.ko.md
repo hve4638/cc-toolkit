@@ -1,6 +1,7 @@
 ---
 name: pairtdd
 description: 사용자가 적대적 pair-TDD 세션 실행을 요청할 때 사용. 백그라운드에 tdd-adversary 테스터 하나만 띄우고 main 세션 자신이 구현자가 된다.
+disable-model-invocation: true
 argument-hint: "[수행할 task 설명]"
 ---
 

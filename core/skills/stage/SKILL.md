@@ -1,6 +1,7 @@
 ---
 name: stage
 description: Stage current changes by intent and recommend a consistent commit message. Does not commit.
+disable-model-invocation: true
 ---
 
 <stage_instruction>

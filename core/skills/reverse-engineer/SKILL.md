@@ -1,6 +1,7 @@
 ---
 name: reverse-engineer
 description: "Analyze an entire codebase and produce a structured report covering architecture, tech stack, and data flow. Use only when analyzing a whole codebase, not for single-file review or debugging."
+disable-model-invocation: true
 ---
 
 <reverse-engineer-instruction>

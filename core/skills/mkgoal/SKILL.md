@@ -1,6 +1,7 @@
 ---
 name: mkgoal
 description: Author a ready-to-paste /goal prompt (Goal/Context/Constraints/Done When) from a task description, grounding every verification command in the repo. Use when the user wants a goal condition written, or wants work to run under /goal until done.
+disable-model-invocation: true
 argument-hint: "[task or goal description]"
 ---
 

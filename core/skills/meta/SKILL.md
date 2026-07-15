@@ -1,6 +1,7 @@
 ---
 name: meta
 description: Generate a new prompt from a task description, or improve an existing prompt. Use when the user wants a prompt authored, refined, or optimized, such as 'write a prompt for ...', 'improve this prompt', 'meta prompt', or '프롬프트 만들어줘'.
+disable-model-invocation: true
 argument-hint: "[task description | existing prompt to improve]"
 ---
 

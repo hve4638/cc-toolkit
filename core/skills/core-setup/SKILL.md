@@ -1,6 +1,7 @@
 ---
 name: core-setup
 description: Install core runtime deps (@ast-grep/napi global, Codex CLI) and register Codex MCP server (user scope)
+disable-model-invocation: true
 ---
 
 # core setup

@@ -1,6 +1,7 @@
 ---
 name: issue-report
 description: "이슈 리포트 — 새 브랜치의 zero-context Claude 세션이 그대로 실행할 수 있는 자기완결 작업 지시서 — 를 작성한다. 사용자가 현재 세션의 분석 결과를 다른 브랜치·세션용 이슈 리포트로 증류하려 할 때 사용한다."
+disable-model-invocation: true
 argument-hint: "[이슈 주제]"
 ---
 

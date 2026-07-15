@@ -1,6 +1,7 @@
 ---
 name: stage
 description: 현재 변경을 의도 단위로 스테이징하고 일관된 커밋 메시지를 추천. 커밋은 하지 않음.
+disable-model-invocation: true
 ---
 
 <stage_instruction>

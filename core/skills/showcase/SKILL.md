@@ -1,6 +1,7 @@
 ---
 name: showcase
 description: "Demo-driven work discipline: build large coding work as runnable demos under demo/, each resolving one uncertainty with a real core. Use when the user says 'showcase', wants to build a large feature demo-first, or wants to follow the work by running demos."
+disable-model-invocation: true
 ---
 
 # showcase

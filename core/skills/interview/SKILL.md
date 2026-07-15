@@ -1,6 +1,7 @@
 ---
 name: interview
 description: Socratic interview with mathematical ambiguity gating to produce a crystal-clear spec
+disable-model-invocation: true
 argument-hint: "[--quick|--standard|--deep] <idea or vague description>"
 handoff: .agent-memory/specs/interview-{slug}.md
 ---

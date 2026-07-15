@@ -1,6 +1,7 @@
 ---
 name: cross-review
 description: "Have codex and a subagent review the same target, then cross-verify each other's reviews. Use when cross-verification of a review is needed."
+disable-model-invocation: true
 ---
 
 <cross-review>
