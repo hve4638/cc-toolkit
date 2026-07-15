@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+// usechrome launcher — runs the CLI bundled in the skill folder.
+// core exposes <plugin-root>/bin on PATH, so `usechrome …` works anywhere.
+// The plugin cache ships without node_modules (gitignored), so the first run
+// bootstraps playwright-core via `npm ci` against the committed lockfile.
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'usechrome', 'scripts');
+if (!existsSync(join(scripts, 'node_modules', 'playwright-core'))) {
+  process.stderr.write('usechrome: 최초 실행 — playwright-core 설치 중 (npm ci)…\n');
+  const r = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: scripts, stdio: ['ignore', 'ignore', 'inherit'] });
+  if (r.status !== 0) {
+    process.stderr.write(`usechrome: npm ci 실패 — ${scripts} 에서 직접 실행해 확인\n`);
+    process.exit(1);
+  }
+}
+await import(join(scripts, 'cli.mjs'))
+  .catch(e => { process.stderr.write(`usechrome: ${e?.message ?? e}\n`); process.exit(1); });
