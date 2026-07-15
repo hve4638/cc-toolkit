@@ -1,19 +1,23 @@
 ---
-name: showcase
-description: "Demo-driven work discipline: build large coding work as runnable demos under demo/, each resolving one uncertainty with a real core. Use when the user says 'showcase', wants to build a large feature demo-first, or wants to follow the work by running demos."
+name: demo-first
+description: "Demo-driven work discipline: build large coding work as runnable demos under demo/."
 disable-model-invocation: true
 ---
 
-# showcase
+# demo-first
 
 Build large coding work as demos under `demo/` that the user runs to follow the work's context.
+
+## Two phases
+
+- Phase 1 — present the demo candidates as a list: the question each resolves and what running it will show. The list is this phase's only output.
+- Phase 2 — build, starting after the user approves the list. When they adjust it, revise and re-present before building.
 
 ## Demo decomposition
 
 - Define each demo as one uncertainty to resolve — the question a person building by hand would check next (does the TUI launch at all, does a message from A reach B over the real transport, does the parsed record land in the database) — not as a unit of code structure.
 - Derive the order from how a person would build and check by hand: it runs at all → components connect → data flows through → real data replaces dummy → it looks right → the whole works together. Reorder per project; independent demos may proceed in parallel, and when demos build on each other's outputs, state the dependency order.
 - Cut a demo as a vertical slice when its question spans components.
-- Before building, present the demo candidates: the question each resolves and what running it will show.
 
 ## Demo artifacts
 
