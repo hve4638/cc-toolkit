@@ -105,8 +105,8 @@ test('Stop consumes flags into per-command hint lines and deletes the file', asy
     const parsed = JSON.parse(stdout);
     const lines = parsed.systemMessage.split('\n');
     assert.deepEqual(lines, [
-      'hint: SKILL.md modified. Consider running /writing-great-skill. (core/skills/foo/SKILL.md)',
-      'hint: CLAUDE.md modified. Consider running /writing-great-agents-md. (CLAUDE.md)',
+      '[hint] SKILL.md modified. Consider running /writing-great-skill. (core/skills/foo/SKILL.md)',
+      '[hint] CLAUDE.md modified. Consider running /writing-great-agents-md. (CLAUDE.md)',
     ]);
     assert.equal(parsed.decision, undefined);
     assert.ok(!existsSync(flagPath), 'flag file must be deleted after consumption');
@@ -127,7 +127,7 @@ test('duplicate edits dedupe; paths outside the project root stay absolute', asy
     const parsed = JSON.parse(stdout);
     assert.equal(
       parsed.systemMessage,
-      'hint: SKILL.ko.md modified. Consider running /writing-great-skill. (/outside/SKILL.ko.md)',
+      '[hint] SKILL.ko.md modified. Consider running /writing-great-skill. (/outside/SKILL.ko.md)',
     );
   });
 });

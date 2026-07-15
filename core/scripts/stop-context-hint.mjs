@@ -62,7 +62,7 @@ async function main() {
   const hints = [];
   for (const [cmd, paths] of groups) {
     const names = [...new Set([...paths].map((p) => basename(p)))].join(', ');
-    hints.push(`hint: ${names} modified. Consider running ${cmd}. (${[...paths].join(', ')})`);
+    hints.push(`[hint] ${names} modified. Consider running ${cmd}. (${[...paths].join(', ')})`);
   }
 
   process.stdout.write(JSON.stringify({
