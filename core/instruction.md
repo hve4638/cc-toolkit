@@ -21,6 +21,11 @@ Verify before claiming completion. Size appropriately: smallâ†’haiku, standardâ†
 If verification fails, keep iterating.
 </verification>
 
+<codex_support>
+Codex is available, which supports consulting OpenAI GPT models.
+"Use codex" or "ask GPT" means the `codex_agent` / `codex_send` MCP tools.
+</codex_support>
+
 <execution_protocols>
 Broad requests: explore first, then plan. 2+ independent tasks in parallel. `run_in_background` for builds/tests.
 Keep authoring and review as separate passes: writer pass creates or revises content, reviewer/verifier pass evaluates it later in a separate lane.

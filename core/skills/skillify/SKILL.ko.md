@@ -39,7 +39,7 @@ argument-hint: "[선택사항: 만들 스킬의 짧은 설명 또는 슬러그]"
 
 - kebab-case, 30자 이내, 영문
 - 가족이 있으면 prefix (`reflect-*`, `rule-*`)
-- 좋음: `git-rebase-no-edit-flag`, `codex-mcp-guide`
+- 좋음: `git-rebase-no-edit-flag`, `man-banaction`
 - 나쁨: `general-tips`, `mistakes`, `learning-20260430`
 
 ---

@@ -94,6 +94,8 @@ interface CodexExecResult {
   threadId: string | null;
   /** Concatenated agent_message texts from the JSONL stream (fallback body). */
   agentMessages: string[];
+  /** Error texts from the JSONL stream — with --json, failures land here, not on stderr. */
+  errorMessages: string[];
   lastMessage: string;
   stderrTail: string;
 }
@@ -133,6 +135,7 @@ function runCodexExec(opts: {
     let stderrBuf = "";
     let threadId: string | null = null;
     const agentMessages: string[] = [];
+    const errorMessages: string[] = [];
     let timedOut = false;
 
     const timer = setTimeout(() => {
@@ -152,6 +155,15 @@ function runCodexExec(opts: {
           typeof event.item.text === "string"
         ) {
           agentMessages.push(event.item.text);
+        } else if (
+          event.type === "item.completed" &&
+          event.item?.type === "error" &&
+          typeof event.item.message === "string"
+        ) {
+          errorMessages.push(event.item.message);
+        } else if (event.type === "error" && typeof event.message === "string") {
+          // turn.failed is skipped — it repeats the same message as this event
+          errorMessages.push(event.message);
         }
       } catch {
         // Non-JSON line (warnings etc.) — ignore
@@ -187,6 +199,7 @@ function runCodexExec(opts: {
         timedOut,
         threadId,
         agentMessages,
+        errorMessages,
         lastMessage,
         stderrTail: stderrBuf.trim(),
       });
@@ -200,6 +213,7 @@ function runCodexExec(opts: {
         timedOut: false,
         threadId: null,
         agentMessages: [],
+        errorMessages: [],
         lastMessage: "",
         stderrTail: `failed to spawn codex: ${err.message}`,
       });
@@ -233,14 +247,53 @@ function deliverReply(
   );
 }
 
-function execFailure(result: CodexExecResult, timeoutSec: number) {
+/** Model-rejection markers as of codex-cli 0.144.4 — fail-open if the wording drifts. */
+const MODEL_ERROR_PATTERN = /model is not supported|model metadata for/i;
+
+/** List available model slugs via `codex debug models`; empty array on any failure. */
+function fetchModelSlugs(timeoutMs = 10_000): Promise<string[]> {
+  return new Promise((resolvePromise) => {
+    const child = spawn("codex", ["debug", "models"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let out = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stdout.on("data", (chunk: Buffer) => {
+      out += chunk.toString("utf-8");
+    });
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolvePromise([]);
+    });
+    child.on("close", () => {
+      clearTimeout(timer);
+      try {
+        const parsed = JSON.parse(out) as { models?: Array<{ slug?: unknown }> };
+        resolvePromise(
+          (parsed.models ?? [])
+            .map((m) => m.slug)
+            .filter((s): s is string => typeof s === "string"),
+        );
+      } catch {
+        resolvePromise([]);
+      }
+    });
+  });
+}
+
+async function execFailure(result: CodexExecResult, timeoutSec: number) {
   if (result.timedOut) {
     return textResult(`codex exec timed out after ${timeoutSec}s`, true);
   }
-  return textResult(
-    `codex exec failed (exit ${result.exitCode})${result.stderrTail ? `:\n${result.stderrTail}` : ""}`,
-    true,
-  );
+  const detail = [...result.errorMessages, result.stderrTail]
+    .filter(Boolean)
+    .join("\n");
+  let message = `codex exec failed (exit ${result.exitCode})${detail ? `:\n${detail}` : ""}`;
+  if (MODEL_ERROR_PATTERN.test(detail)) {
+    const slugs = await fetchModelSlugs();
+    if (slugs.length) message += `\n\nAvailable models: ${slugs.join(", ")}`;
+  }
+  return textResult(message, true);
 }
 
 const timeoutSchema = z
@@ -283,7 +336,7 @@ Runs with full disk access in the project directory (sandbox bypassed by design 
     model: z
       .string()
       .optional()
-      .describe("OpenAI model id (e.g. gpt-5.4). Omit to use the codex config default."),
+      .describe("OpenAI model id. Omit to use the codex config default."),
     output_file: outputFileSchema,
     timeout: timeoutSchema,
   },

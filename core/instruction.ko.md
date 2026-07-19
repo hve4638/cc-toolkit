@@ -21,6 +21,11 @@
 검증이 실패하면 반복할 것.
 </verification>
 
+<codex_support>
+Codex 를 사용할 수 있으며, OpenAI GPT 모델에게 자문을 구하는 것을 지원한다.
+"codex 써" 또는 "GPT 에게 물어봐"는 `codex_agent` / `codex_send` MCP 도구를 뜻한다.
+</codex_support>
+
 <execution_protocols>
 광범위한 요청: 먼저 탐색 후 계획. 독립적인 작업 2개 이상은 병렬로. 빌드·테스트는 `run_in_background`.
 작성과 리뷰는 별도의 패스로 유지: writer 패스가 내용 생성·수정, reviewer/verifier 패스가 이후 별도 레인에서 평가.

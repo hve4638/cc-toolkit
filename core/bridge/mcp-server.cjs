@@ -20736,6 +20736,7 @@ function runCodexExec(opts) {
     let stderrBuf = "";
     let threadId = null;
     const agentMessages = [];
+    const errorMessages = [];
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -20749,6 +20750,10 @@ function runCodexExec(opts) {
           threadId = event.thread_id;
         } else if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") {
           agentMessages.push(event.item.text);
+        } else if (event.type === "item.completed" && event.item?.type === "error" && typeof event.item.message === "string") {
+          errorMessages.push(event.item.message);
+        } else if (event.type === "error" && typeof event.message === "string") {
+          errorMessages.push(event.message);
         }
       } catch {
       }
@@ -20779,6 +20784,7 @@ function runCodexExec(opts) {
         timedOut,
         threadId,
         agentMessages,
+        errorMessages,
         lastMessage,
         stderrTail: stderrBuf.trim()
       });
@@ -20791,6 +20797,7 @@ function runCodexExec(opts) {
         timedOut: false,
         threadId: null,
         agentMessages: [],
+        errorMessages: [],
         lastMessage: "",
         stderrTail: `failed to spawn codex: ${err.message}`
       });
@@ -20814,15 +20821,48 @@ function deliverReply(result, outputFile, meta) {
     `Reply from codex agent "${meta.name}" saved to ${target} (${Buffer.byteLength(body, "utf-8")} bytes)`
   );
 }
-function execFailure(result, timeoutSec) {
+var MODEL_ERROR_PATTERN = /model is not supported|model metadata for/i;
+function fetchModelSlugs(timeoutMs = 1e4) {
+  return new Promise((resolvePromise) => {
+    const child = (0, import_child_process6.spawn)("codex", ["debug", "models"], {
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    let out = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stdout.on("data", (chunk) => {
+      out += chunk.toString("utf-8");
+    });
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolvePromise([]);
+    });
+    child.on("close", () => {
+      clearTimeout(timer);
+      try {
+        const parsed = JSON.parse(out);
+        resolvePromise(
+          (parsed.models ?? []).map((m) => m.slug).filter((s) => typeof s === "string")
+        );
+      } catch {
+        resolvePromise([]);
+      }
+    });
+  });
+}
+async function execFailure(result, timeoutSec) {
   if (result.timedOut) {
     return textResult(`codex exec timed out after ${timeoutSec}s`, true);
   }
-  return textResult(
-    `codex exec failed (exit ${result.exitCode})${result.stderrTail ? `:
-${result.stderrTail}` : ""}`,
-    true
-  );
+  const detail = [...result.errorMessages, result.stderrTail].filter(Boolean).join("\n");
+  let message = `codex exec failed (exit ${result.exitCode})${detail ? `:
+${detail}` : ""}`;
+  if (MODEL_ERROR_PATTERN.test(detail)) {
+    const slugs = await fetchModelSlugs();
+    if (slugs.length) message += `
+
+Available models: ${slugs.join(", ")}`;
+  }
+  return textResult(message, true);
 }
 var timeoutSchema = external_exports.number().int().min(1).optional().describe(`Timeout in seconds (default: ${DEFAULT_TIMEOUT_SEC})`);
 var outputFileSchema = external_exports.string().optional().describe(
@@ -20842,7 +20882,7 @@ Runs with full disk access in the project directory (sandbox bypassed by design 
   schema: {
     name: external_exports.string().regex(NAME_PATTERN, "must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$").describe("Name for this conversation; address it later via codex_send"),
     message: external_exports.string().min(1).describe("First message (task/prompt) for the GPT agent"),
-    model: external_exports.string().optional().describe("OpenAI model id (e.g. gpt-5.4). Omit to use the codex config default."),
+    model: external_exports.string().optional().describe("OpenAI model id. Omit to use the codex config default."),
     output_file: outputFileSchema,
     timeout: timeoutSchema
   },
