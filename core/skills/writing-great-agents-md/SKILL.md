@@ -2,9 +2,9 @@
 name: writing-great-agents-md
 description: Reference for writing and editing context files (CLAUDE.md, AGENTS.md) — what earns a place in an always-loaded file. Pass file paths to review them against it.
 disable-model-invocation: true
-argument-hint: "[file paths]"
 ---
 
+<writing-great-agents-md>
 A context file — `CLAUDE.md`, `AGENTS.md` — is loaded into every session: permanent **context load**, every line spending tokens and attention on every turn whether the turn needs it or not. The principles of skill writing apply here in their harshest form, because nothing in this file loads on demand.
 
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.
@@ -33,5 +33,6 @@ Run the **no-op** test on every line: would the agent behave differently if it w
 ---
 
 When file paths follow, review each against every section above — the whole file, every principle — and fix violations.
+</writing-great-agents-md>
 
-Task: $ARGUMENTS
+$ARGUMENTS

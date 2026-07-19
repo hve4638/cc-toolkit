@@ -2,9 +2,9 @@
 name: writing-great-agents-md
 description: 컨텍스트 파일(CLAUDE.md, AGENTS.md)을 잘 작성·편집하기 위한 참조 — 상시 로드되는 파일에 들 자격. 파일 경로를 넘기면 그 기준으로 리뷰한다.
 disable-model-invocation: true
-argument-hint: "[파일 경로]"
 ---
 
+<writing-great-agents-md>
 `CLAUDE.md`·`AGENTS.md` 같은 컨텍스트 파일은 매 세션 로드된다: 영구적인 **context load**로, 그 턴에 필요하든 아니든 모든 줄이 매 턴 토큰과 주의를 지불한다. 스킬 작성 원칙이 여기서는 가장 혹독한 형태로 적용된다 — 이 파일의 어떤 것도 필요할 때 로드되지 않기 때문이다.
 
 **굵은 용어**는 [`GLOSSARY.ko.md`](GLOSSARY.ko.md)에 정의되어 있다; 전체 의미는 거기서 찾는다.
@@ -33,5 +33,6 @@ argument-hint: "[파일 경로]"
 ---
 
 파일 경로가 아래에 주어지면 각 파일을 위의 모든 절에 비추어 — 파일 전체에, 모든 원칙을 — 검토하고 위반을 고친다.
+</writing-great-agents-md>
 
-Task: $ARGUMENTS
+$ARGUMENTS

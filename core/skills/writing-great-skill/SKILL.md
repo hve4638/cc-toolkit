@@ -2,9 +2,9 @@
 name: writing-great-skill
 description: Reference for writing, editing, and reviewing skills — the vocabulary and principles that make a skill predictable. Pass file paths to review them against it.
 disable-model-invocation: true
-argument-hint: "[file paths]"
 ---
 
+<writing-great-skill>
 A skill exists to wrangle determinism out of a stochastic system. **Predictability** — the agent taking the same _process_ every run, not producing the same output — is the root virtue; every lever below serves it.
 
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.
@@ -91,7 +91,7 @@ Use these to diagnose issues the user may be having with the skill.
 House rules in this repository, beyond the portable principles above.
 
 - Third person and the imperative throughout, description and body alike — no first or second person.
-- The `Task:` line at the very end is the argument substitution point: the user's input is spliced in there before the agent reads the text, so the token it carries is gone by run time. Everywhere else, refer to user input in natural language ("the files the user named") rather than by the token.
+- The very end of the body is the argument substitution point: the user's input is spliced in there before the agent reads the text, so the token it carries is gone by run time. Everywhere else, refer to user input in natural language ("the files the user named") rather than by the token.
 - `SKILL.md` and `SKILL.ko.md` in the same folder are a translation pair: editing one updates the other in the same session. Section structure, bullet counts, identifiers and messages inside code fences, and functional frontmatter fields match.
 - The body holds instructions and their objects only. Meta about the skill itself (audience, prerequisites, importance) and rationale tails after a dash on a bullet fail the **no-op** test — delete the sentence.
 - Prose stays in plain register: no colloquial verbs carried over from conversation, bold marks glossary terms rather than emphasis, one term per concept, forward slashes in paths.
@@ -100,5 +100,6 @@ House rules in this repository, beyond the portable principles above.
 ---
 
 When file paths follow, review each against every section above — the whole file, every principle — and fix violations.
+</writing-great-skill>
 
-Task: $ARGUMENTS
+$ARGUMENTS
