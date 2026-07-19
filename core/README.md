@@ -37,7 +37,7 @@
 | 도메인 지식 | `/knowledge-fsonl` | FSONL (Function-Styled Object Notation Lines) 포맷 스펙 |
 | | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
-| 스펙 | `/interview` | Socratic 질의응답으로 모호한 아이디어 → spec 파일. brownfield/greenfield 판정에 내장 `Explore` 에이전트 사용 |
+| 스펙 | `/interview` | 계획·결정·아이디어를 질문 하나씩 + 추천 답으로 집요하게 인터뷰. 종료는 사용자가 선언, 요약 파일은 opt-in |
 
 ## 자동 규약
 
