@@ -33,8 +33,7 @@
  *   FRAME_FORCE_CONTINUE_DEBUG       save transcript tail to .agent-memory/stop (default: off)
  */
 
-import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, openSync, readSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   readJson, removeFile, resolveProjectRoot, statePath, writeFileAtomic,
@@ -42,6 +41,8 @@ import {
 import { readStdin } from './lib/stdin.mjs';
 
 const TAIL_LINES_DEFAULT = 50;
+const TAIL_CHUNK_BYTES = 256 * 1024;
+const TAIL_CHUNK_MAX_BYTES = 8 * 1024 * 1024;
 const STATE_SUBDIR = 'unexpected-stop';
 const SOFT_LIMIT = 5;
 const SOFT_WINDOW_MS = 5 * 60 * 1000;
@@ -87,15 +88,40 @@ function readState(projectRoot, relPath) {
   return Array.isArray(parsed?.stops) ? { stops: parsed.stops.slice() } : { stops: [] };
 }
 
+// WHY: tail(1) 셸아웃은 Windows 에 tail 이 없어 기능 전체를 조용히 무력화했다.
+//      순수 Node 로 파일 끝 청크만 읽는다. 바이트 오프셋으로 자른 첫 줄은
+//      대부분 반토막이라 버려야 하므로, 온전한 n 줄이 나올 때까지 청크를
+//      두 배씩 늘린다 (상한 도달 시 확보된 줄만으로 우아하게 축소).
 function tailLines(path, n) {
+  let fd;
   try {
-    return execSync(`tail -n ${n} ${JSON.stringify(path)}`, {
-      encoding: 'utf-8',
-      timeout: 1000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    for (let chunk = TAIL_CHUNK_BYTES; ; chunk *= 2) {
+      const start = Math.max(0, size - chunk);
+      const buf = Buffer.alloc(size - start);
+      const bytesRead = readSync(fd, buf, 0, buf.length, start);
+      let text = buf.subarray(0, bytesRead).toString('utf-8');
+      if (start > 0) {
+        const nl = text.indexOf('\n');
+        if (nl === -1) {
+          if (chunk >= TAIL_CHUNK_MAX_BYTES) return '';
+          continue;
+        }
+        text = text.slice(nl + 1);
+      }
+      const lines = text.split('\n');
+      if (lines[lines.length - 1] === '') lines.pop();
+      if (start === 0 || lines.length >= n || chunk >= TAIL_CHUNK_MAX_BYTES) {
+        return lines.length ? lines.slice(-n).join('\n') + '\n' : '';
+      }
+    }
   } catch {
     return '';
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* already closed */ }
+    }
   }
 }
 

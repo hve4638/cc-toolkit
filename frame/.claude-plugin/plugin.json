@@ -1,6 +1,6 @@
 {
   "name": "frame",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Opt-in code-work guardrails behind per-project markers — one dispatcher routes hook events to active guardrails (inlay, ponytail)",
   "author": {
     "name": "Hve"

@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/session-start-inject.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/session-start-inject.mjs",
             "timeout": 3
           }
         ]

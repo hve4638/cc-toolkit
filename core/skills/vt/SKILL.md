@@ -1,12 +1,14 @@
 ---
 name: vt
-description: "Drive terminal sessions via the vt CLI: run shell commands with captured output and exit codes, type into interactive programs (TUIs, REPLs, installers), and read the rendered screen as text. Use when work needs a persistent shell, keystrokes, or screen observation over time; for stateless one-shot commands, plain Bash suffices."
+description: "Drive terminal sessions via the vt CLI: run shell commands with captured output and exit codes, type into interactive programs (TUIs, REPLs, installers), and read the rendered screen as text. Use when work needs a persistent shell, keystrokes, or screen observation over time; for stateless one-shot commands, plain Bash suffices. Linux/macOS only."
 ---
 
 <vt_instruction>
 # vt
 
 Run terminal work in key-addressed virtual-terminal sessions. A session is a persistent shell with a screen: run commands in it, type into interactive programs, read the screen back as text.
+
+Supported on Linux/macOS (requires tmux). Not available on native Windows.
 
 ## Commands
 

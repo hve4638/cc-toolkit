@@ -108,6 +108,42 @@ test('normal-end-turn passes through', async () => {
   assert.equal(parsed.decision, undefined);
 });
 
+test('detection survives a chunk boundary cutting a huge line (partial first line dropped)', async () => {
+  await withTmpDir(async (tmpDir) => {
+    // 256KB 청크의 시작이 이 거대 줄 한가운데에 떨어지도록 만든다. 반토막
+    // 첫 줄을 버린 뒤 온전한 줄이 모자라면 청크를 늘려 끝까지 읽어야 한다.
+    const hugeLine = JSON.stringify({ type: 'system', pad: 'x'.repeat(300 * 1024) });
+    const base = readFileSync(join(FIXTURES_DIR, 'abnormal-assistant-tool-use.jsonl'), 'utf-8');
+    const outPath = join(tmpDir, 'big.jsonl');
+    writeFileSync(outPath, hugeLine + '\n' + base);
+    const { stdout } = await runHook(outPath, `test-${Date.now()}-5`);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.decision, 'block');
+    assert.ok(
+      parsed.reason?.startsWith('[UNEXPECTED STOP ALERT]'),
+      `reason should start with alert prefix, got: ${parsed.reason}`,
+    );
+  });
+});
+
+test('huge abnormal entry cut by the chunk boundary is reassembled by the grow loop', async () => {
+  await withTmpDir(async (tmpDir) => {
+    // abnormal 엔트리 자체를 256KB 보다 크게 만들어 파일 끝에 둔다. 첫 청크는
+    // 이 줄 중간에서 시작하므로, 반토막을 버리고 청크를 키워 줄 전체를
+    // 복원해야만 감지가 성립한다 — drop 과 grow 둘 다 load-bearing.
+    const raw = readFileSync(join(FIXTURES_DIR, 'abnormal-assistant-tool-use.jsonl'), 'utf-8');
+    const lines = raw.split('\n').filter(Boolean);
+    const last = JSON.parse(lines[lines.length - 1]);
+    last.pad = 'x'.repeat(300 * 1024);
+    lines[lines.length - 1] = JSON.stringify(last);
+    const outPath = join(tmpDir, 'huge-abnormal.jsonl');
+    writeFileSync(outPath, lines.join('\n') + '\n');
+    const { stdout } = await runHook(outPath, `test-${Date.now()}-6`);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.decision, 'block');
+  });
+});
+
 test('stale tool_result timestamp passes through (race-guard FP fix)', async () => {
   await withTmpDir(async (tmpDir) => {
     const fixture = materializeFixture(

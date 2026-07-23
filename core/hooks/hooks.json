@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/session-start-inject.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/session-start-inject.mjs",
             "timeout": 3
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/pre-tool-enforcer.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/pre-tool-enforcer.mjs",
             "timeout": 3
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/ban-actions.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/ban-actions.mjs",
             "timeout": 3
           }
         ]
@@ -41,12 +41,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/stop-force-continue.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/stop-force-continue.mjs",
             "timeout": 3
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/stop-context-hint.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/stop-context-hint.mjs",
             "timeout": 3
           }
         ]
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/hooks.mjs PostToolUse",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hooks.mjs PostToolUse",
             "timeout": 5
           }
         ]

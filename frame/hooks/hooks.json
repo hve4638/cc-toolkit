@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs SessionStart",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs SessionStart",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs UserPromptSubmit",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs UserPromptSubmit",
             "timeout": 5
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs PreToolUse",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs PreToolUse",
             "timeout": 5
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs PostToolUse",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs PostToolUse",
             "timeout": 5
           }
         ]
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs PostCompact",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs PostCompact",
             "timeout": 5
           }
         ]
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs Stop",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs Stop",
             "timeout": 5
           }
         ]
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/scripts/run.cjs \"$CLAUDE_PLUGIN_ROOT\"/scripts/dispatch.mjs SubagentStop",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/dispatch.mjs SubagentStop",
             "timeout": 5
           }
         ]
