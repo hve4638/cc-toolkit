@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// skilltrace — scan local Claude Code transcripts (~/.claude/projects) and
+// tracetranscript — scan local Claude Code transcripts (~/.claude/projects) and
 // aggregate usage statistics: skills, slash commands, subagents, MCP tools,
 // models/tokens, session cwd paths.
 //
@@ -18,13 +18,13 @@ import readline from 'node:readline';
 process.stdout.on('error', err => { if (err.code === 'EPIPE') process.exit(0); throw err; });
 
 function die(msg) {
-  process.stderr.write(`skilltrace: ${msg}\n`);
+  process.stderr.write(`tracetranscript: ${msg}\n`);
   process.exit(1);
 }
 
 const USAGE = `usage:
-  skilltrace scan   [--root DIR] [--since D] [--until D] [--out FILE]
-  skilltrace report [FILE|-] [--since D] [--until D] [--by day|week|month]
+  tracetranscript scan   [--root DIR] [--since D] [--until D] [--out FILE]
+  tracetranscript report [FILE|-] [--since D] [--until D] [--by day|week|month]
                     [--path SUBSTR] [--top N] [--format md|json] [--out FILE] [--root DIR]
 
 dates: ISO (2026-06-01) or relative (7d, 4w, 1m, 1y)
@@ -217,7 +217,7 @@ async function cmdScan(a) {
   const n = await scanAll(a, rec => out.write(JSON.stringify(rec) + '\n'));
   if (a.out) {
     await new Promise(res => out.end(res));
-    process.stderr.write(`skilltrace: ${n} sessions -> ${a.out}\n`);
+    process.stderr.write(`tracetranscript: ${n} sessions -> ${a.out}\n`);
   }
 }
 
@@ -382,7 +382,7 @@ function buildViews(A, top) {
 function renderMd(v, top) {
   const out = [];
   const named = rows => rows.map(r => [r.name, r.n, day(r.last)]);
-  out.push(`# skilltrace — ${v.sessions} sessions (${day(v.first)} -> ${day(v.last)})`);
+  out.push(`# tracetranscript — ${v.sessions} sessions (${day(v.first)} -> ${day(v.last)})`);
   out.push(`entries ${v.entries} · user turns ${v.userTurns} · subagent transcripts ${v.subagentFiles}`);
   out.push('');
 
@@ -433,7 +433,7 @@ async function cmdReport(a) {
   let records = await readRecords(a);
   const invalid = records.filter(r => !Number.isFinite(Date.parse(r.last))).length;
   if (invalid) {
-    process.stderr.write(`skilltrace: skipped ${invalid} record(s) without a valid last timestamp\n`);
+    process.stderr.write(`tracetranscript: skipped ${invalid} record(s) without a valid last timestamp\n`);
     records = records.filter(r => Number.isFinite(Date.parse(r.last)));
   }
   const since = parseWhen(a.since, '--since');
@@ -461,7 +461,7 @@ async function cmdReport(a) {
     : chunks.map(c => (c.label ? `═══ ${c.label} ═══\n\n` : '') + renderMd(c.view, a.top)).join('\n');
   if (a.out) {
     try { fs.writeFileSync(a.out, doc); } catch (err) { die(`cannot write ${a.out}: ${err.message}`); }
-    process.stderr.write(`skilltrace: report -> ${a.out}\n`);
+    process.stderr.write(`tracetranscript: report -> ${a.out}\n`);
   } else {
     process.stdout.write(doc);
   }

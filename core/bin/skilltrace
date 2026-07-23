@@ -1,7 +1,0 @@
-#!/usr/bin/env node
-// skilltrace launcher — runs the engine bundled in the skill folder (node-only, no deps).
-// core exposes <plugin-root>/bin on PATH, so `skilltrace …` works anywhere.
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-await import(join(dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'skilltrace', 'scripts', 'skilltrace.mjs'))
-  .catch(e => { process.stderr.write(`skilltrace: ${e?.message ?? e}\n`); process.exit(1); });
