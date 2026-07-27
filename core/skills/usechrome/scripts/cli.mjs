@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // usechrome — 경량 네이티브 브라우저 코어.
-// openclaw 전체 대신 playwright-core + 시스템 chrome(CDP) 만으로 같은 액션을 낸다.
+// playwright-core + 시스템 chrome(CDP) 만으로 액션을 낸다.
 //
 // 상태 유지 모델: chrome 를 데몬으로 한 번 띄워두고, 매 호출은 CDP 로 붙었다 뗀다.
 // snapshot 으로 받은 ref 가 다음 click 호출까지 유효하려면 브라우저가 호출 사이에

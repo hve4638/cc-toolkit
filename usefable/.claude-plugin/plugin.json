@@ -1,6 +1,6 @@
 {
   "name": "usefable",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Fable-tier agents — fable- prefixed top-model variants of core's executor and review/verification agents",
   "author": {
     "name": "Hve"

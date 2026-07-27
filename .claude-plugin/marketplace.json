@@ -33,11 +33,6 @@
       "description": "Heads-Up Display statusline — live session state from Claude Code stdin (cwd, git branch, rate limits, context %, model)"
     },
     {
-      "name": "oc-browser",
-      "source": "./oc-browser",
-      "description": "Isolated headed Chromium in Docker via `oc-as <name> browser <action>` — host/vnc/headless modes, per-project containers"
-    },
-    {
       "name": "research",
       "source": "./research",
       "description": "Research workflow skills - journal, plan, report, commit"

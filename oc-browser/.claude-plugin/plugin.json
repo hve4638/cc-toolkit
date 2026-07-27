@@ -1,9 +1,0 @@
-{
-  "name": "oc-browser",
-  "version": "0.3.0",
-  "description": "Drive an isolated, headed Chromium inside a Docker container via `oc-as <name> browser <action>`. Names support display-mode prefixes — `host:<rest>` renders directly on the host's X server, `vnc:<rest>` exposes noVNC on a free port (use `vnc:<port>:<rest>` to pin the port), and bare `<rest>` runs headless. Each resolved name is its own container with its own cookies/cache, scoped per project (`oc-browser-<projTag>-<name>`). Container lifecycle is manual: created on first call, removed via `oc-rm <name>` (which bundles container + docker volume; `--rm-shared` also deletes host files, `--all` wipes the project). Use `oc-list` to see active instances. A sibling `oc browser <action>` command skips Docker entirely for already-isolated environments (e.g. Claude itself running inside a container) — it forwards to a pinned `npx openclaw` on the current env. Provides /oc-setup to build the image and place `oc-as`, `oc-list`, `oc-rm`, `oc` on PATH.",
-  "author": { "name": "local" },
-  "license": "MIT",
-  "keywords": ["browser", "automation", "docker", "openclaw", "playwright", "chromium", "vnc", "x11"],
-  "skills": "./skills/"
-}

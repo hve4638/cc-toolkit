@@ -81,7 +81,7 @@
 
 ### /stage 호출 시 버전 bump 확인
 
-`/stage` (`core:stage`) 호출 시, 변경된 파일이 특정 플러그인 디렉터리 (예: `core/`, `oc-browser/`) 안에 있으면 해당 플러그인의 `.claude-plugin/plugin.json` 의 `version` 이 *이번 변경분에 맞춰 bump 됐는지* 먼저 확인한다. 안 했으면 적절한 단계로 bump 한 뒤 같이 스테이징한다.
+`/stage` (`core:stage`) 호출 시, 변경된 파일이 특정 플러그인 디렉터리 (예: `core/`, `frame/`) 안에 있으면 해당 플러그인의 `.claude-plugin/plugin.json` 의 `version` 이 *이번 변경분에 맞춰 bump 됐는지* 먼저 확인한다. 안 했으면 적절한 단계로 bump 한 뒤 같이 스테이징한다.
 
 bump 단계 기준:
 - patch — 오탈자·사소한 문구 수정·주석 등 minor 미만 변경

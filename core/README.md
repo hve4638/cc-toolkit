@@ -54,14 +54,14 @@
 
 ### 1. 범용 에이전트 카탈로그
 
-13 개 plugin-independent 서브에이전트. 다른 플러그인·스킬에서 `Agent(subagent_type="<name>", ...)` 로 호출 가능.
+11 개 plugin-independent 서브에이전트. 다른 플러그인·스킬에서 `Agent(subagent_type="<name>", ...)` 로 호출 가능.
 
 | 카테고리 | 에이전트 |
 |---|---|
 | 탐색·계획 | analyst, planner, architect |
-| 구현 | executor, code-simplifier |
+| 구현 | executor |
 | 검증 | verifier, critic, code-reviewer, security-reviewer, test-engineer, tdd-adversary |
-| 기타 | document-specialist, git-master |
+| 기타 | document-specialist |
 
 ### 2. 툴 사용 규율 리마인더
 
