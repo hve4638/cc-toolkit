@@ -4,7 +4,7 @@
  * Callers pass paths relative to `.agent-memory` (e.g. 'pre-tool-advisory/s1.json')
  * and never touch mkdir or the base directory themselves.
  *
- * 가드레일: 워크스페이스 (projectRoot) 가 이미 삭제됐으면 (wt-destroy 등) 어떤
+ * 가드레일: 워크스페이스 (projectRoot) 가 이미 삭제됐으면 (wt destroy 등) 어떤
  * 쓰기도 하지 않는다 — mkdir -p 가 죽은 워크스페이스를 .agent-memory 만 담은
  * 빈 폴더로 되살리는 것을 이 모듈 한 곳에서 구조적으로 차단한다.
  * 새 상태 파일 경로를 만들 땐 반드시 이 모듈을 경유한다 (직접 mkdir 금지).

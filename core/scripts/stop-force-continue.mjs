@@ -176,7 +176,7 @@ async function main() {
   if (!transcriptPath || !existsSync(transcriptPath)) return ok();
 
   const projectRoot = resolveProjectRoot(data);
-  // WHY: 죽은 워크스페이스 (wt-destroy 등) 의 쓰기는 lib 가드가 이미 막지만,
+  // WHY: 죽은 워크스페이스 (wt destroy 등) 의 쓰기는 lib 가드가 이미 막지만,
   //      block 결정·디버그 tail 등 이후 작업 전체가 무의미하므로 즉시 종료.
   if (!existsSync(projectRoot)) return ok();
 

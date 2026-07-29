@@ -23,7 +23,7 @@ test('writeFileAtomic creates dirs and writes under .agent-memory', async () => 
   });
 });
 
-// 가드레일 본체: 죽은 워크스페이스를 되살리지 않는다 (wt-destroy 부활 방지)
+// 가드레일 본체: 죽은 워크스페이스를 되살리지 않는다 (wt destroy 부활 방지)
 test('writeFileAtomic on missing project root creates nothing', async () => {
   await withTmpDir(async (dir) => {
     const gone = join(dir, 'destroyed-worktree');
