@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * OMC HUD - Main Entry Point
+ * HUD - Main Entry Point
  *
  * Statusline command that visualizes session state from Claude Code stdin.
  * Receives stdin JSON from Claude Code and outputs a formatted statusline.

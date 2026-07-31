@@ -18,7 +18,7 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
 ## 출력 예시
 
 ```
-📁 cc-plugin | 🌿 main | ⏳ 5h:10%(4d12h) wk:40%(2d12h) | 📦 context:24% | 💻 Opus 4.7 (1M context)
+📁 cc-plugin | 🌿 cc-plugin(main) | ⏳ 5h:10%(4d12h) wk:40%(2d12h) | 📦 context:24% | 💻 Opus 4.7 (1M context)
 ```
 
 표시 요소:
@@ -26,7 +26,7 @@ Claude Code statusline — 세션 하단에 현재 디렉토리·브랜치·rate
 | 요소 | 내용 |
 |---|---|
 | `📁 {cwd}` | 현재 디렉토리 basename (`$HOME` 은 `~` 로 치환). 실행 베이스 cwd 가 사라졌으면 (워크트리 삭제 등) `📁 missing` 으로 표시하고 브랜치는 생략 |
-| `🌿 {branch}` | Git 브랜치. detached HEAD 면 커밋 해시 7자 |
+| `🌿 {repo}({branch})` | 레포명과 Git 브랜치. 레포명은 origin 원격이 있으면 그 이름, 없으면 로컬 체크아웃 디렉터리명. detached HEAD 면 브랜치 자리에 커밋 해시 7자 |
 | `⏳ 5h:… wk:…` | 5시간 / 7일 rate limit 사용률과 남은 시간 |
 | `📦 context:{pct}%` | context window 사용률 |
 | `💻 {model}` | Claude Code 가 보내주는 모델 display_name |

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * OMC HUD - Main Entry Point
+ * HUD - Main Entry Point
  *
  * Statusline command that visualizes session state from Claude Code stdin.
  * Receives stdin JSON from Claude Code and outputs a formatted statusline.
@@ -53,7 +53,7 @@ function getHudPluginVersion(): string {
 function showDiagnostic(): void {
   const version = getHudPluginVersion();
   const configDir = getClaudeConfigDir();
-  const hudScript = join(configDir, "hud", "omc-hud.mjs");
+  const hudScript = join(configDir, "hud", "hud.mjs");
   const settingsFile = join(configDir, "settings.json");
 
   const hudExists = existsSync(hudScript);
@@ -62,9 +62,9 @@ function showDiagnostic(): void {
     const settings = JSON.parse(readFileSync(settingsFile, "utf-8"));
     const sl = settings.statusLine;
     if (sl && typeof sl === "object" && typeof (sl as Record<string, unknown>).command === "string") {
-      statusLineOk = ((sl as Record<string, unknown>).command as string).includes("omc-hud");
+      statusLineOk = ((sl as Record<string, unknown>).command as string).includes("hud/hud.mjs");
     } else if (typeof sl === "string") {
-      statusLineOk = sl.includes("omc-hud");
+      statusLineOk = sl.includes("hud/hud.mjs");
     }
   } catch {
     /* settings.json missing or invalid */
@@ -73,12 +73,12 @@ function showDiagnostic(): void {
   const config = readHudConfig();
   const preset = config.preset ?? "default";
 
-  console.log(`[OMC] HUD v${version} | preset: ${preset}`);
+  console.log(`[HUD] v${version} | preset: ${preset}`);
   console.log(`  HUD script:  ${hudExists ? "installed" : "MISSING"}`);
   console.log(`  statusLine:  ${statusLineOk ? "configured" : "NOT configured"}`);
 
   if (!hudExists || !statusLineOk) {
-    console.log("  Run /oh-my-claudecode:hud setup to fix.");
+    console.log("  Run /hud setup to fix.");
   } else {
     console.log("  HUD renders automatically inside Claude Code sessions.");
   }
@@ -183,13 +183,13 @@ async function main(): Promise<void> {
         error.message.includes("Cannot find module"));
 
     if (isInstallError) {
-      console.log("[OMC] run /omc-setup to install properly");
+      console.log("[HUD] run /hud setup to install properly");
     } else {
       // Output fallback message to stdout for status line visibility
-      console.log("[OMC] HUD error - check stderr");
+      console.log("[HUD] error - check stderr");
       // Log actual runtime errors to stderr for debugging
       console.error(
-        "[OMC HUD Error]",
+        "[HUD Error]",
         error instanceof Error ? error.message : error,
       );
     }
@@ -199,5 +199,5 @@ async function main(): Promise<void> {
 // Export for programmatic use
 export { main };
 
-// Auto-run (unconditional so dynamic import() via omc-hud.mjs wrapper works correctly)
+// Auto-run (unconditional so dynamic import() via the hud.mjs wrapper works correctly)
 main();

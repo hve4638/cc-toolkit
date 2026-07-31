@@ -3,7 +3,7 @@
  *
  * Composes the statusline output as a single line:
  *
- *   📁 {cwd} | 🌿 {branch} | ⏳ 5h:... wk:... | 📦 context:{pct}% | 💻 {model}
+ *   📁 {cwd} | 🌿 {repo}({branch}) | ⏳ 5h:... wk:... | 📦 context:{pct}% | 💻 {model}
  */
 import { DEFAULT_HUD_CONFIG } from "./types.js";
 import { stringWidth, getCharWidth } from "../utils/string-width.js";

@@ -29,6 +29,25 @@ export declare function resetGitCache(): void;
  */
 export declare function getGitRepoName(cwd?: string): string | null;
 /**
+ * Get the repository name from the local checkout.
+ *
+ * Uses --git-common-dir rather than --show-toplevel so a linked worktree
+ * reports the main checkout's name instead of the worktree directory name
+ * (which the cwd element already shows).
+ *
+ * @param cwd - Working directory to run git command in
+ * @returns Repository name or null if not in a git repo
+ */
+export declare function getLocalRepoName(cwd?: string): string | null;
+/**
+ * Resolve the repository name to display: the origin remote's name when the
+ * repo has one, otherwise the local checkout's directory name.
+ *
+ * @param cwd - Working directory
+ * @returns Repository name or null if not in a git repo
+ */
+export declare function getRepoDisplayName(cwd?: string): string | null;
+/**
  * Get current git branch name.
  *
  * @param cwd - Working directory to run git command in
@@ -52,13 +71,14 @@ export declare function getWorktreeInfo(cwd?: string): WorktreeDetection;
  */
 export declare function renderGitRepo(cwd?: string): string | null;
 /**
- * Render git branch element.
+ * Render git repo + branch element.
  *
- * Output format: `🌿 {branch}` when a branch is available,
- * `🌿 {7charHash}` when in detached HEAD state, null otherwise.
+ * Output format: `🌿 {repo}({branch})`, with the 7-char commit hash in place
+ * of the branch when in detached HEAD state. Falls back to `🌿 {branch}` when
+ * the repo name can't be resolved, and null when there is no ref at all.
  *
  * @param cwd - Working directory
- * @returns Formatted branch name or null
+ * @returns Formatted repo/branch or null
  */
 export declare function renderGitBranch(cwd?: string): string | null;
 /**

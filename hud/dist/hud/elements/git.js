@@ -5,10 +5,11 @@
  */
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve, basename, join } from 'node:path';
+import { resolve, basename, dirname, join } from 'node:path';
 import { dim, cyan, green, red } from '../colors.js';
 const CACHE_TTL_MS = 30_000;
 const repoCache = new Map();
+const localRepoCache = new Map();
 const branchCache = new Map();
 const worktreeCache = new Map();
 const statusCache = new Map();
@@ -17,6 +18,7 @@ const statusCache = new Map();
  */
 export function resetGitCache() {
     repoCache.clear();
+    localRepoCache.clear();
     branchCache.clear();
     worktreeCache.clear();
     statusCache.clear();
@@ -60,6 +62,54 @@ export function getGitRepoName(cwd) {
     }
     repoCache.set(key, { value: result, expiresAt: Date.now() + CACHE_TTL_MS });
     return result;
+}
+/**
+ * Get the repository name from the local checkout.
+ *
+ * Uses --git-common-dir rather than --show-toplevel so a linked worktree
+ * reports the main checkout's name instead of the worktree directory name
+ * (which the cwd element already shows).
+ *
+ * @param cwd - Working directory to run git command in
+ * @returns Repository name or null if not in a git repo
+ */
+export function getLocalRepoName(cwd) {
+    const key = cwd ? resolve(cwd) : process.cwd();
+    const cached = localRepoCache.get(key);
+    if (cached && Date.now() < cached.expiresAt) {
+        return cached.value;
+    }
+    let result = null;
+    try {
+        const commonDir = execSync('git rev-parse --git-common-dir', {
+            cwd,
+            encoding: 'utf-8',
+            timeout: 1000,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            shell: process.platform === 'win32' ? 'cmd.exe' : undefined,
+        }).trim();
+        if (commonDir) {
+            // /repo/.git → repo; a bare repo (/repo.git) has no .git leaf to strip
+            const resolved = resolve(key, commonDir);
+            const leaf = basename(resolved);
+            result = (leaf === '.git' ? basename(dirname(resolved)) : leaf) || null;
+        }
+    }
+    catch {
+        result = null;
+    }
+    localRepoCache.set(key, { value: result, expiresAt: Date.now() + CACHE_TTL_MS });
+    return result;
+}
+/**
+ * Resolve the repository name to display: the origin remote's name when the
+ * repo has one, otherwise the local checkout's directory name.
+ *
+ * @param cwd - Working directory
+ * @returns Repository name or null if not in a git repo
+ */
+export function getRepoDisplayName(cwd) {
+    return getGitRepoName(cwd) ?? getLocalRepoName(cwd);
 }
 /**
  * Get current git branch name.
@@ -171,24 +221,21 @@ function readDetachedHeadShort(cwd) {
     }
 }
 /**
- * Render git branch element.
+ * Render git repo + branch element.
  *
- * Output format: `🌿 {branch}` when a branch is available,
- * `🌿 {7charHash}` when in detached HEAD state, null otherwise.
+ * Output format: `🌿 {repo}({branch})`, with the 7-char commit hash in place
+ * of the branch when in detached HEAD state. Falls back to `🌿 {branch}` when
+ * the repo name can't be resolved, and null when there is no ref at all.
  *
  * @param cwd - Working directory
- * @returns Formatted branch name or null
+ * @returns Formatted repo/branch or null
  */
 export function renderGitBranch(cwd) {
-    const branch = getGitBranch(cwd);
-    if (branch) {
-        return `🌿 ${cyan(branch)}`;
-    }
-    const shortHash = readDetachedHeadShort(cwd);
-    if (shortHash) {
-        return `🌿 ${cyan(shortHash)}`;
-    }
-    return null;
+    const ref = getGitBranch(cwd) ?? readDetachedHeadShort(cwd);
+    if (!ref)
+        return null;
+    const repo = getRepoDisplayName(cwd);
+    return `🌿 ${cyan(repo ? `${repo}(${ref})` : ref)}`;
 }
 /**
  * Get git working tree status counts.
