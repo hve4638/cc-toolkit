@@ -84,7 +84,7 @@ gives you the worktree path and sets `WT_INTERACTIVE=0`, so a well-written hook
 leaves the user's terminal alone.
 
 wt-init's output already states how to run `mkwt.sh`; relay that. The mkwt,
-`.wtrc`, and `wt merge` / `wt destroy` mechanics belong elsewhere, not here:
+`.wtrc`, and `wt merge` / `wt land` / `wt destroy` mechanics belong elsewhere, not here:
 README.md for maintainers, and the `CLAUDE.md` dropped into each worktree for the
 session working there.
 </wt_instruction>

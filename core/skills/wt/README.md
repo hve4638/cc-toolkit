@@ -10,7 +10,7 @@ Claude Code 빌트인 워크트리는 항상 메인 브랜치에서 분기한다
 - 워크트리 경로를 stdout 에 출력한다.
 - `.wtrc` 에 `post_create` 훅이 있으면 그걸 부른다. `/wt` 가 기본으로 써주는 훅은 tmux 윈도우를 여는 것이고(선택하면 거기서 claude 자동 실행), 다른 mux 든 알림이든 그 자리를 바꾸면 된다.
 
-상정 워크플로는 그대로다: 워크트리를 작업장으로 쓰며 막 커밋하다가, 끝나면 누적 결과를 부모 브랜치에 **squash 한 단일 커밋**으로 올린다(merge 흔적 없음). 그 조작을 각 워크트리가 스스로 책임지도록 `wt` 한 파일이 워크트리 안에 들어가고, `merge`·`destroy` 두 동사를 받는다.
+상정 워크플로는 그대로다: 워크트리를 작업장으로 쓰며 막 커밋하다가, 끝나면 누적 결과를 부모 브랜치에 **squash 한 단일 커밋**으로 올린다(merge 흔적 없음). 그 조작을 각 워크트리가 스스로 책임지도록 `wt` 한 파일이 워크트리 안에 들어가고, `merge`·`land`·`destroy` 세 동사를 받는다. 커밋 경계를 남기고 싶으면 `--no-squash` 로 squash 만 끈다.
 
 ## 스크립트 구성
 
@@ -18,7 +18,7 @@ Claude Code 빌트인 워크트리는 항상 메인 브랜치에서 분기한다
 |---|---|
 | `wt-init.sh` | `/wt` 본문이 호출. 인자 `<repo-rel>` 받아 `mkwt.sh` 조립·드롭, `mkwt init` 실행, 워크트리 폴더에 `CLAUDE.md` 드롭 (감지 안 함, 검증만) |
 | `mkwt-body.sh` | `mkwt.sh` 의 정적 본문(템플릿). `wt-init` 이 페이로드를 앞에 붙여 완성 |
-| `wt.sh` | 워크트리용 `merge`/`destroy`. mkwt 가 base64 로 워크트리에 `wt` 로 생성 |
+| `wt.sh` | 워크트리용 `merge`/`land`/`destroy`. mkwt 가 base64 로 워크트리에 `wt` 로 생성 |
 | `worktree-claude.md` | 워크트리용 `CLAUDE.md` 템플릿. wt-init 이 그룹 폴더에 복사 |
 
 `mkwt.sh` 는 **자체 포함**이다. `wt-init` 이 `wt.sh` 를 base64 로 인코딩해 `mkwt.sh` 안에 써넣으므로, 사용자 셸에서 플러그인 경로(`CLAUDE_PLUGIN_ROOT`) 없이 동작한다. 템플릿이 바뀌면 `mkwt.sh` 를 지우고 `/wt` 를 재실행해 다시 조립한다.
@@ -48,7 +48,7 @@ Claude Code 빌트인 워크트리는 항상 메인 브랜치에서 분기한다
 조립 후:
 - `mkwt.sh` 에 실행권한 부여.
 - **`mkwt.sh init <repo-rel>` 실행.** `.wtrc` 생성과 exclude 등록은 mkwt 자신의 일이라 여기서 재구현하지 않고 태운다.
-- 그 `.wtrc` 를 **읽어서** `worktree_dir` 을 알아낸 뒤 거기에 `worktree-claude.md` 를 `CLAUDE.md` 로 복사. 이미 있으면 보존(사용자 수정 유지). 워크트리가 이 폴더 하위라 각 워크트리는 부모 디렉터리 지침으로 자동으로 읽는다. `wt destroy` 의 `rmdir` 은 폴더가 빌 때만 지우므로 CLAUDE.md 와 함께 잔존한다.
+- 그 `.wtrc` 를 **읽어서** `worktree_dir` 을 알아낸 뒤 거기에 `worktree-claude.md` 를 `CLAUDE.md` 로 복사. 이미 있으면 보존(사용자 수정 유지). **보존이라 템플릿을 고쳐도 이미 배포된 `CLAUDE.md` 는 갱신되지 않는다** — `wt` 의 동사가 바뀌면 기존 그룹 폴더의 사본을 손으로 덮어써야 한다. 워크트리가 이 폴더 하위라 각 워크트리는 부모 디렉터리 지침으로 자동으로 읽는다. `wt destroy` 의 `rmdir` 은 폴더가 빌 때만 지우므로 CLAUDE.md 와 함께 잔존한다.
 
 경로를 여기서 다시 계산하지 않고 `.wtrc` 에서 읽는 게 요점이다 — 규칙이 두 곳에 있으면 어긋난다.
 
@@ -106,9 +106,12 @@ Claude Code 빌트인 워크트리는 항상 메인 브랜치에서 분기한다
 ```bash
 <워크트리>/wt merge -m "feat: ..."                 # 기록된 부모로
 <워크트리>/wt merge -m "feat: ..." --into=<브랜치>  # 다른 브랜치로
+<워크트리>/wt merge --no-squash                    # 커밋을 합치지 않고
 ```
 
-대상은 **스크립트 파일이 놓인 위치(`$0`)** 의 워크트리. `-m` 없으면 usage.
+대상은 **스크립트 파일이 놓인 위치(`$0`)** 의 워크트리. `-m` 없으면 usage(`--no-squash` 일 때는 반대로 `-m` 이 있으면 거부).
+
+`-m`·`--into` 에 값을 띄어 쓸 때, 값이 `-` 로 시작하고 공백이 없으면 거부한다. `-m --no-squash` 가 플래그를 메시지로 삼켜 조용히 squash 하는 걸 막는다 — `land` 로 부르면 브랜치까지 지워져 되돌릴 수 없다. 공백이 있으면 통과시킨다. 플래그에는 공백이 없으니 `-m "--wip: 작업 중"` 같은 건 명백히 값이다. 나머지는 붙여 쓰는 형태(`-m-x`)로 넘기고, 거부 메시지가 그 형태를 알려준다. `--into` 쪽은 git 이 `-` 로 시작하는 브랜치명을 애초에 거부하므로 오탐이 없다.
 
 **merge 는 워크트리를 정리하지 않는다.** 정리는 `wt destroy` 의 일이다. 둘을 한 명령에 묶으면 플래그 하나가 "정리하지 마라" 와 "내 미커밋 작업을 살려둬라" 를 동시에 뜻하게 되는데, 예전 `wt-land --keep` 이 정확히 그 상태였다. 나누면 각 동사가 한 가지만 하고, 미커밋 작업을 버려도 되는지는 destroy 의 기존 안전장치가 판정한다.
 
@@ -128,6 +131,41 @@ Claude Code 빌트인 워크트리는 항상 메인 브랜치에서 분기한다
 충돌 해결은 스크립트가 안 한다(판정 영역). 그 워크트리에서 `git merge <대상>` 으로 풀고 커밋 후 재실행. 그 merge 커밋은 다음 merge 의 squash 로 사라져 최종 이력은 단일 커밋 유지.
 
 한 워크트리에서 여러 번 merge 할 수 있다(작업 → `wt merge` → 다음 작업 → `wt merge`). merge 마다 부모에 단일 커밋이 하나씩 쌓인다. **merge 직후 브랜치와 부모가 동일 커밋이 되므로 merge base 가 전진하고, 다음 merge 는 완전히 새 출발점에서 시작한다.** 이 수렴이 없으면(예전 `merge --squash` 방식) merge base 가 최초 분기점에 머물러, 부모가 이미 올라간 영역을 후속 수정했을 때 이미 반영된 작업이 충돌로 되살아난다.
+
+### --no-squash
+
+3(squash)만 건너뛴다. 나머지 절차와 실패 처리는 그대로다.
+
+**수렴은 유지된다.** 브랜치와 부모가 같은 커밋이 되어 merge base 가 전진하는 건 4(rebase)의 성질이지 squash 의 성질이 아니다. 그래서 `--no-squash` 로도 반복 merge 가 충돌을 되살리지 않는다. 커밋 SHA 는 rebase 로 바뀌지만 커밋 경계는 보존된다.
+
+`-m` 과 같이 주면 **거부한다.** 합칠 커밋이 없어 메시지가 갈 곳이 없는데 조용히 무시하면, 사용자는 자기가 쓴 메시지가 올라간 작업의 이름이 됐다고 믿은 채 지나간다.
+
+출력은 단일 커밋 SHA 대신 올라간 커밋 수와 tip 을 알린다(`merged feat/x onto main (3 commits, tip abc1234)`). 개수는 5(ff) 직전에 세므로 rebase 가 비워서 떨군 커밋은 빠진다.
+
+개수가 0 이면 — rebase 가 전부 이미 반영된 것으로 보고 떨군 경우 — 성공 문구 대신 아무것도 안 올라갔다고 알린다. 사전검사(3-dot diff)는 merge base 기준이라 이걸 못 보므로, 여기가 "대상이 안 움직였다" 를 알 수 있는 첫 지점이다. squash 쪽도 같다 — 안 그러면 대상의 기존 tip 을 방금 올린 커밋인 양 출력한다.
+
+보고 출력은 뒤따르는 동작을 막지 못하게 묶어둔다. 쓰기가 실패하면(스트림이 닫혔거나 가득 참) merge 는 끝난 뒤인데 destroy 전에 죽어 land 의 all-or-nothing 이 깨진다.
+
+읽는 쪽이 먼저 끊는 경우는 `||` 로 못 막는다 — SIGPIPE 는 쓰기를 실패시키는 게 아니라 셸을 그냥 죽인다. 그래서 **wt 는 stdout 에 아무것도 쓰지 않는다.** 전부 상태 메시지일 뿐 데이터가 아니고, `wt land ... | less` 를 바로 닫으면 첫 보고 — land 에서는 merge 와 destroy 사이 — 에서 죽어 정확히 land 가 막으려던 반쯤 된 상태가 된다. stdout 에 쓰지 않으면 그 실패가 생길 자리가 없다 — 기본 스트림 배치에 한해서다. `2>&1 |` 로 보고를 stdout 에 되돌리면 같은 위험이 그대로 돌아오고, SIGPIPE 를 통째로 무시하는 것 말고는 막을 방법이 없다(무시하면 자식 git 프로세스까지 물려받아 더 나쁘다).
+
+`git branch -D` 의 `Deleted branch ... (was <sha>)` 도 stderr 로 돌린다. 그 sha 가 브랜치 복구 경로라 버리진 않는다.
+
+## wt land 작동
+
+```bash
+<워크트리>/wt land -m "feat: ..."     # = merge 후 destroy
+<워크트리>/wt land --no-squash        # merge 의 인자를 그대로 받는다
+```
+
+`merge` 다음 `destroy`. 인자는 전부 `merge` 의 것이고, destroy 는 인자를 안 받는다.
+
+**시작 전에 작업트리가 깨끗한지 검사하고, 아니면 아무것도 하지 않는다.** merge 가 성공한 뒤에도 destroy 를 막을 수 있는 사유는 미커밋 변경 하나뿐인데, 그때는 이미 merge 가 끝난 뒤라 land 가 반만 된 채 멈춘다. 앞에서 검사하면 land 는 둘 다 하거나 아무것도 안 하고, 사용자가 할 일은 어느 쪽이든 같다 — 커밋하거나, 두 동사를 따로 부르거나.
+
+**올릴 게 없으면 merge 를 건너뛰고 바로 destroy 한다.** 상정 워크플로가 "작업하며 merge 하다가 끝나면 land" 라, merge 성공 직후 상태(브랜치가 부모에 아무것도 더하지 않음)에서 land 를 부르는 게 정상 경로다. 여기서 `nothing to merge` 로 죽으면 그 정상 경로가 막히고, 사용자는 destroy 를 따로 불러야 한다는 걸 알아야 한다.
+
+**destroy 의 판정 기준은 기록된 `wt-parent` 가 아니라 방금 merge 한 대상이다.** `--into=<브랜치>` 로 부모가 아닌 곳에 올린 경우 둘이 갈라지고, 기록된 부모로 재면 방금 성공한 land 를 destroy 가 "안 올라간 커밋이 있다" 며 거부한다.
+
+`merge` 와 `destroy` 를 따로 두는 이유는 그대로다(→ [wt merge 작동](#wt-merge-작동)). land 는 그 둘을 없애지 않고 얹은 것이라, 예전 `wt-land --keep` 처럼 플래그 하나가 "정리하지 마라" 와 "미커밋 작업을 살려둬라" 를 겸하는 일이 생기지 않는다.
 
 ## wt destroy 작동
 
@@ -159,6 +197,6 @@ wt/
 └── scripts/
     ├── wt-init.sh        # /wt 본문: <repo-rel> 받아 mkwt.sh 조립·드롭 + mkwt init + CLAUDE.md
     ├── mkwt-body.sh      # mkwt.sh 정적 본문 템플릿
-    ├── wt.sh             # 워크트리용 merge(squash→rebase→부모 ff) / destroy (mkwt 가 임베드)
+    ├── wt.sh             # 워크트리용 merge(squash→rebase→부모 ff) / land(merge+destroy) / destroy (mkwt 가 임베드)
     └── worktree-claude.md # 워크트리용 CLAUDE.md 템플릿 (wt-init 이 그룹 폴더에 복사)
 ```

@@ -56,5 +56,5 @@ post_create() {
 
 `mkwt.sh` 는 사용자의 명령이다 — 시키지 않은 한 직접 실행하지 말고 전달한다(실행하면 브랜치+워크트리가 생긴다). 실행하더라도 `$(...)` 로 캡처하면 워크트리 경로를 받고 `WT_INTERACTIVE=0` 이 되므로, 제대로 쓴 훅이면 사용자 터미널을 건드리지 않는다.
 
-wt-init 출력이 이미 `mkwt.sh` 실행법을 안내하므로 그대로 전달한다. mkwt·`.wtrc`·`wt merge`/`wt destroy` 의 메커니즘은 여기가 아니라 다른 곳에 있다: README.md(유지보수자), 그리고 각 워크트리에 생성되는 `CLAUDE.md`(거기서 작업하는 세션).
+wt-init 출력이 이미 `mkwt.sh` 실행법을 안내하므로 그대로 전달한다. mkwt·`.wtrc`·`wt merge`/`wt land`/`wt destroy` 의 메커니즘은 여기가 아니라 다른 곳에 있다: README.md(유지보수자), 그리고 각 워크트리에 생성되는 `CLAUDE.md`(거기서 작업하는 세션).
 </wt_instruction>

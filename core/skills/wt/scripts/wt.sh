@@ -4,21 +4,29 @@
 # each worktree it creates; self-locates via its own path, so it needs no path
 # argument and can be called from anywhere.
 #
-#   <worktree>/wt merge -m "<message>" [--into=<branch>]
+#   <worktree>/wt merge -m "<message>" [--into=<branch>] [--no-squash]
+#   <worktree>/wt land  -m "<message>" [--into=<branch>] [--no-squash]
 #   <worktree>/wt destroy [<key>]
 #   <worktree>/wt                                        print usage
 #
-# The two verbs are deliberately separate. `merge` publishes committed work to
-# the parent and leaves the worktree in place; `destroy` disposes of the
-# worktree. Bundling them would force one flag to mean both "don't clean up" and
-# "keep my uncommitted work", which is how the earlier single `land` command
-# ended up with a --keep flag that meant neither clearly. Split, each verb has
-# one job and `destroy`'s existing safety check is what decides whether
-# uncommitted work may be discarded.
+# `merge` publishes committed work to the parent and leaves the worktree in
+# place; `destroy` disposes of the worktree; `land` runs both for when the work
+# is finished. The first two remain usable on their own, which is the point: an
+# earlier version offered only the bundle, and its --keep flag had to mean both
+# "don't clean up" and "keep my uncommitted work" at once. Separate, each verb
+# has one job, and `destroy`'s safety check alone decides whether uncommitted
+# work may be discarded.
 #
-# The usual sequence is `wt merge` then `wt destroy`: after a merge the branch
-# sits exactly on the parent, so destroy sees nothing to lose and removes the
-# worktree without asking.
+# After a merge the branch sits exactly on the parent, so a following destroy
+# sees nothing to lose and removes the worktree without asking.
+#
+# Nothing here writes to stdout. Every line it prints is status, not data, and a
+# reader that stops early (`land … | less`, quit) would otherwise raise SIGPIPE
+# on the first report — which under `land` lands between the merge and the
+# destroy and would kill the script there, exactly the half-done state land
+# exists to avoid. Leaving stdout unwritten removes that, for the default stream
+# layout: `land … 2>&1 | …` pipes the reports back into the same hazard, and
+# nothing short of ignoring SIGPIPE outright would help there.
 
 set -euo pipefail
 
@@ -29,11 +37,20 @@ usage() {
   cat >&2 <<EOF
 usage: $0 <command>
 
-  merge -m "<message>" [--into=<branch>]
-        Land this worktree's committed work onto its parent branch as a single
-        commit. Uncommitted changes are stashed for the duration and restored
-        afterwards; they are never landed. The worktree stays in place — clean
-        it up with \`destroy\` when the work is done.
+  merge -m "<message>" [--into=<branch>] [--no-squash]
+        Land this worktree's committed work onto its parent branch, squashed
+        into a single commit unless --no-squash. Uncommitted changes are stashed
+        for the duration and restored afterwards; they are never landed. The
+        worktree stays in place — clean it up with \`destroy\` when the work is
+        done.
+
+        --no-squash  keep each commit instead of collapsing them into one;
+                     -m then has nothing to name and is refused
+
+  land -m "<message>" [--into=<branch>] [--no-squash]
+        merge, then destroy. Refuses up front unless the worktree is clean, so
+        it either does both or neither. With nothing left to merge it goes
+        straight to the destroy.
 
   destroy [<key>]
         Remove this worktree and its branch. Refuses with a confirmation key if
@@ -62,6 +79,11 @@ main_repo="$(dirname "$common_dir")"
 branch="$(git -C "$wt" symbolic-ref --quiet --short HEAD || true)"
 parent="$(cat "$git_dir/wt-parent" 2>/dev/null || true)"   # land target recorded by mkwt
 
+# Set by `land` so merge can leave out the "now run destroy" hint, and so destroy
+# weighs the branch against what merge actually resolved as its target.
+in_land=0
+merged_target=""
+
 require_git_2_38() {
   local vmaj vmin
   read -r vmaj vmin < <(git version | sed -E 's/^git version ([0-9]+)\.([0-9]+).*/\1 \2/')
@@ -75,32 +97,62 @@ require_git_2_38() {
 #   1. merge the target in memory; stop before touching anything if it conflicts
 #   2. stash uncommitted work, so only committed work lands and the working
 #      state survives the history rewrite
-#   3. squash every commit since the target into one
+#   3. squash every commit since the target into one  (skipped by --no-squash)
 #   4. rebase onto the target, making this branch a descendant of it
 #   5. fast-forward the target
 #   6. restore the stash
+#
+# --no-squash drops step 3 only. Step 4 still runs, so the target still only ever
+# fast-forwards and the branch still ends up on the same commit as the target —
+# the convergence the repeated-merge case depends on is a property of the rebase,
+# not of the squash.
 #
 # The target is never merged into, only fast-forwarded. Its worktree therefore
 # cannot end up half-merged and needs no cleanliness check: git refuses the
 # fast-forward by itself when it would overwrite work in progress there, and
 # leaves unrelated work in progress alone.
 cmd_merge() {
-  prog="wt merge"
-  local msg="" into="" target tw="" cur line merge_out conflicted merge_base orig_head landed
-  local stashed=0
+  # Left alone under `land`, so errors are attributed to the verb that was typed.
+  [ "$in_land" = 1 ] || prog="wt merge"
+  local msg="" into="" target tw="" cur line merge_out conflicted merge_base orig_head landed ncommits
+  local stashed=0 no_squash=0
+
+  # A separated value that looks like a flag is a typo, not a value: `-m
+  # --no-squash` would otherwise take the flag as the message, squash anyway, and
+  # under `land` delete the branch whose commit boundaries were being asked for.
+  # Whitespace settles the ambiguity the other way — no flag contains any, so a
+  # dash-leading phrase is plainly the value. For the rest, the joined form is
+  # the way to say a value that really does start with a dash, so the refusal
+  # names it. (Defined here rather than at file scope for proximity; like
+  # bail/unstash below it outlives the call, which nothing depends on.)
+  flagval() { # $1 = flag, $2 = value, $3 = joined spelling to suggest
+    case "$2" in
+      *[[:space:]]*) return 0 ;;
+      -*) die "$1 takes a value, but '$2' reads as a flag; write it as $3 if it is really the value" ;;
+    esac
+  }
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      -m)        shift; [ $# -gt 0 ] || die "-m needs a message"; msg="$1" ;;
-      -m*)       msg="${1#-m}" ;;
-      --into)    shift; [ $# -gt 0 ] || die "--into needs a branch"; into="$1" ;;
-      --into=*)  into="${1#--into=}" ;;
-      -h|--help) usage 0 ;;
-      *)         die "unknown argument: $1" ;;
+      -m)         shift; [ $# -gt 0 ] || die "-m needs a message"
+                  flagval -m "$1" "-m$1"; msg="$1" ;;
+      -m*)        msg="${1#-m}" ;;
+      --into)     shift; [ $# -gt 0 ] || die "--into needs a branch"
+                  flagval --into "$1" "--into=$1"; into="$1" ;;
+      --into=*)   into="${1#--into=}" ;;
+      --no-squash) no_squash=1 ;;
+      -h|--help)  usage 0 ;;
+      *)          die "unknown argument: $1" ;;
     esac
     shift
   done
-  [ -n "$msg" ] || usage 1
+  # Refused rather than ignored: a message that silently goes nowhere leaves the
+  # caller believing they named the landed work.
+  if [ "$no_squash" = 1 ]; then
+    [ -z "$msg" ] || die "--no-squash keeps each commit as-is; -m has nothing to name"
+  else
+    [ -n "$msg" ] || usage 1
+  fi
   [ -n "$branch" ] || die "HEAD is detached; cannot merge from a detached worktree"
 
   if [ -n "$into" ]; then
@@ -112,6 +164,7 @@ cmd_merge() {
   [ "$target" != "$branch" ] || die "target '$target' is this worktree's own branch"
   git -C "$wt" show-ref --verify --quiet "refs/heads/$target" \
     || die "target branch '$target' does not exist"
+  merged_target="$target"
 
   # Where the target is checked out, if anywhere. Its files must move with the
   # fast-forward, so that is the worktree the merge runs in; an unchecked-out
@@ -125,6 +178,17 @@ cmd_merge() {
 
   # Nothing to land is not a pipeline failure, so check before running any of it.
   if git -C "$wt" diff --quiet "$target...$branch" --; then
+    # Under `land` it is not a failure at all: there is nothing to publish, so
+    # the cleanup is the whole remaining job and destroy's own check decides
+    # whether it is safe. Dying here would break the documented main flow —
+    # merge while working, then land at the end — by stopping on the very state
+    # a successful merge leaves behind.
+    if [ "$in_land" = 1 ]; then
+      # Guarded like the other reports: a failed write here would kill the script
+      # before the return and skip the cleanup that is the whole remaining job.
+      printf 'nothing to merge onto %s; going straight to destroy\n' "$target" >&2 || true
+      return 0
+    fi
     die "nothing to merge: '$branch' adds no changes relative to '$target'"
   fi
 
@@ -187,12 +251,14 @@ cmd_merge() {
   # a previous merge (which leaves branch and target on the same commit) it IS
   # that point: already-landed work falls outside the range and cannot be
   # replayed.
-  merge_base="$(git -C "$wt" merge-base "$target" "$branch")" \
-    || bail "no merge base between '$branch' and '$target'; nothing merged"
-  git -C "$wt" reset -q --soft "$merge_base" \
-    || bail "could not squash '$branch'; nothing merged"
-  git -C "$wt" commit -q -m "$msg" \
-    || bail "commit failed (hook or signing?); nothing merged"
+  if [ "$no_squash" = 0 ]; then
+    merge_base="$(git -C "$wt" merge-base "$target" "$branch")" \
+      || bail "no merge base between '$branch' and '$target'; nothing merged"
+    git -C "$wt" reset -q --soft "$merge_base" \
+      || bail "could not squash '$branch'; nothing merged"
+    git -C "$wt" commit -q -m "$msg" \
+      || bail "commit failed (hook or signing?); nothing merged"
+  fi
 
   # Step 4 — rebase onto the target, so the target only ever fast-forwards. The
   # precheck cleared this, so a conflict here means the target moved in between.
@@ -201,6 +267,10 @@ cmd_merge() {
   # human finishes it by hand.
   git -C "$wt" rebase -q "$target" >/dev/null 2>&1 \
     || bail "rebase onto '$target' conflicted ('$target' moved since the precheck); re-run"
+
+  # Counted before step 5 moves the target: this is exactly what is about to land
+  # (1 after a squash, and after a rebase that may have dropped emptied commits).
+  ncommits="$(git -C "$wt" rev-list --count "$target..$branch")"
 
   # Step 5 — fast-forward the target.
   if [ -n "$tw" ]; then
@@ -217,8 +287,60 @@ cmd_merge() {
   # Step 6 — the worktree stays, so the stash always comes back.
   unstash
 
-  printf 'merged %s onto %s as %s; worktree kept @ %s\n' "$branch" "$target" "$landed" "$wt"
-  printf 'clean up with:  %s destroy\n' "$0"
+  # Reporting must not gate what follows it. The merge is already done here, and
+  # under `land` a failed write — stderr closed (`land … 2>&-`) or full — would
+  # otherwise abort before destroy and break the all-or-nothing promise. `|| true`
+  # covers a write that fails; writing to stderr rather than stdout covers the
+  # reader that quits, which no `||` can catch because SIGPIPE kills the shell
+  # outright rather than failing the write.
+  {
+    # ncommits is 0 when the rebase dropped every commit as already applied. The
+    # 3-dot precheck cannot see that (it measures from the merge base), so this
+    # is the first point where "the target did not move" is known, and saying
+    # "merged … as <sha>" here would name the target's pre-existing tip.
+    if [ "$ncommits" = 0 ]; then
+      printf 'nothing landed on %s: every commit was already there' "$target"
+    elif [ "$no_squash" = 1 ]; then
+      printf 'merged %s onto %s (%s commits, tip %s)' "$branch" "$target" "$ncommits" "$landed"
+    else
+      printf 'merged %s onto %s as %s' "$branch" "$target" "$landed"
+    fi
+    # Under `land` the worktree is about to go, so neither the "kept" note nor
+    # the hint that follows it would be true.
+    if [ "$in_land" = 1 ]; then
+      printf '\n'
+    else
+      printf '; worktree kept @ %s\n' "$wt"
+      printf 'clean up with:  %s destroy\n' "$0"
+    fi
+  } >&2 || true
+}
+
+# ---------------------------------------------------------------------- land
+#
+# merge and destroy in one call, for when the work is finished.
+#
+# The cleanliness check runs BEFORE the merge instead of being left to destroy's
+# key path afterwards. Uncommitted work is the one thing that can still make
+# destroy refuse once a merge has succeeded, and by then the merge has happened —
+# stopping there would leave a land half-done. Checked up front, land either does
+# both or neither, and the fix is the same either way: commit it, or run the two
+# verbs separately.
+cmd_land() {
+  prog="wt land"
+  case "${1:-}" in -h|--help) usage 0 ;; esac
+
+  [ -z "$(git -C "$wt" status --porcelain)" ] \
+    || die "worktree has uncommitted changes, which land would have to leave behind; commit them, or run \`merge\` and then \`destroy\`"
+
+  in_land=1
+  cmd_merge "$@"
+
+  # destroy weighs this branch against the branch it was merged into. With --into
+  # that is not the recorded parent, and without this it would refuse the land it
+  # just completed.
+  parent="$merged_target"
+  cmd_destroy
 }
 
 # ------------------------------------------------------------------- destroy
@@ -232,7 +354,7 @@ cmd_merge() {
 # The confirmation key is sha256(current state)[:5]. It changes whenever HEAD,
 # the tracked diff, or untracked (non-ignored) file contents change.
 cmd_destroy() {
-  prog="wt destroy"
+  [ "$in_land" = 1 ] || prog="wt destroy"
   local head key reason
   [ $# -le 1 ] || die "usage: $0 destroy [<key>]"
   case "${1:-}" in -h|--help) usage 0 ;; esac
@@ -303,16 +425,31 @@ cmd_destroy() {
   }
 
   destroy() { # $1 = force (0|1)
+    local landed_note="" branch_msg=""
+    # Removal can still fail (a locked worktree, a busy path). Under `land` that
+    # arrives after a successful merge, and git's own error says nothing about
+    # the half that did work.
+    [ "$in_land" = 0 ] || landed_note=" — the merge before it already succeeded"
     cd "$main_repo"
-    if [ "$1" = 1 ]; then git worktree remove --force "$wt"; else git worktree remove "$wt"; fi
+    { if [ "$1" = 1 ]; then git worktree remove --force "$wt"; else git worktree remove "$wt"; fi; } \
+      || die "could not remove the worktree$landed_note"
     # Force-delete is safe here: the no-arg path runs only when integrated, and
     # the key path means the user explicitly confirmed.
     if [ -n "$branch" ] && git show-ref --verify --quiet "refs/heads/$branch"; then
-      git branch -D "$branch"
+      # Its "Deleted branch … (was <sha>)" line is worth keeping — that sha is
+      # how the branch is recovered. Captured rather than redirected so the two
+      # ways this can fail stay apart: the delete failing is real and must be
+      # reported, while failing to print the confirmation is not and must not
+      # turn a completed destroy into a non-zero exit.
+      branch_msg="$(git branch -D "$branch" 2>&1)" \
+        || die "could not delete branch '$branch'$landed_note: $branch_msg"
+      printf '%s\n' "$branch_msg" >&2 || true
     fi
     git worktree prune
     rmdir "$(dirname "$wt")" 2>/dev/null || true   # remove empty group folder (case A)
-    printf 'destroyed worktree %s%s\n' "$wt" "${branch:+ (branch $branch)}"
+    # As in merge: the work is done, so a failed write here must not turn a
+    # completed destroy into a non-zero exit.
+    printf 'destroyed worktree %s%s\n' "$wt" "${branch:+ (branch $branch)}" >&2 || true
   }
 
   key="$(statekey)"
@@ -323,9 +460,9 @@ cmd_destroy() {
       destroy 1
       exit 0
     fi
-    printf 'Confirmation key does not match the current state (it changed since the key was issued).\n'
-    printf 'To delete anyway, re-run with the new key:\n'
-    printf '    %s destroy %s\n' "$0" "$key"
+    printf 'Confirmation key does not match the current state (it changed since the key was issued).\n' >&2
+    printf 'To delete anyway, re-run with the new key:\n' >&2
+    printf '    %s destroy %s\n' "$0" "$key" >&2
     exit 1
   fi
 
@@ -350,9 +487,9 @@ cmd_destroy() {
     reason="it has commits that are not in '$parent'"
   fi
 
-  printf 'Refusing to destroy this worktree: %s; this would lose work.\n' "$reason"
-  printf 'To delete anyway, re-run with the confirmation key:\n'
-  printf '    %s destroy %s\n' "$0" "$key"
+  printf 'Refusing to destroy this worktree: %s; this would lose work.\n' "$reason" >&2
+  printf 'To delete anyway, re-run with the confirmation key:\n' >&2
+  printf '    %s destroy %s\n' "$0" "$key" >&2
   exit 1
 }
 
@@ -362,10 +499,11 @@ cmd="${1:-}"
 [ $# -gt 0 ] && shift
 case "$cmd" in
   merge)     cmd_merge "$@" ;;
+  land)      cmd_land "$@" ;;
   destroy)   cmd_destroy "$@" ;;
   -h|--help) usage 0 ;;
   # No verb is a usage error, not a help request — exit non-zero so a caller that
   # forgot the verb fails instead of looking like it succeeded.
   "")        usage 1 ;;
-  *)         die "unknown command: $cmd  (expected: merge, destroy)" ;;
+  *)         die "unknown command: $cmd  (expected: merge, land, destroy)" ;;
 esac

@@ -257,6 +257,7 @@ printf '%s\n' "$mkwt_parent" > "$mkwt_wt_git_dir/wt-parent"
 printf 'worktree: %s  (branch %s off %s)\n' "$mkwt_target" "$mkwt_branch" "${mkwt_parent:-HEAD}" >&2
 if [ -n "$mkwt_parent" ]; then
   printf 'merge:   %s/wt merge -m "<message>"\n' "$mkwt_target" >&2
+  printf 'land:    %s/wt land -m "<message>"          (merge, then remove this worktree)\n' "$mkwt_target" >&2
 else
   printf 'merge:   %s/wt merge -m "<message>" --into=<branch>   (HEAD detached; no parent recorded)\n' "$mkwt_target" >&2
 fi
