@@ -29,7 +29,15 @@ try {
 
   const parts = [];
   for (const name of FILES) {
-    try { parts.push(readFileSync(join(cwd, name), 'utf8')); } catch { /* absent — skip */ }
+    const path = join(cwd, name);
+    try {
+      const body = readFileSync(path, 'utf8');
+      // Label each file the way the CLAUDE.md chain does ("Contents of <path>:"),
+      // so the model can tell where the text came from — hook outputs are
+      // concatenated without separators, leaving unlabeled text
+      // indistinguishable from the neighboring injection.
+      parts.push(`Contents of ${path}:\n\n${body}`);
+    } catch { /* absent — skip */ }
   }
 
   if (parts.length === 0) {
