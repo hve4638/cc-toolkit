@@ -86,6 +86,17 @@ export function appendLine(projectRoot, relPath, line) {
   }
 }
 
+/** Guarded mkdir -p under .agent-memory. Returns false when the workspace is gone or IO fails. */
+export function ensureDir(projectRoot, relPath) {
+  if (!existsSync(projectRoot)) return false;
+  try {
+    mkdirSync(statePath(projectRoot, relPath), { recursive: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Best-effort delete. 삭제는 아무것도 만들지 않으므로 가드 불필요. */
 export function removeFile(projectRoot, relPath) {
   try { unlinkSync(statePath(projectRoot, relPath)); } catch { /* ENOENT ok */ }
