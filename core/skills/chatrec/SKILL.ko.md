@@ -21,6 +21,8 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/chatrec/scripts/chatrec.mjs" <command> …
 
 `$CLAUDE_CODE_SESSION_ID`로 이 세션을 찾는다(cwd 무관 → 워크트리에서도 동작). 첫 호출에서 자동 캐시된 슬림본을 만들고, 이후 호출은 재사용한다(transcript가 자랐을 때만 재빌드).
 
+다른 transcript를 대상으로 하려면(모든 명령 공통): `--session <id>`는 `~/.claude/projects/` 아래에서 그 세션의 `.jsonl`을 찾고, `--source <jsonl>`은 임의의 transcript 파일을 직접 읽는다. 캐시는 충돌하지 않는다 — 세션은 id, source는 경로로 키를 나눈다.
+
 ## 레코드 (평탄 jsonl, role 4종)
 
 ```

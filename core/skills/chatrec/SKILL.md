@@ -21,6 +21,8 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/chatrec/scripts/chatrec.mjs" <command> …
 
 It finds this session via `$CLAUDE_CODE_SESSION_ID` (cwd-independent → works in worktrees). First use builds an auto-cached slimmed copy; later calls reuse it (rebuilt only when the transcript has grown).
 
+To target a different transcript (any command): `--session <id>` finds that session's `.jsonl` anywhere under `~/.claude/projects/`; `--source <jsonl>` reads an arbitrary transcript file directly. Caches don't clash — sessions key by id, sources by path.
+
 ## Records (flat jsonl, 4 roles)
 
 ```

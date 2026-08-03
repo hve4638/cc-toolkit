@@ -17,6 +17,29 @@ function die(msg) {
   process.exit(1);
 }
 
+function usage() {
+  process.stdout.write(`usage: chatrec <command> [options]
+
+commands
+  build              rebuild the slim cache
+  count              total turns + role counts
+  search [pat]       matching turns as T<t>  <role>  <snippet>
+  clip <from> [to]   records of a turn range (jsonl)
+  filter             filtered records (jsonl)
+
+options
+  --session <id>     another session (default: $CLAUDE_CODE_SESSION_ID)
+  --source <jsonl>   an arbitrary transcript file
+  --role <r,...>     user,assistant,tool_call,tool_result
+  --tool <n,...>     filter by tool name
+  --match <text>     substring match
+  --from N --to M    turn range
+  --invert           invert the filter
+  --out <file>       write to file instead of stdout
+`);
+  process.exit(0);
+}
+
 function num(v, label) {
   const n = Number(v);
   if (!Number.isFinite(n)) die(`${label} must be a number`);
@@ -31,7 +54,8 @@ function parseArgs(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
-    if (v === '--session') a.session = argv[++i] || '';
+    if (v === '--help' || v === '-h') usage();
+    else if (v === '--session') a.session = argv[++i] || '';
     else if (v === '--source') a.source = argv[++i] || '';
     else if (v === '--role') a.role = argv[++i] || '';
     else if (v === '--tool') a.tool = argv[++i] || '';
