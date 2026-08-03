@@ -1,0 +1,234 @@
+#!/usr/bin/env node
+'use strict';
+// linkskill — materialize alias skills declared in alias-skills.json.
+//
+// Self-locating: scans from the directory THIS FILE lives in, regardless of
+// cwd. Copy this single file into any repo/plugin root to reuse it there.
+//
+// Each plugin root may hold an alias-skills.json mapping alias skill names to
+// source skill names within that plugin's skills/ directory:
+//   { "b": "a" }   → skills/b/ becomes a managed copy of skills/a/
+//
+// An alias directory is recognized by a `.alias` marker file inside it. The
+// marker is the safety latch: linkskill only ever wipes a directory that
+// carries it. A directory named in the mapping but lacking the marker is
+// treated as a real skill and refused.
+//
+// Sync per mapping entry:
+//   - alias dir missing            → create it, drop the marker, copy source
+//   - alias dir + marker           → wipe everything except the marker, copy source
+//   - alias dir without marker     → error, untouched
+// After copying, SKILL.md (and SKILL.ko.md if present) get their frontmatter
+// `name` set to the alias name and `description` prefixed with "[<source>] ".
+//
+// Orphans (dirs with a marker but absent from the mapping) are reported;
+// --prune deletes them.
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = __dirname;
+const MAPPING_FILE = 'alias-skills.json';
+const MARKER = '.alias';
+const MARKER_BODY = 'managed by linkskill; contents are generated — edit the source skill instead\n';
+// Skill dir names only — anything else could escape skills/ via the mapping.
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
+
+let errors = 0;
+
+function fail(msg) {
+  errors++;
+  console.error(`error: ${msg}`);
+}
+
+function findMappingFiles(dir, acc) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return acc;
+  }
+  for (const e of entries) {
+    if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+    const p = path.join(dir, e.name);
+    if (e.isFile() && e.name === MAPPING_FILE) acc.push(p);
+    else if (e.isDirectory()) findMappingFiles(p, acc);
+  }
+  return acc;
+}
+
+function hasMarker(dir) {
+  return fs.existsSync(path.join(dir, MARKER));
+}
+
+// Rewrite the frontmatter of a copied SKILL.md: name → alias, description →
+// "[<source>] " prefix. Files without frontmatter are left alone (the alias
+// directory name already supplies the command name).
+function rewriteFrontmatter(file, aliasName, sourceName) {
+  let text = fs.readFileSync(file, 'utf8');
+  // Normalize BOM/CRLF so frontmatter detection can't silently miss — a missed
+  // rewrite would leave two skills declaring the same name. This is a generated
+  // copy, so forcing LF is fine.
+  text = text.replace(/^\uFEFF/, '');
+  if (text.includes('\r\n')) text = text.replace(/\r\n/g, '\n');
+  if (!text.startsWith('---\n')) return;
+  const close = text.match(/\n---(?:\n|$)/);
+  if (!close) {
+    fail(`${path.relative(ROOT, file)}: frontmatter has no closing --- delimiter`);
+    return;
+  }
+  const fmLines = text.slice(4, close.index).split('\n');
+  const rest = text.slice(close.index);
+
+  const nameIdx = fmLines.findIndex((l) => /^name:/.test(l));
+  if (nameIdx !== -1) fmLines[nameIdx] = `name: ${aliasName}`;
+  else fmLines.unshift(`name: ${aliasName}`);
+
+  const prefix = `[${sourceName}] `;
+  const descIdx = fmLines.findIndex((l) => /^description:/.test(l));
+  if (descIdx !== -1) {
+    const raw = fmLines[descIdx].slice('description:'.length).trim();
+    const header = raw.replace(/\s+#.*$/, '');
+    if (/^[>|](\d*[+-]?|[+-]?\d*)$/.test(header)) {
+      // Block scalar — prefix the first content line, but never look past the
+      // end of the block: a following top-level key ends it.
+      for (let i = descIdx + 1; i < fmLines.length; i++) {
+        if (/^\S/.test(fmLines[i])) break;
+        const m = fmLines[i].match(/^(\s+)(\S.*)$/);
+        if (m) {
+          fmLines[i] = `${m[1]}${prefix}${m[2]}`;
+          break;
+        }
+      }
+    } else {
+      // Plain or quoted scalar, possibly spanning indented continuation lines —
+      // fold them into one value so the rewrite can't leave a dangling tail.
+      const parts = raw === '' ? [] : [raw];
+      let endIdx = descIdx;
+      for (let i = descIdx + 1; i < fmLines.length; i++) {
+        if (!/^\s+\S/.test(fmLines[i])) break;
+        parts.push(fmLines[i].trim());
+        endIdx = i;
+      }
+      let value = parts.join(' ');
+      if (/^".*"$/.test(value)) {
+        try {
+          value = JSON.parse(value);
+        } catch {
+          value = value.slice(1, -1);
+        }
+      } else if (/^'.*'$/.test(value)) {
+        value = value.slice(1, -1).replace(/''/g, "'");
+      }
+      fmLines.splice(descIdx, endIdx - descIdx + 1, `description: ${JSON.stringify(prefix + value)}`);
+    }
+  }
+
+  fs.writeFileSync(file, `---\n${fmLines.join('\n')}${rest}`);
+}
+
+function syncAlias(skillsDir, aliasName, sourceName) {
+  const label = `${path.relative(ROOT, skillsDir)}/${aliasName}`;
+  const sourceDir = path.join(skillsDir, sourceName);
+  const aliasDir = path.join(skillsDir, aliasName);
+
+  if (!fs.existsSync(path.join(sourceDir, 'SKILL.md'))) {
+    fail(`${label}: source skill "${sourceName}" not found (no ${path.relative(ROOT, sourceDir)}/SKILL.md)`);
+    return;
+  }
+
+  if (!fs.existsSync(aliasDir)) {
+    fs.mkdirSync(aliasDir, { recursive: true });
+    fs.writeFileSync(path.join(aliasDir, MARKER), MARKER_BODY);
+  } else if (!hasMarker(aliasDir)) {
+    fail(`${label}: exists but has no ${MARKER} marker — looks like a real skill, refusing to touch it`);
+    return;
+  } else {
+    for (const e of fs.readdirSync(aliasDir)) {
+      if (e === MARKER) continue;
+      fs.rmSync(path.join(aliasDir, e), { recursive: true, force: true });
+    }
+  }
+
+  for (const e of fs.readdirSync(sourceDir)) {
+    if (e === MARKER) continue;
+    fs.cpSync(path.join(sourceDir, e), path.join(aliasDir, e), { recursive: true });
+  }
+  for (const f of ['SKILL.md', 'SKILL.ko.md']) {
+    const p = path.join(aliasDir, f);
+    if (fs.existsSync(p)) rewriteFrontmatter(p, aliasName, sourceName);
+  }
+  console.log(`synced: ${label} ← ${sourceName}`);
+}
+
+function reportOrphans(skillsDir, keys, prune) {
+  if (!fs.existsSync(skillsDir)) return;
+  for (const e of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue;
+    const dir = path.join(skillsDir, e.name);
+    if (!hasMarker(dir) || keys.has(e.name)) continue;
+    if (prune) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      console.log(`pruned orphan: ${path.relative(ROOT, dir)}`);
+    } else {
+      console.error(`warning: orphan alias ${path.relative(ROOT, dir)} (marker present, not in ${MAPPING_FILE}) — rerun with --prune to delete`);
+    }
+  }
+}
+
+function processMapping(file, prune) {
+  const rel = path.relative(ROOT, file);
+  let mapping;
+  try {
+    mapping = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (err) {
+    fail(`${rel}: invalid JSON (${err.message})`);
+    return;
+  }
+  if (typeof mapping !== 'object' || mapping === null || Array.isArray(mapping)) {
+    fail(`${rel}: expected an object of {alias: source}`);
+    return;
+  }
+
+  const skillsDir = path.join(path.dirname(file), 'skills');
+  const keys = new Set(Object.keys(mapping));
+
+  for (const [alias, source] of Object.entries(mapping)) {
+    if (typeof source !== 'string' || !NAME_RE.test(alias) || !NAME_RE.test(source)) {
+      fail(`${rel}: "${alias}": ${JSON.stringify(source)} — names must match ${NAME_RE}`);
+      continue;
+    }
+    if (alias === source) {
+      fail(`${rel}: "${alias}" maps to itself`);
+      continue;
+    }
+    if (keys.has(source)) {
+      fail(`${rel}: "${alias}" → "${source}" — source is itself an alias; chains are not supported`);
+      continue;
+    }
+    syncAlias(skillsDir, alias, source);
+  }
+
+  reportOrphans(skillsDir, keys, prune);
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const prune = args.includes('--prune');
+  const unknown = args.filter((a) => a !== '--prune');
+  if (unknown.length) {
+    console.error(`usage: linkskill [--prune]\nunknown argument: ${unknown.join(' ')}`);
+    process.exit(2);
+  }
+
+  const files = findMappingFiles(ROOT, []);
+  if (!files.length) {
+    console.log(`no ${MAPPING_FILE} found under ${ROOT}`);
+    return;
+  }
+  for (const f of files) processMapping(f, prune);
+
+  if (errors) process.exit(1);
+}
+
+main();
