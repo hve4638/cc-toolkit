@@ -28,8 +28,8 @@
 | | `/draft-pr` | 셀프 PR 본문 양식 작성 (WHY 중심). 실제 PR 은 하지 않음 |
 | 리뷰·분석 | `/cross-review` | codex MCP + subagent 교차 리뷰 (기본 1-1, 동일 작업) |
 | | `/reverse-engineer` | 프로젝트 분석 → `_report/<date>-project-analysis/` 에 8 산출물 (INDEX, overview, tech-stack, directory-structure, data-flow, core-implementation, constraints, insights) |
-| 세션 인계 | `/handoff` | 현재 세션을 task 섹션 단위로 `.agent-memory/HANDOFF.md` 단일 파일에 보관 (기존 파일 있으면 덮어쓰기 확인) |
-| | `/pickup` | HANDOFF.md 복원 후 삭제 |
+| 작업 위임 | `/handoff` | 위임할 작업을 HANDOFF 파일로 저장 — 작업 디렉토리 또는 프로젝트 루트, 기존 파일 있으면 덮어쓰기 확인 |
+| | `/pickup` | 현재 디렉토리의 HANDOFF 파일 로드 후 삭제 |
 | 외부 docs | `/docs-claude` | Claude Code llms.txt 링크 |
 | | `/docs-skills` | Claude Code skills 작성·배포 docs 링크 |
 | 스킬 설명서 | `/man` | 스킬의 `MAN.md` 를 읽고 설명·질의응답. 인자 없으면 문서화된 스킬 색인 |
