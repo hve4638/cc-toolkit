@@ -46,6 +46,11 @@
       "name": "plugin-devtool",
       "source": "./plugin-devtool",
       "description": "Plugin-author tooling for this marketplace — get-ticket queries the global feedback tickets that core:ticket publishes. Not needed in ordinary sessions"
+    },
+    {
+      "name": "personal",
+      "source": "./personal",
+      "description": "Strictly personal environment customization — session-injected personal instructions and personal workflow skills. Not meant for sharing"
     }
   ]
 }

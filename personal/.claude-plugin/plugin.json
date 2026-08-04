@@ -1,0 +1,13 @@
+{
+  "name": "personal",
+  "version": "0.1.0",
+  "description": "Strictly personal environment customization — session-injected personal instructions and personal workflow skills. Not meant for sharing",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin"
+  ]
+}
