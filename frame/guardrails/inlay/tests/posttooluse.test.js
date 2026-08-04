@@ -79,6 +79,39 @@ test('editing INLAY.md itself refreshes its hash and marks inlayUpdated', async 
   }
 });
 
+test('trigger-excluded file: no codeTouched, no stopHookFired reset', async () => {
+  const root = makeTmpRoot();
+  try {
+    write(join(root, 'proj', '.inlay'), '!*.md\n');
+    write(join(root, 'proj', 'INLAY.md'), 'PROJ');
+    // seed stopHookFired=true so a reset would be observable
+    const { saveCache, ensureCacheDir } = await import('../lib/state-file.mjs');
+    ensureCacheDir(root);
+    saveCache({ stopHookFired: true }, { projectRoot: root, sessionId: SID });
+    const out = await posttooluse(payload(root, join(root, 'proj', 'docs', 'a.md')));
+    assert.equal(out, null);
+    const cache = readCacheFile(root, `${SID}.json`);
+    assert.deepEqual(cache.tracking, {}, 'excluded file is not tracked');
+    assert.equal(cache.stopHookFired, true, 'stopHookFired not reset by excluded file');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('INLAY.md edit still marks inlayUpdated even under "!*.md"', async () => {
+  const root = makeTmpRoot();
+  try {
+    write(join(root, 'proj', '.inlay'), '!*.md\n');
+    const inlay = write(join(root, 'proj', 'INLAY.md'), 'NEW BODY');
+    const out = await posttooluse(payload(root, inlay));
+    assert.equal(out, null);
+    const cache = readCacheFile(root, `${SID}.json`);
+    assert.equal(cache.tracking[inlay].inlayUpdated, true, 'INLAY.md bookkeeping is pattern-independent');
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('non-write tool returns null', async () => {
   const root = makeTmpRoot();
   try {

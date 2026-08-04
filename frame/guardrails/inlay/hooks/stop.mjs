@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { dirname } from 'path';
+import { basename, dirname } from 'path';
 import { execFileSync } from 'child_process';
 import {
   loadCache,
@@ -29,7 +29,14 @@ function getInlayDiff(inlayRoot) {
 
   // WHY: full diff 는 모델이 방금 자기가 만든 변경이라 본문 중복. 파일별
   //      +/- 통계만 노출해 inlay 내 변동 스코프만 알린다.
-  const stat = runGit(inlayRoot, ['diff', '--stat', '--', '.']);
+  // WHY: INLAY.md 는 diff 에서 제외 — stale 판정은 이번 사이클 tracking 기준
+  //      인데 diff 는 워킹트리 전체 기준이라, 이전 사이클에 이미 고친
+  //      `INLAY.md | 2 +-` 가 "안 고쳤다" 알림에 같이 찍히는 자기모순이 생긴다.
+  //      exclude pathspec 두 개로 최상위(INLAY.md)·중첩(**/INLAY.md) 을 정확히
+  //      잡는다 (`*INLAY.md` 한 개는 MY-INLAY.md 류까지 과잉 제외 — 실증 확인).
+  const stat = runGit(inlayRoot, [
+    'diff', '--stat', '--', '.', ':(exclude)INLAY.md', ':(exclude)**/INLAY.md',
+  ]);
   // WHY: git diff 는 untracked 신규 파일을 못 잡으므로 ls-files --others
   //      로 보완. inlay 안에 새로 생긴 파일도 변동 스코프의 일부.
   const others = runGit(inlayRoot, ['ls-files', '--others', '--exclude-standard', '--', '.']);
@@ -37,7 +44,9 @@ function getInlayDiff(inlayRoot) {
   const blocks = [];
   if (stat != null && stat.length > 0) blocks.push(stat.replace(/\n+$/, ''));
   if (others != null && others.trim().length > 0) {
-    blocks.push(others.trim().split('\n').map((p) => `[NEW] ${p}`).join('\n'));
+    // WHY: untracked INLAY.md 도 diff 쪽과 같은 이유로 제외 (basename 필터로 충분).
+    const newFiles = others.trim().split('\n').filter((p) => basename(p) !== 'INLAY.md');
+    if (newFiles.length > 0) blocks.push(newFiles.map((p) => `[NEW] ${p}`).join('\n'));
   }
   return blocks.length === 0 ? null : blocks.join('\n');
 }

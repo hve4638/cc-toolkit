@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 import { findNearestContext } from '../lib/read-context.mjs';
 import { saveCache, ensureCacheDir, resolveProjectRoot } from '../lib/state-file.mjs';
 import { findMarkerDir } from '../../../scripts/lib/markers.mjs';
+import { isTriggerFile } from '../lib/trigger-patterns.mjs';
 
 const INTERCEPT = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
@@ -37,6 +38,10 @@ export default async function posttooluse(payload) {
   ensureCacheDir(projectRoot);
   const ctx = { projectRoot, sessionId: session_id, agentId: agent_id };
 
+  // WHY: INLAY.md 편집 부기는 트리거 패턴과 무관하게 유지 — 패턴 제외는
+  //      "주입·codeTouched 트리거로서의 제외" 지 INLAY.md 부기의 제외가 아니다.
+  //      이 분기가 패턴에 걸려 죽으면 INLAY.md 를 고쳤는데도 inlayUpdated 가
+  //      안 박혀 Stop 훅이 stale 로 잡는 역오탐이 생긴다.
   if (basename(resolved) === 'INLAY.md') {
     // WHY: PreToolUse 의 self-edit 가드가 chain emit 을 막았기 때문에
     //      hash 도 갱신되지 않은 상태. 여기서 직접 새 본문을 읽어 hash 를
@@ -59,6 +64,11 @@ export default async function posttooluse(payload) {
     );
     return null;
   }
+
+  // WHY: 트리거 패턴에 안 걸리는 파일은 codeTouched 마킹도 stopHookFired
+  //      리셋도 없다 — PreToolUse 의 주입 제외와 같은 판정을 써야 "주입은
+  //      없었는데 잔소리는 오는" 비대칭이 안 생긴다.
+  if (!isTriggerFile(resolved, ceiling)) return null;
 
   const nearest = findNearestContext(resolved, { ceiling });
   if (!nearest) return null;

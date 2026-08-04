@@ -94,7 +94,7 @@ test('self-edit of INLAY.md by a write tool is left alone (no chain injection)',
   }
 });
 
-test('Reading INLAY.md (non-write tool) is treated as a normal chain', async () => {
+test('Reading INLAY.md is silent too (INLAY.md never triggers, regardless of tool)', async () => {
   const root = makeTmpRoot();
   try {
     write(join(root, 'proj', '.inlay'), '');
@@ -102,7 +102,7 @@ test('Reading INLAY.md (non-write tool) is treated as a normal chain', async () 
     const out = await pretooluse(payload(root, join(root, 'proj', 'INLAY.md'), {
       tool_name: 'Read',
     }));
-    assert.ok(out && out.context.includes('PROJ BODY'));
+    assert.equal(out, null, 'Read of INLAY.md must not inject the chain');
   } finally {
     cleanup(root);
   }
@@ -143,6 +143,38 @@ test('second identical PreToolUse is silent (unchanged), no re-injection', async
     assert.ok(first.context.includes('PROJ'));
     const second = await pretooluse(p);
     assert.equal(second, null, 'unchanged chain => no context');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('trigger patterns: "!*.md" in .inlay silences md edits', async () => {
+  const root = makeTmpRoot();
+  try {
+    write(join(root, 'proj', '.inlay'), '!*.md\n');
+    write(join(root, 'proj', 'INLAY.md'), 'PROJ');
+    mkdirp(join(root, 'proj', 'docs'));
+    const out = await pretooluse(payload(root, join(root, 'proj', 'docs', 'a.md'), {
+      tool_name: 'Edit',
+      tool_input: { file_path: join(root, 'proj', 'docs', 'a.md') },
+    }));
+    assert.equal(out, null, 'excluded file gets no injection');
+    assert.deepEqual(cacheFiles(root), [], 'and no cache write');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('trigger patterns: a pattern-matched file still injects as before', async () => {
+  const root = makeTmpRoot();
+  try {
+    write(join(root, 'proj', '.inlay'), '*.js\n');
+    write(join(root, 'proj', 'INLAY.md'), 'PROJ CONTEXT');
+    mkdirp(join(root, 'proj', 'src'));
+    const hit = await pretooluse(payload(root, join(root, 'proj', 'src', 'a.js')));
+    assert.ok(hit && hit.context.includes('PROJ CONTEXT'), 'matched file injects');
+    const miss = await pretooluse(payload(root, join(root, 'proj', 'src', 'a.md')));
+    assert.equal(miss, null, 'unmatched file is silent');
   } finally {
     cleanup(root);
   }

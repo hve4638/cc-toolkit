@@ -1,5 +1,6 @@
-import { basename, dirname, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { readContextChain, formatForHook } from '../lib/read-context.mjs';
+import { isTriggerFile } from '../lib/trigger-patterns.mjs';
 import {
   loadCache,
   saveCache,
@@ -11,7 +12,6 @@ import {
 import { findMarkerDir } from '../../../scripts/lib/markers.mjs';
 
 const INTERCEPT = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
-const WRITE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
 function extractPath(toolName, toolInput) {
   if (!toolInput) return null;
@@ -27,18 +27,17 @@ export default async function pretooluse(payload) {
   const filePath = extractPath(tool_name, tool_input);
   if (!filePath) return null;
 
-  // WHY: INLAY.md 를 직접 수정하는 호출에서 chain 을 박으면 그 자기
-  //      본문이 prompt 에 또 들어가 의미상 순환이 생긴다. Read 는 본문
-  //      만 보여주므로 정상 chain 으로 다룬다.
-  if (WRITE_TOOLS.has(tool_name) && basename(filePath) === 'INLAY.md') {
-    return null;
-  }
-
   // WHY: 천장은 편집 대상 파일에서 올라가며 찾은 .inlay 디렉터리. 파일 위에
   //      .inlay 가 없으면 그 파일은 어떤 inlay 스코프에도 안 속하므로 INLAY.md
   //      를 아예 보지 않는다 (주입·추적 없음).
   const ceiling = findMarkerDir(dirname(resolve(filePath)), '.inlay');
   if (!ceiling) return null;
+
+  // WHY: .inlay 의 트리거 패턴에 안 걸리는 파일은 주입도 추적도 없다.
+  //      INLAY.md 자신은 패턴과 무관하게 항상 비트리거 — 수정 호출에서 chain
+  //      을 박으면 그 자기 본문이 prompt 에 또 들어가 의미상 순환이 생기고,
+  //      Read 도 본문을 그대로 보여주므로 chain 중복일 뿐이라 조용히 넘긴다.
+  if (!isTriggerFile(resolve(filePath), ceiling)) return null;
 
   const projectRoot = resolveProjectRoot(payload);
   ensureCacheDir(projectRoot);
