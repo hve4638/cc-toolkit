@@ -31,7 +31,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/memhome/scripts/relocate-memory.mjs" [custom-
 
 ### 3. Report
 
-Relay the script's summary to the user in full: the memory target, the migrated file counts per source, any warnings, the settings change, and both follow-up notes.
+Relay the script's summary to the user in full: the memory target, the migrated file counts per source, any warnings, the settings change, and the follow-up notes.
 
 ### 4. On failure, stop
 

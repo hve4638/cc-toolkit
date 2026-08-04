@@ -6,8 +6,9 @@
  *
  * Moves the legacy per-slug memory (~/.claude/projects/<slug>/memory/) and,
  * when settings already point somewhere else, that previous location to the
- * target directory, then points `autoMemoryDirectory` in the project's
- * .claude/settings.local.json at it.
+ * target directory, then points `autoMemoryDirectory` at it in the project's
+ * .claude/settings.local.json — the main checkout's inside a git repo, so every
+ * worktree of that repo reads it.
  *
  * Default target: in a git repo, ~/.agent-memory/<key>/memory where
  * <key> = <repo basename>-<root commit[:12]> — location-independent, so every
@@ -23,7 +24,7 @@ import {
   renameSync, rmdirSync, statSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { ensureDir } from '../../../scripts/lib/agent-memory.mjs';
 
 function git(...args) {
@@ -39,29 +40,38 @@ function git(...args) {
 const commonDir = git('rev-parse', '--git-common-dir');
 const inGit = commonDir !== null;
 let projectRoot;
-let settingsPath;
 if (inGit) {
   const commonDirAbs = resolve(process.cwd(), commonDir);
   projectRoot = basename(commonDirAbs) === '.git' ? dirname(commonDirAbs) : commonDirAbs;
-  // Submodules and --separate-git-dir leave a `.git` component in the derived
-  // root (e.g. <super>/.git/modules/<name>) — that is a git-internal path, not
-  // a checkout. Only plain checkouts/worktrees are supported.
-  if (projectRoot.split(sep).includes('.git')) {
+  // The derived root must itself be a checkout — it is where the settings file
+  // goes. Bare repos (including their worktrees), submodules and
+  // --separate-git-dir all derive a git-internal or checkout-less path, and a
+  // settings file there is one nobody reads. Refused rather than guessed at: in
+  // a bare repo's worktree Claude Code was observed reading that worktree's own
+  // settings, so there is no single file that would serve every worktree.
+  if (git('-C', projectRoot, 'rev-parse', '--is-inside-work-tree') !== 'true') {
     console.error(`Cannot derive the main checkout root from ${commonDirAbs}.`);
-    console.error('Submodules and separate git dirs are not supported; run from a plain checkout or worktree.');
+    console.error('Bare repos, submodules and separate git dirs are not supported; run from a plain checkout or one of its worktrees.');
     process.exit(1);
   }
-  // 2. Current checkout toplevel — settings live with the checkout you run in.
-  const toplevel = git('rev-parse', '--show-toplevel');
-  if (toplevel === null) {
-    console.error('Not inside a git work tree (git rev-parse --show-toplevel failed).');
+  // Refuses a cwd inside `.git`, which the removed --show-toplevel call used to
+  // catch on its way to the settings path.
+  if (git('rev-parse', '--is-inside-work-tree') !== 'true') {
+    console.error('Not inside a git work tree; run from a checkout or worktree.');
     process.exit(1);
   }
-  settingsPath = join(toplevel, '.claude', 'settings.local.json');
 } else {
   projectRoot = resolve(process.cwd());
-  settingsPath = join(projectRoot, '.claude', 'settings.local.json');
 }
+
+// 2. Settings go to the project root — inside git that is the main checkout,
+//    not the checkout you run in.
+// WHY: Claude Code resolves `.claude/settings.local.json` at the canonical git
+//      root even when the session runs in a linked worktree (the worktree's own
+//      file is only a fallback the root value overrides), and the auto memory
+//      directory is shared per repo. Writing at the root is what makes one run
+//      cover every worktree — and survives destroying the worktree it ran in.
+const settingsPath = join(projectRoot, '.claude', 'settings.local.json');
 
 // 3. Target. For `~/` values the settings entry keeps the literal `~/` form
 //    (autoMemoryDirectory accepts it); file operations use the expanded path.
@@ -138,13 +148,15 @@ function containsOrEquals(ancestor, path) {
   const rel = relative(ancestor, path);
   return !rel.startsWith('..') && !isAbsolute(rel);
 }
+// Settings values worth acting on are `~/`-prefixed or absolute; null means a
+// form this script will not guess at.
+function expandSetting(value) {
+  if (typeof value !== 'string') return null;
+  if (value.startsWith('~/')) return join(homedir(), value.slice(2));
+  return isAbsolute(value) ? resolve(value) : null;
+}
 if (previous !== undefined) {
-  let expanded = null;
-  if (typeof previous === 'string' && previous.startsWith('~/')) {
-    expanded = join(homedir(), previous.slice(2));
-  } else if (typeof previous === 'string' && isAbsolute(previous)) {
-    expanded = resolve(previous);
-  }
+  const expanded = expandSetting(previous);
   if (expanded === null) {
     warnings.push(`previous autoMemoryDirectory has an unsupported form; not migrating from it: ${JSON.stringify(previous)}`);
   } else if (expanded === resolve(target)) {
@@ -167,6 +179,33 @@ if (previous !== undefined) {
     warnings.push(`previous autoMemoryDirectory is not a directory; not migrating from it: ${previous}`);
   } else {
     prevDir = expanded;
+  }
+}
+
+// 5b. Worktree-local leftovers. Versions up to core 0.56.0 wrote the setting
+//     into the checkout they ran in; the value written here overrides those, so
+//     they are inert from now on. Only one pointing at memory this run leaves
+//     behind is worth saying out loud — reported, not touched.
+if (inGit) {
+  const list = git('worktree', 'list', '--porcelain');
+  for (const line of (list ?? '').split('\n')) {
+    if (!line.startsWith('worktree ')) continue;
+    const wtSettings = join(line.slice('worktree '.length), '.claude', 'settings.local.json');
+    if (resolve(wtSettings) === resolve(settingsPath) || !existsSync(wtSettings)) continue;
+    let wtValue;
+    try {
+      wtValue = JSON.parse(readFileSync(wtSettings, 'utf-8'))?.autoMemoryDirectory;
+    } catch {
+      continue;
+    }
+    const wtDir = expandSetting(wtValue);
+    // Silent when it names the target or a source this run empties — nothing is
+    // left there — and when the directory does not exist. Also silent on forms
+    // this script will not expand: unlike `previous`, an inert leftover in an
+    // odd form gives the user nothing to act on.
+    if (wtDir === null || wtDir === resolve(target) || wtDir === prevDir
+      || wtDir === legacyDir || !existsSync(wtDir)) continue;
+    warnings.push(`a worktree keeps its own autoMemoryDirectory, now overridden; the memory there stays where it is: ${wtSettings} (${wtValue})`);
   }
 }
 
@@ -297,4 +336,6 @@ if (prevDir !== null) {
 for (const w of warnings) console.log(`Warning: ${w}`);
 console.log(`Settings: ${settingsPath} — ${settingsReport}`);
 console.log('Takes effect from the next session; you may need to accept the project settings trust dialog.');
-console.log('To use this in another worktree, run this script once from that worktree (idempotent).');
+if (inGit) {
+  console.log('Settings live at the main checkout, so every worktree of this repo reads this location.');
+}

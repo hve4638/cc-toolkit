@@ -228,18 +228,177 @@ test('previous pointing at a regular file is skipped with a warning', async () =
   });
 });
 
-// key는 루트 커밋 기반이라 linked worktree도 같은 타깃으로 수렴한다.
-test('linked worktree converges on the same target and settings value', async () => {
+// linked worktree에서 실행해도 타깃(루트 커밋 기반 key)과 settings 위치(메인
+// 체크아웃)가 같은 곳으로 수렴한다 — Claude Code가 워크트리 세션에서도 메인
+// 체크아웃의 settings.local.json을 읽기 때문에 한 번 실행이 전 워크트리를 덮는다.
+test('linked worktree run writes settings to the main checkout, not the worktree', async () => {
   await withSetup(async (ctx) => {
-    assert.equal(run(ctx).status, 0);
     const wt = join(ctx.base, 'wt');
     const add = runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt);
     assert.equal(add.status, 0, add.stderr);
+    writeFileP(join(ctx.legacyDir, 'a.md'), 'A');
     const r = run(ctx, [], wt);
     assert.equal(r.status, 0, r.stderr);
-    const wtSettings = JSON.parse(readFileSync(join(wt, '.claude', 'settings.local.json'), 'utf-8'));
-    assert.equal(wtSettings.autoMemoryDirectory, ctx.settingsValue);
+    assert.equal(existsSync(join(wt, '.claude', 'settings.local.json')), false);
     assert.equal(readSettings(ctx).autoMemoryDirectory, ctx.settingsValue);
+    // legacy slug도 메인 체크아웃 기준이라 워크트리에서 실행해도 같은 소스를 옮긴다.
+    assert.equal(readFileSync(join(ctx.target, 'a.md'), 'utf-8'), 'A');
+  });
+});
+
+// 메인 체크아웃 settings를 읽으므로, 워크트리에서만 실행해도 이전 위치 치유가 된다.
+test('linked worktree run heals a stale previous path from the main checkout settings', async () => {
+  await withSetup(async (ctx) => {
+    const wt = join(ctx.base, 'wt');
+    assert.equal(runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const old = join(ctx.base, 'old-memory');
+    writeFileP(join(old, 'c.md'), 'C');
+    writeFileP(ctx.settingsPath, JSON.stringify({ autoMemoryDirectory: old }, null, 2));
+    const r = run(ctx, [], wt);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readFileSync(join(ctx.target, 'c.md'), 'utf-8'), 'C');
+    assert.match(r.stdout, /Files migrated from previous location: 1/);
+    assert.equal(readSettings(ctx).autoMemoryDirectory, ctx.settingsValue);
+  });
+});
+
+// 구 버전(≤ 0.56.0)이 워크트리에 써둔 값은 이제 메인 체크아웃 값에 덮이므로,
+// 다른 경로를 가리키고 있으면 이전되지 않은 채 남는다는 경고만 낸다.
+test('a worktree keeping its own autoMemoryDirectory is reported, not touched', async () => {
+  await withSetup(async (ctx) => {
+    const wt = join(ctx.base, 'wt');
+    assert.equal(runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const stale = join(ctx.base, 'stale-memory');
+    const wtSettingsPath = join(wt, '.claude', 'settings.local.json');
+    writeFileP(wtSettingsPath, JSON.stringify({ autoMemoryDirectory: stale }, null, 2));
+    writeFileP(join(stale, 's.md'), 'S');
+    const r = run(ctx);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /Warning: a worktree keeps its own autoMemoryDirectory/);
+    assert.match(r.stdout, new RegExp(stale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    // 경고만 한다 — 워크트리 파일도 그쪽 메모리도 건드리지 않는다.
+    assert.equal(JSON.parse(readFileSync(wtSettingsPath, 'utf-8')).autoMemoryDirectory, stale);
+    assert.equal(readFileSync(join(stale, 's.md'), 'utf-8'), 'S');
+    assert.equal(readSettings(ctx).autoMemoryDirectory, ctx.settingsValue);
+  });
+});
+
+// 같은 타깃을 가리키는 잔재는 남길 메모리가 없으므로 조용히 지나간다 —
+// `~/` 리터럴과 확장된 절대경로 양쪽 다.
+test('a worktree leftover naming the target produces no warning', async () => {
+  await withSetup(async (ctx) => {
+    const wt = join(ctx.base, 'wt');
+    assert.equal(runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    writeFileP(join(wt, '.claude', 'settings.local.json'),
+      JSON.stringify({ autoMemoryDirectory: ctx.settingsValue }, null, 2));
+    const r1 = run(ctx);
+    assert.equal(r1.status, 0, r1.stderr);
+    assert.doesNotMatch(r1.stdout, /a worktree keeps its own/);
+    // 확장된 형태로 적혀 있어도 같은 디렉터리다.
+    writeFileP(join(wt, '.claude', 'settings.local.json'),
+      JSON.stringify({ autoMemoryDirectory: ctx.target }, null, 2));
+    const r2 = run(ctx);
+    assert.equal(r2.status, 0, r2.stderr);
+    assert.doesNotMatch(r2.stdout, /a worktree keeps its own/);
+  });
+});
+
+// 나머지 침묵 조건 둘: legacy 소스를 가리키는 잔재와, 존재하지 않는 디렉터리.
+test('a worktree leftover naming the legacy source or a missing directory produces no warning', async () => {
+  await withSetup(async (ctx) => {
+    const wt = join(ctx.base, 'wt');
+    assert.equal(runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const wtSettingsPath = join(wt, '.claude', 'settings.local.json');
+    writeFileP(join(ctx.legacyDir, 'a.md'), 'A');
+    writeFileP(wtSettingsPath, JSON.stringify({ autoMemoryDirectory: ctx.legacyDir }, null, 2));
+    const r1 = run(ctx);
+    assert.equal(r1.status, 0, r1.stderr);
+    assert.match(r1.stdout, /Files migrated from legacy: 1/);
+    assert.doesNotMatch(r1.stdout, /a worktree keeps its own/);
+
+    writeFileP(wtSettingsPath, JSON.stringify({ autoMemoryDirectory: join(ctx.base, 'gone') }, null, 2));
+    const r2 = run(ctx);
+    assert.equal(r2.status, 0, r2.stderr);
+    assert.doesNotMatch(r2.stdout, /a worktree keeps its own/);
+  });
+});
+
+// 하위 디렉터리에서 실행하면 --git-common-dir가 상대경로(../../.git)로 나온다 —
+// cwd 기준 resolve가 그걸 메인 체크아웃으로 되돌리는지 본다.
+test('run from a subdirectory still resolves the main checkout', async () => {
+  await withSetup(async (ctx) => {
+    const sub = join(ctx.repo, 'a', 'b');
+    mkdirSync(sub, { recursive: true });
+    writeFileP(join(ctx.legacyDir, 'a.md'), 'A');
+    const r = run(ctx, [], sub);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readFileSync(join(ctx.target, 'a.md'), 'utf-8'), 'A');
+    assert.equal(readSettings(ctx).autoMemoryDirectory, ctx.settingsValue);
+  });
+});
+
+// 잔재가 이번 실행이 비우는 previous를 가리키면 그 자리에 남는 게 없다.
+test('a worktree leftover naming the previous location produces no warning', async () => {
+  await withSetup(async (ctx) => {
+    const wt = join(ctx.base, 'wt');
+    assert.equal(runGit(ctx.repo, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const old = join(ctx.base, 'old-memory');
+    writeFileP(join(old, 'c.md'), 'C');
+    writeFileP(ctx.settingsPath, JSON.stringify({ autoMemoryDirectory: old }, null, 2));
+    writeFileP(join(wt, '.claude', 'settings.local.json'), JSON.stringify({ autoMemoryDirectory: old }, null, 2));
+    const r = run(ctx);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /Files migrated from previous location: 1/);
+    assert.doesNotMatch(r.stdout, /a worktree keeps its own/);
+  });
+});
+
+// 메인 체크아웃이 없는 레이아웃은 거부한다: bare repo의 워크트리는 Claude Code가
+// 워크트리 자기 settings를 읽고 legacy slug도 이 스크립트 계산과 어긋난다.
+test('bare repo worktree is refused instead of writing settings into the git dir', async () => {
+  await withSetup(async (ctx) => {
+    const bare = join(ctx.base, 'bare.git');
+    assert.equal(runGit(ctx.base, ctx.env, 'clone', '--bare', '-q', ctx.repo, bare).status, 0);
+    const wt = join(ctx.base, 'bare-wt');
+    assert.equal(runGit(bare, ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const r = run(ctx, [], wt);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Bare repos, submodules and separate git dirs are not supported/);
+    assert.equal(existsSync(join(bare, '.claude')), false);
+    assert.equal(existsSync(join(wt, '.claude')), false);
+  });
+});
+
+// 같은 가드의 다른 갈래: git 디렉터리가 체크아웃 밖에 있으면 거기에 settings를
+// 쓸 수 없다. `.git`이라는 이름의 bare repo도 basename만으로는 구분되지 않아
+// 같은 가드가 잡아야 한다.
+test('separate git dir and a bare repo named .git are refused', async () => {
+  await withSetup(async (ctx) => {
+    const sg = join(ctx.base, 'sg');
+    mkdirSync(sg);
+    assert.equal(runGit(sg, ctx.env, 'init', '-q', `--separate-git-dir=${join(ctx.base, 'sgdir')}`, '.').status, 0);
+    const r1 = run(ctx, [], sg);
+    assert.equal(r1.status, 1);
+    assert.match(r1.stderr, /not supported/);
+
+    const dotRoot = join(ctx.base, 'dotroot');
+    mkdirSync(dotRoot);
+    assert.equal(runGit(ctx.base, ctx.env, 'clone', '--bare', '-q', ctx.repo, join(dotRoot, '.git')).status, 0);
+    const wt = join(ctx.base, 'dot-wt');
+    assert.equal(runGit(join(dotRoot, '.git'), ctx.env, 'worktree', 'add', '-q', wt).status, 0);
+    const r2 = run(ctx, [], wt);
+    assert.equal(r2.status, 1);
+    assert.match(r2.stderr, /not supported/);
+    assert.equal(existsSync(join(dotRoot, '.claude')), false);
+  });
+});
+
+test('cwd inside .git is refused', async () => {
+  await withSetup(async (ctx) => {
+    const r = run(ctx, [], join(ctx.repo, '.git'));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Not inside a git work tree/);
+    assert.equal(existsSync(ctx.settingsPath), false);
   });
 });
 

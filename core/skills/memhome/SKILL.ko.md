@@ -31,7 +31,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/memhome/scripts/relocate-memory.mjs" [custom-
 
 ### 3. 보고
 
-스크립트의 요약을 빠짐없이 사용자에게 전달한다: 메모리 타깃, 소스별 이전 파일 수, 경고가 있으면 그 내용, settings 변경 내용, 후속 안내 두 줄.
+스크립트의 요약을 빠짐없이 사용자에게 전달한다: 메모리 타깃, 소스별 이전 파일 수, 경고가 있으면 그 내용, settings 변경 내용, 후속 안내.
 
 ### 4. 실패 시 멈춘다
 
