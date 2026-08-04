@@ -40,73 +40,51 @@ whatever worktree folder that `.wtrc` names. It decides nothing — if
 `<repo-rel>` doesn't point at a repo root it errors. Report its output to the
 user. To regenerate after a template change, remove `mkwt.sh` and re-run.
 
-## 2. Write the post_create hook
+## 2. Ask what a new worktree should open, then write the hook
 
-`wt-init.sh` deliberately leaves `.wtrc`'s `post_create` commented out, because
-what a new worktree should open is a question only the user can answer. Ask
-what should happen when a worktree is created, then edit `.wtrc` directly. The
-common answer is a new tmux window, optionally with `claude` started in it:
+`wt-init.sh` leaves `.wtrc`'s `post_create` commented out: what a new worktree
+should open is a question only the user can answer, and it gets answered here,
+once. The hook then behaves the same on every `mkwt.sh` run.
+
+Ask the user:
+
+1. Open a tmux window for each new worktree? (no → leave `post_create` out)
+2. Start `claude` in that window?
+3. Open it when an agent or a script runs `mkwt.sh` too, or only when the user
+   runs it from a terminal?
+4. A window-name prefix? (empty = branch name as-is)
+
+Then edit `.wtrc` with their answers:
 
 ```sh
 # Window-name prefix; empty = branch name as-is (win_prefix=wt: opens "wt:fix/x")
 win_prefix=
 
 post_create() {
-  [ -n "${TMUX:-}" ] || return 0   # windows only exist inside tmux
-  name="${win_prefix}${WT_BRANCH}"
-  case "${WT_WINDOW:-}" in
-    1) ;;
-    0) return 0 ;;
-    *)
-      if [ "$WT_INTERACTIVE" = 1 ]; then
-        printf 'open a tmux window for %s? [Y/n] ' "$WT_BRANCH" >/dev/tty
-        IFS= read -r ans </dev/tty || return 0
-        case "$ans" in [nN]*) return 0 ;; esac
-      else
-        printf 'tmux window NOT opened — the user was not asked. Ask them; if yes, run:\n'
-        printf "  win=\$(tmux new-window -P -F '#{window_id}' -c '%s' -n '%s') && tmux send-keys -t \"\$win\" claude Enter\n" "$WT_PATH" "$name"
-        printf 'or decide up front next time: WT_WINDOW=1 (open) / WT_WINDOW=0 (skip).\n'
-        return 0
-      fi ;;
-  esac
-  win=$(tmux new-window -P -F '#{window_id}' -c "$WT_PATH" -n "$name") || return 0
-  tmux send-keys -t "$win" 'claude' Enter
+  [ -n "${TMUX:-}" ] || return 0          # windows only exist inside tmux
+  [ "$WT_INTERACTIVE" = 1 ] || return 0   # (3) terminal runs only; drop the line to open in every run
+  win=$(tmux new-window -P -F '#{window_id}' -c "$WT_PATH" -n "${win_prefix}${WT_BRANCH}") || return 0
+  tmux send-keys -t "$win" 'claude' Enter # (2) drop if claude should not start
 }
 ```
 
-The hook opens a window only on an explicit decision: `WT_WINDOW=1`/`=0` settles
-it per run; otherwise a terminal user is prompted on the spot, and a captured run
-(an agent) gets the pending question plus the exact command on stderr to relay to
-the user.
-Drop the `send-keys` line (and its copy inside the printed command) if they don't
-want `claude` launched. Use `send-keys` rather than `tmux new-window <cmd>` — the
-latter runs a non-interactive shell and would skip the user's aliases and
-functions.
+Use `send-keys` rather than `tmux new-window <cmd>` — the latter runs a
+non-interactive shell and would skip the user's aliases and functions.
 
 If they want something else entirely (another multiplexer, an editor, a
 notification), write that instead; the hook is plain shell and `.wtrc` documents
-the variables it receives. Leave `post_create` out altogether if they want
-nothing — `mkwt.sh` then just prints the path.
+the variables it receives. A notification usually should fire in captured runs
+too, where a window should not.
 
-Two rules keep any hook correct:
-
-- **Guard terminal-only side effects with `WT_INTERACTIVE`.** It is `1` when a
-  user is at a terminal and `0` when output is captured by a script or an agent.
-  Opening a window in a captured run would spawn stray windows — but silently
-  skipping throws away a choice the user never got to make, so surface the
-  pending question instead, as the example does. A notification, by contrast,
-  should usually fire either way.
-- **Leave the worktree path to `mkwt.sh`.** It prints the path, and callers
-  capture that.
+One rule holds for any hook: leave the worktree path to `mkwt.sh` — it prints the
+path, and callers capture that.
 
 ## After assembling
 
 `mkwt.sh` is the user's command — relay it rather than running it unprompted
 (running it creates a branch + worktree). When running it anyway, capture with
-`$(...)` — that yields the worktree path and sets `WT_INTERACTIVE=0`, so a
-well-written hook leaves the user's terminal alone. With the example hook the
-window question then arrives on stderr — relay it to the user and act on their
-answer, or settle it up front with `WT_WINDOW=1` / `WT_WINDOW=0`.
+`$(...)` — that yields the worktree path and sets `WT_INTERACTIVE=0`, so a hook
+baked for terminal runs only leaves the user's terminal alone.
 
 wt-init's output already states how to run `mkwt.sh`; relay that. For mkwt,
 `.wtrc`, and `wt merge` / `wt land` / `wt destroy` mechanics, point at README.md

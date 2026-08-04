@@ -147,40 +147,16 @@ worktree_dir=$2
 #
 # Its stdout is redirected to stderr, so it cannot disturb the worktree path that
 # mkwt prints. A failing hook is reported but does not undo the worktree.
-#
-# The example below opens a tmux window per worktree (inside tmux only), named
-# \${win_prefix}\${WT_BRANCH}, and never decides by itself whether to open it:
-#   WT_WINDOW=1 ./mkwt.sh …   open it, no questions
-#   WT_WINDOW=0 ./mkwt.sh …   skip it
-#   unset                     a terminal user is asked right here; a captured
-#                             run (agent/script) cannot be asked, so the hook
-#                             prints the pending question and the exact command
-#                             to run after asking.
 
 # Window-name prefix used by the hook below; empty = branch name as-is
 # (win_prefix=wt: opens "wt:fix/x").
 win_prefix=
 
 #post_create() {
-#  [ -n "\${TMUX:-}" ] || return 0   # windows only exist inside tmux
-#  name="\${win_prefix}\${WT_BRANCH}"
-#  case "\${WT_WINDOW:-}" in
-#    1) ;;
-#    0) return 0 ;;
-#    *)
-#      if [ "\$WT_INTERACTIVE" = 1 ]; then
-#        printf 'open a tmux window for %s? [Y/n] ' "\$WT_BRANCH" >/dev/tty
-#        IFS= read -r ans </dev/tty || return 0
-#        case "\$ans" in [nN]*) return 0 ;; esac
-#      else
-#        printf 'tmux window NOT opened — the user was not asked. Ask them; if yes, run:\n'
-#        printf "  win=\\\$(tmux new-window -P -F '#{window_id}' -c '%s' -n '%s') && tmux send-keys -t \"\\\$win\" claude Enter\n" "\$WT_PATH" "\$name"
-#        printf 'or decide up front next time: WT_WINDOW=1 (open) / WT_WINDOW=0 (skip).\n'
-#        return 0
-#      fi ;;
-#  esac
-#  win=\$(tmux new-window -P -F '#{window_id}' -c "\$WT_PATH" -n "\$name") || return 0
-#  tmux send-keys -t "\$win" 'claude' Enter
+#  [ -n "\${TMUX:-}" ] || return 0          # windows only exist inside tmux
+#  [ "\$WT_INTERACTIVE" = 1 ] || return 0   # terminal runs only; drop the line to open in every run
+#  win=\$(tmux new-window -P -F '#{window_id}' -c "\$WT_PATH" -n "\${win_prefix}\${WT_BRANCH}") || return 0
+#  tmux send-keys -t "\$win" 'claude' Enter # drop if claude should not start
 #}
 EOF
 }
