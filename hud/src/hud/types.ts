@@ -229,6 +229,8 @@ export interface HudElementConfig {
   rateLimits: boolean;  // Show 5h and weekly rate limits
   contextBar: boolean;
   maxOutputLines: number;     // Max total output lines to prevent input field shrinkage
+  advertise: boolean;         // Show rotating skill-ad line from advertisable plugins
+  advertiseLang: string;      // Ad text language tag, e.g. 'en', 'ko' (falls back to untagged/en text)
   safeMode: boolean;          // Strip ANSI codes and use ASCII-only output to prevent terminal rendering corruption (Issue #346).
                               // Default true. Set to false to explicitly disable even on Windows (e.g. Windows Terminal with ANSI support).
 }
@@ -300,6 +302,8 @@ export const DEFAULT_HUD_CONFIG: HudConfig = {
     rateLimits: true,
     contextBar: true,
     maxOutputLines: 10,
+    advertise: true,
+    advertiseLang: 'en',
     safeMode: true,
   },
   thresholds: {

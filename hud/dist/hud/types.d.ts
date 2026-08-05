@@ -182,6 +182,8 @@ export interface HudElementConfig {
     rateLimits: boolean;
     contextBar: boolean;
     maxOutputLines: number;
+    advertise: boolean;
+    advertiseLang: string;
     safeMode: boolean;
 }
 export interface HudThresholds {

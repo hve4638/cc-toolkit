@@ -28,6 +28,12 @@ Execute the installer:
 node "${CLAUDE_PLUGIN_ROOT}/scripts/install.mjs"
 ```
 
+Then ask the user how to handle the skill-ad line — a rotating one-line ad for skills of enabled plugins, shown under the statusline (on by default, in English). Three choices:
+
+- Show in English → write nothing (it is the default).
+- Show in Korean → set `hveHud.elements.advertiseLang` to `"ko"` in `~/.claude/settings.json`, preserving all other keys in the file.
+- Turn it off → set `hveHud.elements.advertise` to `false` in `~/.claude/settings.json`, preserving all other keys in the file.
+
 Then tell the user to restart Claude Code.
 
 ## Uninstall
@@ -55,6 +61,7 @@ Then tell the user to restart Claude Code.
 
 ```
 📁 cc-plugin | 🌿 main | ⏳ 5h:10%(4d12h) wk:40%(2d12h) | 📦 context:24% | 💻 Opus 4.7 (1M context)
+try /core:bughunt [Diagnosis loop for hard bugs and perf regressions]
 ```
 
 ## Configuration
@@ -66,7 +73,8 @@ Settings live in `~/.claude/settings.json` under `hveHud`:
   "hveHud": {
     "elements": {
       "cwd": true, "gitBranch": true, "rateLimits": true,
-      "contextBar": true, "model": true
+      "contextBar": true, "model": true,
+      "advertise": true, "advertiseLang": "en"
     },
     "thresholds": { "contextWarning": 70, "contextCritical": 85 }
   }

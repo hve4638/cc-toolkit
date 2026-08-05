@@ -16,6 +16,8 @@ export const DEFAULT_HUD_CONFIG = {
         rateLimits: true,
         contextBar: true,
         maxOutputLines: 10,
+        advertise: true,
+        advertiseLang: 'en',
         safeMode: true,
     },
     thresholds: {

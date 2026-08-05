@@ -19,8 +19,9 @@ import {
 import { readHudConfig } from "./state.js";
 import { getUsage } from "./usage-api.js";
 import { executeCustomProvider } from "./custom-rate-provider.js";
-import { render } from "./render.js";
+import { render, truncateLineToMaxWidth, limitOutputLines } from "./render.js";
 import { sanitizeOutput } from "./sanitize.js";
+import { getAdvertiseLine } from "../advertise/index.js";
 import type { HudRenderContext } from "./types.js";
 import { resolveToWorktreeRoot } from "../lib/worktree-paths.js";
 import { existsSync, readFileSync } from "fs";
@@ -154,6 +155,27 @@ async function main(): Promise<void> {
 
     // Render and output
     let output = await render(context, config);
+
+    // Append the rotating skill-ad line (if any) before sanitization so
+    // safe mode processes it along with the rest of the output
+    // (sanitizeOutput keeps SGR color codes, strips other escapes).
+    const adLine =
+      config.elements.advertise !== false
+        ? getAdvertiseLine({ lang: config.elements.advertiseLang })
+        : null;
+    if (adLine) {
+      const fittedAd =
+        config.maxWidth && config.maxWidth > 0
+          ? truncateLineToMaxWidth(adLine, config.maxWidth)
+          : adLine;
+      const joined = output ? `${output}\n${fittedAd}` : fittedAd;
+      // Re-apply the line limit so the ad line cannot push the total past
+      // maxOutputLines (render() already limited its own lines).
+      output = limitOutputLines(
+        joined.split("\n"),
+        config.elements.maxOutputLines,
+      ).join("\n");
+    }
 
     // Apply safe mode sanitization if enabled (Issue #346)
     // This strips ANSI codes and uses ASCII-only output to prevent
