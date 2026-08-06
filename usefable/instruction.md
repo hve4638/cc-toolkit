@@ -9,5 +9,5 @@ When delegating, use the fable-tier agent instead of core's equivalent:
 - `fable-security-reviewer` instead of core's `security-reviewer`
 
 Do not pass a `model` override when spawning these four — they already pin `model: fable`.
-Agents without a fable variant (analyst, planner, architect, document-specialist, test-engineer, verifier, tdd-adversary) keep core's routing.
+Agents without a fable variant (code-analyzer, docs-researcher, verifier, tdd-adversary) keep core's routing.
 </fable_routing>

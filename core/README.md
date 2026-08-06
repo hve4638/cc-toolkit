@@ -58,26 +58,12 @@
 
 | 카테고리 | 에이전트 |
 |---|---|
-| 탐색·계획 | analyst, planner, architect |
+| 탐색·분석 | code-analyzer |
 | 구현 | executor |
-| 검증 | verifier, critic, code-reviewer, security-reviewer, test-engineer, tdd-adversary |
-| 기타 | document-specialist |
+| 검증 | verifier, critic, code-reviewer, security-reviewer, tdd-adversary |
+| 기타 | docs-researcher |
 
-### 2. 툴 사용 규율 리마인더
-
-**메커니즘**: PreToolUse 훅 (`scripts/pre-tool-enforcer.mjs`, matcher `*`, timeout 3s)
-
-모든 툴 호출 직전 `<system-reminder>` 주입. 같은 메시지는 세션별 5분 쿨다운으로 스로틀 (`FRAME_PRETOOL_ADVISORY_COOLDOWN_MS` 로 조정, 0 이하 → 매 호출 주입).
-
-| 툴 | 주입되는 규칙 |
-|---|---|
-| `Bash` | Prefer dedicated tools (Read, Grep, Glob, Edit) over shell equivalents. |
-| `Read` | Read multiple files in parallel when possible. |
-| `Grep` | Use Grep (ripgrep) — never shell grep/rg. |
-| `Write` / `Edit` | Verify the change after writing. Prefer Edit over Write for existing files. |
-| 그 외 | 주입 없음 (`suppressOutput`) |
-
-### 3. 코드 인텔리전스 (LSP)
+### 2. 코드 인텔리전스 (LSP)
 
 **메커니즘**: MCP 서버 `t` (`bridge/mcp-server.cjs`, `.mcp.json` 으로 등록)
 
@@ -85,21 +71,21 @@
 
 **의존**: 사용자 `PATH` 의 언어 서버 (`gopls`, `typescript-language-server`, `pyright` 등). 설치 안 된 언어는 해당 LSP 호출 시 에러 반환.
 
-### 4. 구조 검색·치환 (AST Grep)
+### 3. 구조 검색·치환 (AST Grep)
 
-**메커니즘**: MCP 서버 `t` (#3 와 동일 서버 공유)
+**메커니즘**: MCP 서버 `t` (#2 와 동일 서버 공유)
 
 AST 패턴 기반 2 개 툴: `ast_grep_search`, `ast_grep_replace`. 정규식의 구문 인식 한계를 극복.
 
-### 5. GPT 대화 (Codex)
+### 4. GPT 대화 (Codex)
 
-**메커니즘**: MCP 서버 `t` (#3 과 동일 서버 공유), `codex exec` 래핑
+**메커니즘**: MCP 서버 `t` (#2 와 동일 서버 공유), `codex exec` 래핑
 
 이름 기반 GPT 대화 2 개 툴: `codex_agent` (생성), `codex_send` (이어가기). 이름 → codex 세션 UUID·모델 매핑을 `<프로젝트>/.agent-memory/codex/<세션ID>/<이름>.json` 에 저장하므로 `claude --resume` 후에도 대화가 이어진다. resume 시 저장된 모델을 매번 `-m` 으로 재지정한다 (codex 는 세션 모델을 유지하지 않고 config 기본값으로 폴백).
 
 **의존**: 사용자 `PATH` 의 Codex CLI (`/core-setup` 으로 설치). 샌드박스 우회 플래그 내장 — 이미 격리된 환경에서의 사용을 전제.
 
-### 6. 액션 차단 (.banaction)
+### 5. 액션 차단 (.banaction)
 
 **메커니즘**: PreToolUse 훅 (`scripts/ban-actions.mjs`, matcher `*`, timeout 3s)
 

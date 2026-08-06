@@ -1,5 +1,5 @@
 {
-  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md), PreToolUse rule reminder + .banaction guard, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher",
+  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md), PreToolUse .banaction guard, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher",
   "hooks": {
     "SessionStart": [
       {
@@ -19,16 +19,6 @@
       }
     ],
     "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/pre-tool-enforcer.mjs",
-            "timeout": 3
-          }
-        ]
-      },
       {
         "matcher": "*",
         "hooks": [

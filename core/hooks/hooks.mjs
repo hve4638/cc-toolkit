@@ -76,6 +76,9 @@ async function main() {
   try {
     skillNames = readdirSync(SKILLS_DIR, { withFileTypes: true })
       .filter((d) => d.isDirectory())
+      // Alias skills (.alias marker) are verbatim copies of their source skill,
+      // hooks.mjs included — running both would fire the same handler twice.
+      .filter((d) => !existsSync(join(SKILLS_DIR, d.name, '.alias')))
       .map((d) => d.name)
       .sort();
   } catch {
