@@ -1,47 +1,39 @@
 ---
 name: showcase
-description: "Open panes next to you in the user's own tmux window, for demos and anything they should watch happen."
-disable-model-invocation: true
+description: "Opens and drives panes in the user's own tmux window so they can watch something happen. Use when the user asks for a demo or wants to see a program run live, or when output should land where the user can see it."
 ---
 
 <showcase_instruction>
 # showcase
 
-Put things where the user can watch them: a demo running, live output, a program
-being driven. Panes open in the tmux window the session already sits in.
+`showcase` opens a terminal this session and the user look at together: a demo running, live output, a program being driven.
 
-If `showcase` reports it is not inside tmux, say so to the user and stop. Do not
-reach for another way to show them something.
+`showcase` runs on tmux. Drive panes only through `showcase`, never by calling `tmux` directly.
+
+If `showcase` reports it is not inside tmux, say so to the user and stop. Do not reach for another way to show them something.
 
 ## Commands
 
 | command | effect |
 |---|---|
-| `showcase new [-- command...]` | open a pane; prints its KEY |
+| `showcase new` | open a pane running a shell; prints its KEY |
+| `showcase exec <command...>` | open a pane running the command; prints its KEY |
 | `showcase ls` | panes in this window: `KEY [WHERE] SIZE CMD` |
 | `showcase send KEY <text...>` | type text literally — no Enter appended |
 | `showcase key KEY <key...>` | press keys: `enter` `esc` `tab` `up` `c-c` `f5` …; modifiers `c-` `m-` `s-` |
 | `showcase read KEY [-n N \| --all] [--ansi]` | capture the screen; `-n N` adds the last N scrollback lines |
 | `showcase kill KEY` | close the pane |
 
+Option detail beyond this table: `showcase --help`.
+
 ## Rules
 
-- `new` with no command opens a shell; drive it with `send` + `key enter` so the
-  user sees the typing. `new -- <command>` runs it straight away, and that pane
-  disappears the moment the command exits.
-- The first `new` opens a column beside the one you sit in; every later one is
-  added at the bottom of that column and the column's rows are levelled out. Your
-  own column is never used, whichever side of the window it is on. Panes share the
-  column, so `new` eventually fails with `no space for new pane`.
-- Address panes by KEY only. The `WHERE` column (`right-top`, `left`, …) is for
-  telling the user where to look; it changes as panes come and go, and is absent
-  whenever the layout is too tangled to describe.
-- Your own pane is not listed and cannot be targeted.
-- The user's cursor never moves — a new pane does not take focus, so tell them
-  where the new pane is. A zoom they set is put back too, and `showcase` says so
-  on stderr: the pane is then hidden behind it until they un-zoom, so say that.
-- `kill` panes this session opened once the demo is over. Everything in the window
-  is reachable, including panes the user opened themselves, so aim carefully.
+- A `new` pane stays until it is killed or its shell exits. Use it to carry a demo along, or to run several commands.
+- An `exec` pane disappears the moment its command ends. Use it for one long-running program; a command that finishes at once can be gone before the pane is placed, and then the call fails.
+- `exec` runs the command with no shell around it, so pipes and redirects need `exec sh -c '…'`.
+- Address panes by KEY only.
+- The `ls` list holds panes this session did not open — another agent's, or the user's. Target only the KEYs this session opened.
+- `kill` the panes this session opened once they have served their purpose.
 - Terminal work the user has no reason to watch belongs in `vt`.
 </showcase_instruction>
 

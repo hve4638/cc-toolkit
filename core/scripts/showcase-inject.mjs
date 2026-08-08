@@ -13,7 +13,7 @@ process.stdout.write(JSON.stringify(
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
         additionalContext: `<showcase>
-This session runs inside tmux, so \`showcase\` can open panes in the user's own window — for demos, live output, anything they should watch happen. \`showcase --help\` lists the commands. Terminal work the user has no reason to watch belongs in \`vt\`.
+\`showcase\` can open and drive panes in the user's own window. When something should happen where the user can watch it — a demo, live output, a program being driven — invoke the \`core:showcase\` skill for how to use it.
 </showcase>
 `,
       },

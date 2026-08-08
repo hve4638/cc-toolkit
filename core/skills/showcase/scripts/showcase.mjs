@@ -18,7 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 const USAGE = `showcase — demo panes in the window you are already in
 
-  showcase new [-- command...]             open a pane; prints its key
+  showcase new                             open a pane running a shell; prints its key
+  showcase exec <command...>               open a pane running command; prints its key
   showcase ls                              panes in this window (yours excluded)
   showcase send KEY <text...>              type text literally (no Enter)
   showcase key KEY <key...>                press keys: enter esc tab up c-c f5 ...
@@ -26,9 +27,8 @@ const USAGE = `showcase — demo panes in the window you are already in
   showcase kill KEY                        close the pane
 
 The first pane opens a column beside the one you sit in; the rest stack at the
-bottom of that column, sharing its height evenly. A pane started with a command
-disappears when that command ends. Terminal work the user does not need to watch
-belongs in vt.
+bottom of that column, sharing its height evenly. An exec pane disappears when
+its command ends. Terminal work the user does not need to watch belongs in vt.
 `;
 
 // Key names, kept identical to vt so both tools take the same spelling.
@@ -365,6 +365,8 @@ function rezoom(v) {
 }
 
 const ZOOM_NOTE = 'showcase: the window is zoomed, so the new pane is hidden behind it\n';
+// said wherever a WHERE is handed out, since the value is only good right now
+const WHERE_NOTE = 'showcase: WHERE shifts as panes come and go — re-read it rather than reuse it\n';
 
 function ordered(v) {
   return [...v.panes].sort((a, b) => a.left - b.left || a.top - b.top);
@@ -422,17 +424,7 @@ function place(v, born) {
   return null;
 }
 
-function cmdNew(args) {
-  let i = 0;
-  for (; i < args.length; i++) {
-    if (args[i] === '--') { i++; break; }
-    die(`new: unexpected argument: ${args[i]}`);
-  }
-  // each word stays its own argument: joining them would strip the quoting that
-  // makes `new -- sh -c 'echo hi; sleep 3'` one command with one argument
-  const command = args.slice(i).map(literal);
-  const born = ['-c', literal(process.cwd()), '-P', '-F', '#{pane_id}', ...(command.length ? ['--', ...command] : [])];
-
+function open(born) {
   // a pane can vanish between the read and the write — a demo command finishing
   // is normal here — and the plan built from the old order no longer fits. That
   // settles by itself, so back out and read the window again.
@@ -440,12 +432,31 @@ function cmdNew(args) {
     const v = view();
     const id = place(v, born);
     if (id) {
+      // read the window again: the label depends on the layout we just changed
+      const after = view();
+      const where = labels(after.panes, after.win, after.zoomed).get(id) ?? '';
       if (rezoom(v)) process.stderr.write(ZOOM_NOTE);
-      return void process.stdout.write(`${paneKey(id)}\n`);
+      // stdout stays the key alone so it can be piped; the place is a sentence
+      // on stderr, since a bare "right" reads like an address
+      process.stdout.write(`${paneKey(id)}\n`);
+      if (where) process.stderr.write(`showcase: the new pane sits at ${where}\n${WHERE_NOTE}`);
+      return;
     }
     rezoom(v);
   }
   die('the window kept changing while placing the pane — nothing changed');
+}
+
+function cmdNew(args) {
+  if (args.length) die(`new: unexpected argument: ${args[0]}`);
+  open(['-c', literal(process.cwd()), '-P', '-F', '#{pane_id}']);
+}
+
+function cmdExec(args) {
+  if (!args.length) die('exec: needs a command');
+  // each word stays its own argument: joining them would strip the quoting that
+  // makes `exec sh -c 'echo hi; sleep 3'` one command with one argument
+  open(['-c', literal(process.cwd()), '-P', '-F', '#{pane_id}', '--', ...args.map(literal)]);
 }
 
 function cmdLs() {
@@ -464,6 +475,7 @@ function cmdLs() {
   const line = (get) => cols.map((c, i) => (i === cols.length - 1 ? get(c) : get(c).padEnd(width(c)))).join('');
   process.stdout.write(`${line((c) => c)}\n`);
   for (const r of rows) process.stdout.write(`${line((c) => r[c])}\n`);
+  if (cols.includes('WHERE')) process.stderr.write(WHERE_NOTE);
 }
 
 function cmdSend(args) {
@@ -538,7 +550,7 @@ function cmdKill(args) {
 
 function main(argv) {
   const [verb, ...args] = argv;
-  const run = { new: cmdNew, ls: cmdLs, send: cmdSend, key: cmdKey, read: cmdRead, kill: cmdKill }[verb];
+  const run = { new: cmdNew, exec: cmdExec, ls: cmdLs, send: cmdSend, key: cmdKey, read: cmdRead, kill: cmdKill }[verb];
   if (!verb || verb === '-h' || verb === '--help') return void process.stdout.write(USAGE);
   if (!run) die(`unknown command: ${verb}`);
   // one line on stderr is the whole contract; a stack trace would break it

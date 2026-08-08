@@ -334,7 +334,7 @@ test('keeps a demo command intact, quoting and all', { skip: !haveTmux && 'tmux 
       TMUX: `${socket},${tmux('display', '-p', '#{pid}').stdout.trim()},$0`,
       TMUX_PANE: self,
     };
-    runCli(['new', '--', 'sh', '-c', `echo ONE > ${proof}; sleep 30`], env);
+    runCli(['exec', 'sh', '-c', `echo ONE > ${proof}; sleep 30`], env);
     for (let i = 0; i < 40 && !existsSync(proof); i++) spawnSync('sleep', ['0.05']);
     assert.equal(readFileSync(proof, 'utf8').trim(), 'ONE');
   } finally {
@@ -404,7 +404,7 @@ test('a demo that exits at once never lands in my column', { skip: !haveTmux && 
     // `true` is gone before showcase can finish placing it, which is the race
     // the retry exists for; whatever the outcome, my column must be untouched
     for (let i = 0; i < 5; i++) {
-      const r = runCli(['new', '--', 'true'], env);
+      const r = runCli(['exec', 'true'], env);
       assert.ok(r.status === 0 || /nothing changed|window kept changing/.test(r.stderr), r.stderr);
       assert.deepEqual(mine(), before, `my column changed on run ${i + 1}`);
     }
@@ -497,6 +497,52 @@ test('read rejects arguments it does not know', { skip: !haveTmux && 'tmux not i
     assert.equal(runCli(['read', key, '--tail', '5'], env).status, 1);
     assert.equal(runCli(['read', key, '-n', 'x'], env).status, 1);
     assert.equal(runCli(['read', key, '-n', '5'], env).status, 0);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('new takes no command and exec insists on one', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '120', '-y', '24');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const env = {
+      TMUX: `${socket},${tmux('display', '-p', '#{pid}').stdout.trim()},$0`,
+      TMUX_PANE: self,
+    };
+    assert.equal(runCli(['new', '--', 'true'], env).status, 1);
+    assert.equal(runCli(['new', 'true'], env).status, 1);
+    assert.equal(runCli(['exec'], env).status, 1);
+    // a command that looks like an option still reaches the pane whole
+    assert.equal(runCli(['exec', 'sleep', '30'], env).status, 0);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('new hands out the WHERE hint next to the key, and says it does not keep', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '120', '-y', '24');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const env = {
+      TMUX: `${socket},${tmux('display', '-p', '#{pid}').stdout.trim()},$0`,
+      TMUX_PANE: self,
+    };
+    const r = runCli(['new'], env);
+    assert.match(r.stdout.trim(), /^[0-9a-f]{4}$/, r.stdout);
+    assert.match(r.stderr, /the new pane sits at right\n/, r.stderr);
+    assert.match(r.stderr, /WHERE shifts/, r.stderr);
+    assert.match(runCli(['ls'], env).stderr, /WHERE shifts/);
   } finally {
     tmux('kill-session', '-t', 'lab');
     rmSync(dir, { recursive: true, force: true });
