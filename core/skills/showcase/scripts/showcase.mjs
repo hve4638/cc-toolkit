@@ -274,7 +274,7 @@ const FIELDS = [
   '#{pid}', '#{pane_id}', '#{pane_left}', '#{pane_top}', '#{pane_width}',
   '#{pane_height}', '#{window_width}', '#{window_height}',
   '#{window_zoomed_flag}', '#{pane_current_command}', '#{window_layout}',
-  '#{pane_active}',
+  '#{pane_active}', '#{pane_in_mode}',
 ];
 
 /**
@@ -289,7 +289,13 @@ const literal = (s) => (s.endsWith(';') ? `${s.slice(0, -1)}\\;` : s);
 function tmux(socket, args) {
   const r = spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
   if (r.error) die('tmux not found');
-  if (r.status !== 0) die(r.stderr.trim() || `tmux ${args[0]} failed`);
+  if (r.status !== 0) {
+    // naming the tmux command says which step went wrong; the rest of a
+    // multi-line complaint is counted rather than printed, so the line holds
+    const lines = r.stderr.trim().split('\n').filter(Boolean);
+    const more = lines.length > 1 ? ` (+${lines.length - 1} more)` : '';
+    die(`${args[0]}: ${lines[0] ?? 'failed'}${more}`);
+  }
   return r.stdout;
 }
 
@@ -308,11 +314,12 @@ function view() {
   const rows = r.stdout.trim().split('\n').map((l) => l.split('\t'));
   if (rows[0][0] !== serverPid) die(OUTSIDE);
 
-  const panes = rows.map(([, id, left, top, width, height, , , , cmd, , active]) => ({
+  const panes = rows.map(([, id, left, top, width, height, , , , cmd, , active, inMode]) => ({
     id, cmd,
     left: Number(left), top: Number(top),
     width: Number(width), height: Number(height),
     active: active === '1',
+    inMode: inMode === '1',
   }));
   return {
     socket, self, panes,
@@ -490,11 +497,23 @@ function cmdLs() {
   if (cols.includes('WHERE')) process.stderr.write(WHERE_NOTE);
 }
 
+/**
+ * Scrolling a pane back — one flick of the wheel, with `mouse on` — puts it in
+ * copy mode, and there tmux runs each key's copy-mode binding instead of typing
+ * it: `f` opens a prompt, `q` cancels the mode, and every key after that fails
+ * as "not in a mode". Leaving the mode first is where typing lands the pane
+ * anyway, so nothing the user was reading is lost that the text would not lose.
+ */
+function unmode(v, pane) {
+  if (pane.inMode) quiet(v, ['send-keys', '-t', pane.id, '-X', 'cancel']);
+}
+
 function cmdSend(args) {
   const v = view();
   const pane = resolve(v, args[0]);
   const text = args.slice(1).join(' ');
   if (!text) die('send: missing text');
+  unmode(v, pane);
   tmux(v.socket, ['send-keys', '-t', pane.id, '-l', '--', literal(text)]);
 }
 
@@ -512,6 +531,7 @@ function cmdKey(args) {
     if (/^f\d{1,2}$/.test(lk)) return lk.toUpperCase();
     return k;
   };
+  unmode(v, pane);
   tmux(v.socket, ['send-keys', '-t', pane.id, '--', ...keys.map((k) => literal(norm(k)))]);
 }
 
@@ -530,7 +550,11 @@ function cmdRead(args) {
       cmd.push('-S', `-${n}`);
     } else die(`read: unexpected argument: ${rest[at]}`);
   }
-  process.stdout.write(tmux(v.socket, cmd));
+  // capture-pane pads its answer out to the full height of the pane, so a
+  // screen that was cleared ends in dozens of blank lines and a `| tail` on the
+  // far side sees nothing but those
+  const out = tmux(v.socket, cmd).replace(/[ \t\n]+$/, '');
+  process.stdout.write(out ? `${out}\n` : '');
 }
 
 function cmdKill(args) {

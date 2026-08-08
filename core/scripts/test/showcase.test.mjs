@@ -321,6 +321,68 @@ test('never lets a payload become a tmux command', { skip: !haveTmux && 'tmux no
   }
 });
 
+test('types into a pane the user scrolled back', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '120', '-y', '24');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const env = {
+      TMUX: `${socket},${tmux('display', '-p', '#{pid}').stdout.trim()},$0`,
+      TMUX_PANE: self,
+    };
+    const key = runCli(['new'], env).stdout.trim();
+    const id = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim().split('\n')[1];
+    const inMode = () => tmux('display', '-p', '-t', id, '#{pane_in_mode}').stdout.trim();
+
+    // one flick of the wheel with `mouse on` lands the pane here, and copy mode
+    // turns every key into a copy-mode command: `f` alone opens a prompt
+    tmux('copy-mode', '-t', id);
+    assert.equal(inMode(), '1');
+
+    const sent = runCli(['send', key, 'echo far off'], env);
+    assert.equal(sent.status, 0, sent.stderr);
+    assert.equal(inMode(), '0', 'the mode is gone rather than eating the text');
+    assert.match(runCli(['read', key], env).stdout, /echo far off/);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a read stops at the last line with something on it', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '120', '-y', '40');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const env = {
+      TMUX: `${socket},${tmux('display', '-p', '#{pid}').stdout.trim()},$0`,
+      TMUX_PANE: self,
+    };
+    const key = runCli(['new'], env).stdout.trim();
+    runCli(['send', key, 'clear; echo MARK'], env);
+    runCli(['key', key, 'enter'], env);
+
+    let screen = '';
+    for (let i = 0; i < 40 && !screen.includes('MARK'); i++) {
+      spawnSync('sleep', ['0.05']);
+      screen = runCli(['read', key], env).stdout;
+    }
+    // the pane is 40 rows and a handful are used: the rest must not come along,
+    // or `read | tail` reads a screenful of nothing
+    assert.ok(screen.split('\n').length < 12, `no blank padding: ${JSON.stringify(screen)}`);
+    assert.match(screen.split('\n').filter(Boolean).at(-1), /\S/);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('keeps a demo command intact, quoting and all', { skip: !haveTmux && 'tmux not installed' }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
   const socket = join(dir, 'sock');
