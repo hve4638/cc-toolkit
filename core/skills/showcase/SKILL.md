@@ -10,8 +10,6 @@ description: "Opens and drives panes in the user's own tmux window so they can w
 
 `showcase` runs on tmux. Drive panes only through `showcase`, never by calling `tmux` directly.
 
-If `showcase` reports it is not inside tmux, say so to the user and stop. Do not reach for another way to show them something.
-
 ## Commands
 
 | command | effect |

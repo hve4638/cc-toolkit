@@ -174,7 +174,7 @@ test('outside tmux it refuses in one line and does nothing else', () => {
   const r = runCli(['ls'], {});
   assert.equal(r.status, 1);
   assert.equal(r.stdout, '');
-  assert.match(r.stderr, /^showcase: not inside tmux — use vt for terminal work\n$/);
+  assert.match(r.stderr, /^showcase: not inside tmux — tell the user .+ and stop\n$/);
 });
 
 const haveTmux = spawnSync('tmux', ['-V'], { encoding: 'utf8' }).status === 0;
@@ -365,12 +365,21 @@ test('gives back a zoom it had to drop, and leaves my column alone', { skip: !ha
     const demo = runCli(['new'], env).stdout.trim();
     const mine = heightOf(self);
 
-    tmux('select-pane', '-t', self);
-    tmux('resize-pane', '-Z', '-t', self);
+    // a zoom on someone else is the user deep in that, so it goes back
+    tmux('select-pane', '-t', mateA);
+    tmux('resize-pane', '-Z', '-t', mateA);
     runCli(['new'], env);
     assert.equal(tmux('display', '-p', '-t', 'lab', '#{window_zoomed_flag}').stdout.trim(), '1',
       'the zoom the user set is put back');
+    tmux('resize-pane', '-Z', '-t', mateA);
+
+    // a zoom on my own pane is the user watching me, so the new pane wins
+    tmux('select-pane', '-t', self);
     tmux('resize-pane', '-Z', '-t', self);
+    const unzoomed = runCli(['new'], env);
+    assert.equal(tmux('display', '-p', '-t', 'lab', '#{window_zoomed_flag}').stdout.trim(), '0',
+      'my own zoom is dropped so the new pane shows');
+    assert.match(unzoomed.stderr, /dropped the zoom/, unzoomed.stderr);
 
     assert.equal(runCli(['kill', paneKey(mateB)], env).status, 0);
     assert.equal(heightOf(self), mine, 'killing in my column does not resize me');

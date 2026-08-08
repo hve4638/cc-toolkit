@@ -10,8 +10,6 @@ description: "사용자의 tmux 창에 pane 을 열고 조작해 무언가를 �
 
 `showcase` 는 tmux 위에서 돈다. 직접 `tmux` 를 부르지 않고 `showcase` 만 거친다.
 
-`showcase` 가 tmux 안이 아니라고 하면 사용자에게 알리고 멈춘다. 다른 방법으로 보여줄 길을 찾지 않는다.
-
 ## 명령
 
 | 명령 | 동작 |

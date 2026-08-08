@@ -42,6 +42,9 @@ const KEYMAP = {
 const COL_NAMES = { 1: [''], 2: ['left', 'right'], 3: ['left', 'center', 'right'] };
 const ROW_NAMES = { 1: [''], 2: ['top', 'bottom'], 3: ['top', 'middle', 'bottom'] };
 
+// the whole refusal: the caller has to hear what to do, not just what failed
+const OUTSIDE = 'not inside tmux — tell the user showcase is unavailable here and stop';
+
 function die(msg) {
   process.stderr.write(`showcase: ${msg}\n`);
   process.exit(1);
@@ -293,17 +296,17 @@ function tmux(socket, args) {
 /** Resolves the anchor window and validates that we may act at all. */
 function view() {
   const { TMUX, TMUX_PANE: self } = process.env;
-  if (!TMUX || !self) die('not inside tmux — use vt for terminal work');
+  if (!TMUX || !self) die(OUTSIDE);
   const [socket, serverPid] = TMUX.split(',');
 
   // list-panes both errors on a stale pane and yields the whole window, unlike
   // display-message, which answers about the current pane when the target is bogus.
   const r = spawnSync('tmux', ['-S', socket, 'list-panes', '-t', self, '-F', FIELDS.join('\t')], { encoding: 'utf8' });
   if (r.error) die('tmux not found');
-  if (r.status !== 0) die('not inside tmux — use vt for terminal work');
+  if (r.status !== 0) die(OUTSIDE);
 
   const rows = r.stdout.trim().split('\n').map((l) => l.split('\t'));
-  if (rows[0][0] !== serverPid) die('not inside tmux — use vt for terminal work');
+  if (rows[0][0] !== serverPid) die(OUTSIDE);
 
   const panes = rows.map(([, id, left, top, width, height, , , , cmd, , active]) => ({
     id, cmd,
@@ -364,7 +367,15 @@ function rezoom(v) {
   return spawnSync('tmux', ['-S', v.socket, 'resize-pane', '-Z', '-t', pane.id], { encoding: 'utf8' }).status === 0;
 }
 
+/**
+ * A zoom on the caller's own pane is the user watching this session, so a pane
+ * opened for them to see should not be buried under it. A zoom anywhere else is
+ * the user deep in something unrelated, and that gets put back untouched.
+ */
+const zoomedSelf = (v) => v.zoomed && v.panes.find((p) => p.active)?.id === v.self;
+
 const ZOOM_NOTE = 'showcase: the window is zoomed, so the new pane is hidden behind it\n';
+const UNZOOM_NOTE = 'showcase: dropped the zoom on this session\'s pane so the new one shows\n';
 // said wherever a WHERE is handed out, since the value is only good right now
 const WHERE_NOTE = 'showcase: WHERE shifts as panes come and go — re-read it rather than reuse it\n';
 
@@ -435,7 +446,8 @@ function open(born) {
       // read the window again: the label depends on the layout we just changed
       const after = view();
       const where = labels(after.panes, after.win, after.zoomed).get(id) ?? '';
-      if (rezoom(v)) process.stderr.write(ZOOM_NOTE);
+      if (zoomedSelf(v)) process.stderr.write(UNZOOM_NOTE);
+      else if (rezoom(v)) process.stderr.write(ZOOM_NOTE);
       // stdout stays the key alone so it can be piped; the place is a sentence
       // on stderr, since a bare "right" reads like an address
       process.stdout.write(`${paneKey(id)}\n`);
