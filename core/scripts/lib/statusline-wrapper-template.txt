@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+/**
+ * statusline wrapper — the script registered as `statusLine` in settings.json.
+ *
+ * Generated from core/scripts/lib/statusline-wrapper-template.txt and installed
+ * to <claude config dir>/statusline.mjs; edit the template, not the copy.
+ *
+ * It knows one thing: where the newest core is. What the statusline shows and
+ * how it renders lives in that core's statusline/main.mjs, so changing the
+ * feature — or bumping core — takes effect on the next render. Reinstalling is
+ * only needed when this file itself changes.
+ */
+
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const ENTRY = join("statusline", "main.mjs");
+
+// The wrapper is installed directly inside the Claude config dir, so its own
+// location is that dir — a relocated CLAUDE_CONFIG_DIR follows for free.
+const configDir = dirname(fileURLToPath(import.meta.url));
+
+function parseVersion(version) {
+  const text = String(version);
+  const dash = text.indexOf("-");
+  const base = dash === -1 ? text : text.slice(0, dash);
+  const pre = dash === -1 ? "" : text.slice(dash + 1);
+  const parts = base.split(".").map((part) => {
+    const n = Number(part);
+    return Number.isFinite(n) && part !== "" ? n : part;
+  });
+  return { parts, pre };
+}
+
+// Newest first. A stable release outranks a prerelease of the same version, and
+// a segment that is not a number falls back to a numeric-aware string compare
+// so a stray directory name cannot throw the order off.
+function compareVersionsDesc(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  const len = Math.max(left.parts.length, right.parts.length);
+  for (let i = 0; i < len; i++) {
+    const x = left.parts[i];
+    const y = right.parts[i];
+    if (x === y) continue;
+    if (x === undefined) return 1;
+    if (y === undefined) return -1;
+    if (typeof x === "number" && typeof y === "number") return y - x;
+    return String(y).localeCompare(String(x), undefined, { numeric: true });
+  }
+  if (left.pre === right.pre) return 0;
+  if (left.pre === "") return -1;
+  if (right.pre === "") return 1;
+  return right.pre.localeCompare(left.pre, undefined, { numeric: true });
+}
+
+// Dim grey: legible when something is broken, quiet enough to sit under a
+// session for a while without shouting. One line, always.
+function report(message) {
+  process.stdout.write(`\x1b[90m${message.replace(/\s+/g, " ").trim()}\x1b[0m\n`);
+}
+
+async function main() {
+  const cacheBase = join(configDir, "plugins", "cache", "hve", "core");
+  const candidates = [];
+
+  const override = process.env.CORE_PLUGIN_ROOT?.trim();
+  if (override) candidates.push(join(override, ENTRY));
+
+  try {
+    for (const version of readdirSync(cacheBase).sort(compareVersionsDesc)) {
+      candidates.push(join(cacheBase, version, ENTRY));
+    }
+  } catch { /* no cache directory — the closing report covers it */ }
+
+  let failure = `statusline: no core with ${ENTRY} under ${cacheBase} — check the core@hve plugin`;
+
+  for (const entry of candidates) {
+    if (!existsSync(entry)) continue;
+    try {
+      await import(pathToFileURL(entry).href);
+      return;
+    } catch (error) {
+      // A half-written build drops through to the next oldest core rather than
+      // taking the statusline down with it.
+      failure = `statusline: ${entry} failed to load: ${error?.message ?? error}`;
+    }
+  }
+
+  report(failure);
+}
+
+main();

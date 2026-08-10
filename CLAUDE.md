@@ -75,6 +75,10 @@
 
 ## 플러그인 작업 규칙
 
+### hud 플러그인은 동결
+
+`hud/` 는 유지보수를 멈춘 플러그인이다. 같은 기능이 `core/statusline/` 에 이식돼 있고 앞으로는 그쪽만 고친다. core 에서 버그를 고치거나 기능을 바꿔도 hud 에 옮기지 않으며, hud 안의 죽은 코드도 정리하지 않는다. core 를 쓰지 않는 사용자를 위해 그 상태로 둔다.
+
 ### 프로젝트 스코프 `.agent-memory` 쓰기는 lib 경유
 
 `<projectRoot>/.agent-memory/` 아래에 상태 파일을 만드는 core 코드는 `core/scripts/lib/agent-memory.mjs` 를 경유한다 — 직접 mkdir 금지. "워크스페이스가 없으면 아무것도 만들지 않는다" 가드 (wt-destroy 된 워크트리 부활 방지) 를 이 lib 한 곳이 보장한다. lib 을 import 할 수 없는 곳 (타 플러그인, TS 번들) 은 같은 가드를 자체 구현하고 WHY 주석으로 명시한다.

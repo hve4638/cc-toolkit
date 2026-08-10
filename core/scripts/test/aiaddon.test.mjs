@@ -40,7 +40,7 @@ test('missing files resolve to nothing', () => {
 
 test('an unknown namespace resolves to nothing', () => {
   withLayers({ global: 'know:x\n' }, (project) => {
-    assert.equal(load(project, 'statusbar').size, 0);
+    assert.equal(load(project, 'statusline').size, 0);
     assert.equal(load(project, 'nonesuch').size, 0);
   });
 });

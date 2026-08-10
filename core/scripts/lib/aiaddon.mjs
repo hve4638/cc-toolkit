@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const NAMESPACES = ['policy', 'statusbar'];
+export const NAMESPACES = ['policy', 'statusline'];
 
 const ENTRY_RE = /^([a-z0-9-]+:[a-z0-9-]+)(?:@(\S+))?$/;
 const NEGATION_RE = /^!([a-z0-9:*-]+)$/;
@@ -56,6 +56,9 @@ function readLayer(path) {
 /**
  * Entries the namespace leaves on, as a Map of `kind:name` → args object
  * (empty when the entry carries none). Entries that end up off are absent.
+ *
+ * A null `projectRoot` skips the local layer, leaving the global state alone —
+ * what a tool editing the global file needs to see.
  */
 export function load(projectRoot, namespace) {
   const entries = new Map();
@@ -63,7 +66,7 @@ export function load(projectRoot, namespace) {
 
   const text = [
     readLayer(join(homedir(), '.config', 'aiaddon', namespace)),
-    readLayer(join(projectRoot, '.config', 'aiaddon', namespace)),
+    projectRoot ? readLayer(join(projectRoot, '.config', 'aiaddon', namespace)) : '',
   ].join('\n');
 
   for (const rawLine of text.split('\n')) {
