@@ -1,6 +1,7 @@
 ---
-name: showcase
-description: "Opens and drives panes in the user's own tmux window so they can watch something happen. Use when the user asks for a demo or wants to see a program run live, or when output should land where the user can see it."
+name: sc
+description: "[showcase] Opens and drives panes in the user's own tmux window so they can watch something happen. Use when the user asks for a demo or wants to see a program run live, or when output should land where the user can see it."
+disable-model-invocation: true
 ---
 
 <showcase_instruction>

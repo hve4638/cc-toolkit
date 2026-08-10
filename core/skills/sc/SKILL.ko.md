@@ -1,6 +1,7 @@
 ---
-name: showcase
-description: "사용자의 tmux 창에 pane 을 열고 조작해 무언가를 직접 보게 한다. 사용자가 데모를 요청하거나 프로그램이 도는 것을 보고 싶어 할 때, 또는 출력이 사용자가 볼 수 있는 자리에 놓여야 할 때 사용한다."
+name: sc
+description: "[showcase] 사용자의 tmux 창에 pane 을 열고 조작해 무언가를 직접 보게 한다. 사용자가 데모를 요청하거나 프로그램이 도는 것을 보고 싶어 할 때, 또는 출력이 사용자가 볼 수 있는 자리에 놓여야 할 때 사용한다."
+disable-model-invocation: true
 ---
 
 <showcase_instruction>

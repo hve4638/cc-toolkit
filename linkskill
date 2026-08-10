@@ -31,6 +31,7 @@ const ROOT = __dirname;
 const MAPPING_FILE = 'alias-skills.json';
 const MARKER = '.alias';
 const MARKER_BODY = 'managed by linkskill; contents are generated — edit the source skill instead\n';
+const ADVERT = '.advertise';
 // Skill dir names only — anything else could escape skills/ via the mapping.
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 
@@ -124,6 +125,15 @@ function rewriteFrontmatter(file, aliasName, sourceName) {
     }
   }
 
+  // An alias is a shorthand for the person typing it; the model already reaches
+  // the source through the source's own description. Letting a copy stay
+  // model-invoked would put the same description in the window twice and leave
+  // the model two names for one skill.
+  const gate = 'disable-model-invocation: true';
+  const gateIdx = fmLines.findIndex((l) => /^disable-model-invocation:/.test(l));
+  if (gateIdx !== -1) fmLines[gateIdx] = gate;
+  else fmLines.push(gate);
+
   fs.writeFileSync(file, `---\n${fmLines.join('\n')}${rest}`);
 }
 
@@ -151,7 +161,9 @@ function syncAlias(skillsDir, aliasName, sourceName) {
   }
 
   for (const e of fs.readdirSync(sourceDir)) {
-    if (e === MARKER) continue;
+    // The ad names a skill worth trying, and the alias is the same skill: a copy
+    // would put it in the rotation twice under two names.
+    if (e === MARKER || e === ADVERT) continue;
     fs.cpSync(path.join(sourceDir, e), path.join(aliasDir, e), { recursive: true });
   }
   for (const f of ['SKILL.md', 'SKILL.ko.md']) {

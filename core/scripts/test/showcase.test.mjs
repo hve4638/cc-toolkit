@@ -229,6 +229,32 @@ test('drives panes in its own window only', { skip: !haveTmux && 'tmux not insta
   }
 });
 
+test('a new pane opens on a blue $ and nothing else', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '80', '-y', '24');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const serverPid = tmux('display', '-p', '#{pid}').stdout.trim();
+    const env = { TMUX: `${socket},${serverPid},$0`, TMUX_PANE: self };
+
+    const key = runCli(['new'], env).stdout.trim();
+    let screen = '';
+    for (let i = 0; i < 40 && !screen.includes('$'); i++) {
+      spawnSync('sleep', ['0.05']);
+      screen = runCli(['read', key], env).stdout;
+    }
+    assert.equal(screen.trim(), '$', `whatever the login shell paints stays out: ${JSON.stringify(screen)}`);
+    // the colour only shows through --ansi, which is where the blue is asserted
+    assert.match(runCli(['read', key, '--ansi'], env).stdout, /\x1b\[34m/);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('places panes by the column rules', { skip: !haveTmux && 'tmux not installed' }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
   const socket = join(dir, 'sock');
