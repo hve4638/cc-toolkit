@@ -1,1 +1,1 @@
-- 작업장 내용을 최종 확인한다 — 합의한 그 밖의 이탈(name-allow 조정 등)은 {RULES} 를 직접 편집해 반영한다
+- 작업장 내용을 최종 확인한다 — 합의한 그 밖의 이탈은 작업장 파일을 직접 편집해 반영한다 ({RULES} 의 name-allow 조정, settings 의 worktree-dir 변경 등)

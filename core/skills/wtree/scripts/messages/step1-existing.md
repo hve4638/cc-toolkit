@@ -16,7 +16,7 @@ This repo already carries a committed policy: {DOTWTREE}. Read its rules and sum
 - keep: leave it untouched and build elsewhere (path: "/tmp/<new folder>")
 </question>
 <next>
-Fill the keys for the answer and re-run:
+Ask the disposal via the AskUserQuestion tool after relaying what you read, fill the keys for the answer, and re-run:
 
 ```
 node {STEP1} --answer '<completed JSON>'

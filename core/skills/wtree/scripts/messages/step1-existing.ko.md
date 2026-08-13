@@ -16,7 +16,7 @@
 - 보존 재구성: 기존은 건드리지 않고 다른 곳에 짓는다 (path: "/tmp/<새 폴더>")
 </question>
 <next>
-답에 맞는 키를 채워 재실행:
+읽은 내용을 전달한 뒤 처분은 AskUserQuestion 도구로 묻고, 답에 맞는 키를 채워 재실행:
 
 ```
 node {STEP1} --answer '<완성된 JSON>'
