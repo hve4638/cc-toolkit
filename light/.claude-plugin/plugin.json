@@ -1,0 +1,13 @@
+{
+  "name": "light",
+  "version": "0.1.0",
+  "description": "TBD",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin"
+  ]
+}
