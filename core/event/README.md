@@ -1,0 +1,164 @@
+# core/event
+
+훅 이벤트를 잡는 모듈이 사는 곳. 어느 항목을 켤지는 aiaddon 의 `event` 네임스페이스가 정한다.
+
+```
+~/.config/aiaddon/event                  전역
+<세션 루트>/.config/aiaddon/event        로컬
+```
+
+`lib/index.mjs` 와 `lib/index.d.mts` 는 생성물이다. 원본은 `core/_build/src/event/index.mts` 고 `_build` 에서 `pnpm build:event` 로 뽑는다.
+
+lib 은 파일시스템도 프로세스도 건드리지 않는다 — 타입·api·`dispatch`·`toHookOutput` 뿐이다. IO 는 lib 밖의 손으로 쓴 `.mjs` 가 한다. `collect.mjs` 가 켜진 모듈을 불러오고, 훅이 부르는 진입점은 `main.mjs` 다.
+
+```
+main.mjs <EventName>    stdin = 훅 payload JSON, stdout = 훅 규약 JSON
+```
+
+`hooks/hooks.json` 이 네 이벤트 전부에 매처 `*` 로 걸어둔다. `source` 나 `tool_name` 으로 좁히는 것은 모듈이 payload 를 보고 직접 한다. 종료 코드는 언제나 0 이고, 모르는 이벤트 이름·깨진 stdin·예외는 전부 `{}` 로 떨어진다.
+
+## 모듈 하나
+
+`core/event/<종류>/<이름>/index.mjs` 에 놓는다. 종류(`feat`·`rule`·`know` 등)는 폴더 이름일 뿐 동작에 영향이 없다.
+
+```js
+// @ts-check
+import { create } from '../../lib/index.mjs';
+
+const a = create();
+
+a.register('PreToolUse', { priority: 'high' }, (api, payload) => {
+  if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
+});
+
+export default a;
+```
+
+핸들러는 아무것도 반환하지 않는다. 훅이 낼 것은 전부 api 호출로 적는다. 첫 줄의 `// @ts-check` 가 있어야 타입 오류가 에디터에 뜬다.
+
+## api 의 층
+
+무엇에 영향을 주는지로 묶는다. 이벤트가 달라도 축은 그대로다.
+
+| 층 | 뜻 | 가진 이벤트 |
+|---|---|---|
+| 평평 | 정보만 준다 — `args`·`notify`·`injectContext` | 넷 다 |
+| `permission` | 권한 판정 | PreToolUse |
+| `tool` | 도구 호출을 건드린다 | PreToolUse(인자)·PostToolUse(결과) |
+| `turn` | 턴 자체를 건드린다 | 넷 다 |
+| `session` | 세션 설정을 건드린다 | SessionStart |
+
+`turn` 은 이벤트마다 멤버가 다르다. SessionStart·PreToolUse 는 `halt` 만, PostToolUse 는 `feedback`+`halt`, Stop 은 `keepGoing`+`halt`.
+
+## 합침 규칙
+
+여러 모듈이 같은 이벤트를 잡으면 priority 밴드 순(high → medium → low), 같은 밴드 안에서는 aiaddon 파일에 적힌 순서로 돈다. 결과는 세 방식으로 합쳐진다.
+
+| 방식 | 해당 | 규칙 |
+|---|---|---|
+| 이어붙임 | `injectContext`·`notify`·`session.watchPaths` | 부른 순서대로 전부 남는다 |
+| 플래그 | `session.reloadSkills` | 하나라도 부르면 켜진다 |
+| 등급 슬롯 | `permission.*`, `turn.*` | 제한적인 쪽이 이긴다 |
+| 선착 슬롯 | `tool.*`, `injectUserMessage`, `session.setTitle` | 먼저 부른 쪽이 이긴다 |
+
+등급 슬롯의 순서는 이렇다. 부른 순서와 무관하다.
+
+```
+permission   deny > ask > allow
+turn         halt > block(feedback·keepGoing)
+```
+
+같은 등급끼리는 사유를 모은다. 진 등급의 사유는 버린다 — `allow` 를 원한 모듈의 사유는 `deny` 앞에서 의미가 없다. 사유가 하나면 그대로 나가고, 둘 이상이면 번호를 붙여 감싼다.
+
+```
+<reason_1>생성물이다</reason_1>
+<reason_2>감사 로그가 꺼져 있다</reason_2>
+```
+
+슬롯이 서로 다르면 같이 나간다. `permission.deny()` 와 `tool.rewrite()` 도, `permission.deny()` 와 `turn.halt()` 도 둘 다 실린다. 권한은 `hookSpecificOutput` 안이고 `halt` 는 최상위라 자리가 안 겹친다.
+
+한 핸들러가 던지면 그 핸들러가 적은 것만 버리고 나머지는 계속 돈다. 모듈마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적으므로, 도중에 터진 모듈이 슬롯을 선점해 뒤 모듈의 판정을 묻어버리는 일이 없다.
+
+## 이벤트별 주의사항
+
+### PreToolUse
+
+`tool.rewrite()` 는 병합이 아니라 교체다. 넘긴 객체가 그 도구의 완전한 입력이어야 하고 도구 스키마로 검증된다 — 고칠 키만 넘기면 통째로 거부된다.
+
+```js
+api.tool.rewrite({ ...payload.tool_input, command: fixed });
+```
+
+거부되면 이 문구가 뜬다: `PreToolUse hook for <도구> returned updatedInput that failed schema validation`.
+
+모델은 인자가 바뀐 걸 모른다. 알리려면 `injectContext()` 를 같이 부른다.
+
+`updatedInput` 을 낸 것만으로 권한 프롬프트를 건너뛰는 경로가 있다 (`Hook satisfied user interaction for <도구> via updatedInput, bypassing permission prompt`). 발동 조건은 추적 안 했다.
+
+### PostToolUse
+
+도구가 이미 실행된 뒤다. `turn.feedback()` 은 되돌리는 게 아니라 뒷수습을 시키는 것이다. reason 은 `hook feedback:` 을 달고 모델에게 전달되고, 모델은 "막히면 다른 방법을 찾으라" 고 안내받는다. 무엇이 잘못됐는지와 함께 어떻게 하면 되는지를 적는다.
+
+### Stop
+
+`payload.stop_hook_active` 가 true 면 lib 이 `turn.keepGoing()` 을 무시한다. 이미 훅이 막아서 이어진 턴이라 또 막으면 무한 루프가 된다. 핸들러가 직접 확인할 필요는 없다.
+
+Stop 에서는 `injectContext()` 도 턴을 잇는다. 스키마 설명이 이렇게 못 박는다.
+
+> Hook-specific output for the Stop event. additionalContext is non-error feedback delivered to the model; the conversation continues so the model can act on it.
+
+`turn.keepGoing()` 과 결과가 같고, error 로 취급되지 않는다는 것만 다르다.
+
+### SessionStart
+
+`session.watchPaths()` 로 등록한 파일이 바뀌면 FileChanged 이벤트가 뜬다. FileChanged 를 잡는 api 는 아직 없어서 등록만 되고 받을 데가 없다.
+
+`session.reloadSkills()` 는 훅이 스킬을 설치했을 때 쓴다. 스캔이 이미 끝난 뒤라 다시 훑지 않으면 그 스킬은 다음 세션부터 보인다.
+
+## raw 대응표
+
+api 가 내는 필드와 스키마 설명 원문. 이벤트 31종 전체 규약은 `core/docs/claude-code-hook-events.md`.
+
+| api | raw | 스키마 설명 |
+|---|---|---|
+| `notify` | 최상위 `systemMessage` | Warning message shown to the user |
+| `injectContext` | `hookSpecificOutput.additionalContext` | |
+| `injectUserMessage` | `hookSpecificOutput.initialUserMessage` | |
+| `session.setTitle` | `hookSpecificOutput.sessionTitle` | Set the session title |
+| `session.watchPaths` | `hookSpecificOutput.watchPaths` | Absolute paths to watch for FileChanged hooks |
+| `session.reloadSkills` | `hookSpecificOutput.reloadSkills` | Re-scan skill and command directories after SessionStart hooks complete, so skills installed by the hook are available in the same session |
+| `permission.allow/deny/ask` | `hookSpecificOutput.permissionDecision` + `permissionDecisionReason` | |
+| `tool.rewrite` | `hookSpecificOutput.updatedInput` | Modified tool input to use |
+| `tool.rewriteOutput` | `hookSpecificOutput.updatedToolOutput` | Replaces the tool output before it is sent to the model |
+| `turn.feedback` / `turn.keepGoing` | 최상위 `decision: "block"` + `reason` | Explanation for the decision |
+| `turn.halt` | 최상위 `continue: false` + `stopReason` | Message shown when continue is false |
+
+## 열지 않은 필드
+
+규약에는 있지만 api 로 내보내지 않은 것.
+
+| 필드 | 이벤트 | 이유 |
+|---|---|---|
+| `permissionDecision: "defer"` | PreToolUse | 대화형 세션에서 무시된다. print 모드 전용 |
+| `updatedMCPToolOutput` | PostToolUse | MCP 도구 전용. 스키마 설명이 `updatedToolOutput` 을 권한다 |
+| `suppressOutput` | 공통 | 이 lib 은 stdout 에 제어 JSON 만 뱉어 실효가 불분명하다 |
+| `terminalSequence` | 공통 | 데스크톱 알림·창 제목·비프. 어느 OSC 가 먹는지가 터미널마다 달라 lib 이 고를 수 없다 |
+| `decision: "approve"` / 최상위 `decision` | PreToolUse | PreToolUse 에서는 deprecated |
+
+## 모듈은 import 될 때 register 만 한다
+
+어느 모듈이 어느 이벤트를 잡는지는 import 해서 `register()` 가 돌아야 안다. 그래서 `collect.mjs` 는 켜둔 모듈을 매번 전부 import 하고, PreToolUse 하나 때문에 Stop 만 잡는 모듈도 불러온다. 무거운 일을 import 시점에 하면 그 값을 관계없는 이벤트마다 치른다. 파일 읽기든 프로세스 띄우기든 핸들러 안으로 미룬다.
+
+## 캐시 (미룸)
+
+잡는 이벤트를 미리 표로 적어두고 필요한 모듈만 import 하는 안이 있었다. 값이 안 맞아 미뤘다.
+
+| 켜둔 모듈 | 훅 한 번 | 캐시가 아낄 몫 |
+|---|---|---|
+| 0 | 27.4 ms | — |
+| 10 | 32.3 ms | 3.0 ms |
+| 40 | 40.1 ms | 6.2 ms |
+
+훅은 매번 새 프로세스라 27 ms 는 node 가 뜨는 값이고 캐시가 건드릴 수 없다. 모듈 하나는 0.3 ms 다. 표를 만드는 모드, 표를 둘 자리, 낡은 표 판정과 그 버그를 들일 만한 몫이 아니다.
+
+위 절의 전제가 깨지면 — 어떤 모듈이 import 되면서 실제로 무거운 일을 하면 — 다시 재고 판단한다.

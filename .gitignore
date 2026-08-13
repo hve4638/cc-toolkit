@@ -27,3 +27,5 @@ hook-stop.log
 
 # temporary files
 testsrc/**/*
+# core dumps
+core.*

@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "build": "node build-mcp-server.mjs",
+    "build:event": "tsc -p tsconfig.event.json",
     "dev": "node build-mcp-server.mjs --watch"
   },
   "dependencies": {

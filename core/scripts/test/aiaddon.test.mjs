@@ -14,7 +14,7 @@ function withLayers({ global: globalText, local: localText }, fn) {
   for (const [base, text] of [[home, globalText], [project, localText]]) {
     if (text === undefined) continue;
     mkdirSync(join(base, '.config', 'aiaddon'), { recursive: true });
-    writeFileSync(join(base, '.config', 'aiaddon', 'policy'), text);
+    writeFileSync(join(base, '.config', 'aiaddon', 'event'), text);
   }
   const saved = process.env.HOME;
   process.env.HOME = home;
@@ -27,7 +27,7 @@ function withLayers({ global: globalText, local: localText }, fn) {
   }
 }
 
-const on = (opts) => withLayers(opts, (project) => load(project, 'policy'));
+const on = (opts) => withLayers(opts, (project) => load(project, 'event'));
 
 test('reads entries, skipping blanks and comments', () => {
   const entries = on({ global: '# a comment\n\nknow:rust-embedded\n  rule:conventional-commit  \n' });

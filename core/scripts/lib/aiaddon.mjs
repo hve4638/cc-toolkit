@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const NAMESPACES = ['policy', 'statusline'];
+export const NAMESPACES = ['event', 'statusline'];
 
 const ENTRY_RE = /^([a-z0-9-]+:[a-z0-9-]+)(?:@(\S+))?$/;
 const NEGATION_RE = /^!([a-z0-9:*-]+)$/;
