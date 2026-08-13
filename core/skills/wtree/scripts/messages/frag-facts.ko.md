@@ -1,0 +1,5 @@
+- wtree CLI: OK — {WTREE_VERSION}
+- repo: {PRIMARY} (common dir: {COMMON})
+- 기존 설정: 없음 — 셋업 진행 가능
+- 공유 .wtree/: {DOTWTREE_LINE}
+- 루트 브랜치: {ROOT}

@@ -1,0 +1,1 @@
+- Give the workspace a final look — any other agreed deviation (name-allow tweaks, …) goes in by editing {RULES} directly

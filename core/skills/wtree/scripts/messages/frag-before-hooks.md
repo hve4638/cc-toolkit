@@ -1,0 +1,1 @@
+- Open {HOOK_PATH} and check its adjustment comments (focus, window-name prefix, command to run); edit them when the defaults differ from the user's taste

@@ -1,0 +1,1 @@
+- Compose {WS}/rules with the user from {VOCAB}, and iterate until `wtree check {WS}/rules` reports 0 errors (relay warnings to the user)
