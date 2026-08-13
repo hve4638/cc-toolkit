@@ -7,11 +7,12 @@ import { load } from '../lib/aiaddon.mjs';
 
 // HOME 을 임시 디렉터리로 격리 — 실제 사용자의 ~/.config/aiaddon 이 결과에 새어
 // 들어오지 않게 한다. os.homedir() 는 호출 시점의 $HOME 을 본다.
-function withLayers({ global: globalText, local: localText }, fn) {
+// ancestor 는 project 의 부모 디렉터리 층이다 (전역과 로컬 사이).
+function withLayers({ global: globalText, ancestor: ancestorText, local: localText }, fn) {
   const dir = mkdtempSync(join(tmpdir(), 'aiaddon-test-'));
   const home = join(dir, 'home');
   const project = join(dir, 'project');
-  for (const [base, text] of [[home, globalText], [project, localText]]) {
+  for (const [base, text] of [[home, globalText], [dir, ancestorText], [project, localText]]) {
     if (text === undefined) continue;
     mkdirSync(join(base, '.config', 'aiaddon'), { recursive: true });
     writeFileSync(join(base, '.config', 'aiaddon', 'event'), text);
@@ -93,6 +94,41 @@ test('args do not reach the object prototype', () => {
 
 test('negation ignores args', () => {
   assert.equal(on({ global: 'feat:hud@lang=ko\n!feat:*\n' }).size, 0);
+});
+
+test('an ancestor layer applies to sessions below it', () => {
+  const entries = on({ ancestor: 'feat:inlay\n' });
+  assert.deepEqual([...entries.keys()], ['feat:inlay']);
+});
+
+test('closer layers win: local over ancestor over global', () => {
+  const entries = on({
+    global: 'feat:a\n',
+    ancestor: '!feat:a\nfeat:b\n',
+    local: '!feat:b\nfeat:c\n',
+  });
+  assert.deepEqual([...entries.keys()], ['feat:c']);
+});
+
+test('a session under home reads the global layer once, in global position', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aiaddon-test-'));
+  const home = join(dir, 'home');
+  const project = join(home, 'project');
+  for (const [base, text] of [[dir, 'feat:a\n'], [home, '!feat:a\n']]) {
+    mkdirSync(join(base, '.config', 'aiaddon'), { recursive: true });
+    writeFileSync(join(base, '.config', 'aiaddon', 'event'), text);
+  }
+  const saved = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    // home 의 !feat:a 는 전역 층으로서 dir 층보다 먼저 읽힌다. walk 에서 한 번
+    // 더 읽혔다면 dir 층 뒤에 와서 feat:a 를 지웠을 것이다.
+    assert.deepEqual([...load(project, 'event').keys()], ['feat:a']);
+  } finally {
+    if (saved === undefined) delete process.env.HOME;
+    else process.env.HOME = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('malformed lines are ignored', () => {

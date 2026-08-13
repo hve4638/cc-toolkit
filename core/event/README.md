@@ -3,8 +3,9 @@
 훅 이벤트를 잡는 모듈이 사는 곳. 어느 항목을 켤지는 aiaddon 의 `event` 네임스페이스가 정한다.
 
 ```
-~/.config/aiaddon/event                  전역
-<세션 루트>/.config/aiaddon/event        로컬
+~/.config/aiaddon/event                  전역 (가장 약함)
+<조상 디렉터리>/.config/aiaddon/event    루트부터 아래로
+<세션 루트>/.config/aiaddon/event        가장 가까움 (이김)
 ```
 
 `lib/index.mjs` 와 `lib/index.d.mts` 는 생성물이다. 원본은 `core/_build/src/event/index.mts` 고 `_build` 에서 `pnpm build:event` 로 뽑는다.

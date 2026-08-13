@@ -2,9 +2,11 @@
  * aiaddon reader — resolves which addon entries a namespace has turned on.
  * Format and rationale: AIADDON.md at the repository root.
  *
- * Two layers, concatenated in this order:
- *   1. ~/.config/aiaddon/<namespace>              (global)
- *   2. <projectRoot>/.config/aiaddon/<namespace>  (local)
+ * Layers, concatenated in this order (later lines win, so closer wins):
+ *   1. ~/.config/aiaddon/<namespace>                (global — always first,
+ *      wherever the home directory sits in the tree)
+ *   2. <dir>/.config/aiaddon/<namespace> for every ancestor of projectRoot,
+ *      root first, projectRoot itself last
  *
  * Lines:
  *   <kind>:<name>[@k=v,flag]  turn on; a later line replaces the whole entry
@@ -19,7 +21,7 @@
 
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 export const NAMESPACES = ['event', 'statusline'];
 
@@ -53,21 +55,40 @@ function readLayer(path) {
   }
 }
 
+/** The namespace file's path under global, then under each ancestor of
+ *  projectRoot from the root down — so the layer closest to the session is
+ *  read last and wins. The global path is skipped in the walk (a session
+ *  under the home directory would otherwise read it twice, and a layer in
+ *  between would then re-order negation matches). */
+function layerPaths(projectRoot, namespace) {
+  const globalPath = join(homedir(), '.config', 'aiaddon', namespace);
+  const paths = [globalPath];
+  if (projectRoot) {
+    const dirs = [];
+    for (let dir = projectRoot; ; dir = dirname(dir)) {
+      dirs.unshift(dir);
+      if (dir === dirname(dir)) break;
+    }
+    for (const dir of dirs) {
+      const path = join(dir, '.config', 'aiaddon', namespace);
+      if (path !== globalPath) paths.push(path);
+    }
+  }
+  return paths;
+}
+
 /**
  * Entries the namespace leaves on, as a Map of `kind:name` → args object
  * (empty when the entry carries none). Entries that end up off are absent.
  *
- * A null `projectRoot` skips the local layer, leaving the global state alone —
- * what a tool editing the global file needs to see.
+ * A null `projectRoot` skips the ancestor layers, leaving the global state
+ * alone — what a tool editing the global file needs to see.
  */
 export function load(projectRoot, namespace) {
   const entries = new Map();
   if (!NAMESPACES.includes(namespace)) return entries;
 
-  const text = [
-    readLayer(join(homedir(), '.config', 'aiaddon', namespace)),
-    projectRoot ? readLayer(join(projectRoot, '.config', 'aiaddon', namespace)) : '',
-  ].join('\n');
+  const text = layerPaths(projectRoot, namespace).map(readLayer).join('\n');
 
   for (const rawLine of text.split('\n')) {
     const line = rawLine.trim();

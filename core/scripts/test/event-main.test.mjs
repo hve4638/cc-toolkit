@@ -178,10 +178,11 @@ test('CLAUDE_PROJECT_DIR 이 payload.cwd 보다 앞선다', () => {
     tree.module('feat', 'one', catcher('PreToolUse', "api.notify('켜졌다');"));
     tree.entries('feat:one\n');
 
-    // 세션 루트를 엉뚱한 곳으로 가리키면 로컬 층을 못 읽어 아무것도 안 켜진다.
+    // 세션 루트를 형제 디렉터리로 돌리면 조상 walk 에도 설정이 없어 아무것도
+    // 안 켜진다 (하위 디렉터리는 cascade 로 설정이 보이므로 못 쓴다).
     assert.deepEqual(tree.run('PreToolUse', { env: { CLAUDE_PROJECT_DIR: tree.project } }), {
       systemMessage: '켜졌다',
     });
-    assert.deepEqual(tree.run('PreToolUse', { env: { CLAUDE_PROJECT_DIR: join(tree.project, 'nope') } }), {});
+    assert.deepEqual(tree.run('PreToolUse', { env: { CLAUDE_PROJECT_DIR: join(tree.project, '..', 'elsewhere') } }), {});
   });
 });
