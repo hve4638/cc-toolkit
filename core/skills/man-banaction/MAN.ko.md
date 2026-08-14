@@ -1,15 +1,25 @@
 # banaction
 
-banaction 은 core 플러그인에 포함된 PreToolUse 훅이다. Claude Code 가 도구 호출 — Bash, Write, MCP 도구 등 전부 — 을 실행하기 직전에 `.banaction` 파일의 규칙과 대조해, 매칭되면 그 호출을 거부한다. `.banaction` 파일이 없으면 아무것도 하지 않는다.
+banaction 은 core 플러그인에 포함된 도구 호출 가드로, PreToolUse 훅의 event 모듈로 돈다. Claude Code 가 도구 호출 — Bash, Write, MCP 도구 등 전부 — 을 실행하기 직전에 `.banaction` 파일의 규칙과 대조해, 매칭되면 그 호출을 거부한다. `.banaction` 파일이 없으면 아무것도 하지 않는다.
+
+## 켜기
+
+banaction 은 aiaddon `event` 파일에 적어야 돈다. 적용할 범위에 한 줄 쓴다:
+
+```
+# ~/.config/aiaddon/event — 모든 세션
+# <디렉터리>/.config/aiaddon/event — 그 아래 세션
+rule:banaction
+```
 
 ## 위치
 
 | 파일 | 범위 |
 |---|---|
-| `~/.banaction` | 글로벌 — 모든 프로젝트 |
-| `<프로젝트 루트>/.banaction` | 해당 프로젝트 (프로젝트 루트 = `CLAUDE_PROJECT_DIR`) |
+| `~/.banaction` | 글로벌 — 모든 세션, 가장 먼저 읽힘 |
+| `<디렉터리>/.banaction` | 세션 루트의 각 조상 디렉터리, 파일시스템 루트부터 세션 루트까지 (세션 루트 = `CLAUDE_PROJECT_DIR`) |
 
-두 파일을 모두 읽어 합산 병합하며, 없는 파일은 건너뛴다. 해제 문법은 없다: 프로젝트 파일이 글로벌 규칙을 풀 수 없다.
+모든 파일을 읽어 합산 병합하며, 없는 파일은 건너뛴다. 해제 문법은 없다: 가까운 파일이 바깥 규칙을 풀 수 없다.
 
 ## 규칙 형식
 
@@ -52,4 +62,4 @@ Blocked by BAN Action rule '<rule text>'. The user has banned this action. Do no
 
 ## 실패 동작
 
-banaction 은 fail-open 이다: 읽을 수 없는 파일, 잘못된 줄, 훅 크래시, 훅 타임아웃 (3s) 은 모두 세션을 깨는 대신 도구 호출을 통과시킨다. 백트래킹이 심한 정규식은 매 호출마다 훅을 타임아웃으로 몰아 규칙 파일 전체를 조용히 무력화할 수 있다.
+banaction 은 fail-open 이다: 읽을 수 없는 파일, 잘못된 줄, 모듈 크래시, 훅 타임아웃 (5s, event 호스트와 공유) 은 모두 세션을 깨는 대신 도구 호출을 통과시킨다. 백트래킹이 심한 정규식은 매 호출마다 훅을 타임아웃으로 몰아 규칙 파일 전체를 조용히 무력화할 수 있다.
