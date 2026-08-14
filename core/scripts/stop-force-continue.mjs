@@ -38,7 +38,7 @@ import { join } from 'node:path';
 import {
   readJson, removeFile, resolveProjectRoot, statePath, writeFileAtomic,
 } from './lib/agent-memory.mjs';
-import { readStdin } from './lib/stdin.mjs';
+import { readHookPayload } from './lib/corelib.mjs';
 
 const TAIL_LINES_DEFAULT = 50;
 const TAIL_CHUNK_BYTES = 256 * 1024;
@@ -163,9 +163,8 @@ function rotateDebugDir(dir) {
 }
 
 async function main() {
-  const raw = await readStdin(1000);
-  let data = {};
-  try { data = JSON.parse(raw); } catch { return ok(); }
+  const data = await readHookPayload(1000);
+  if (data === null) return ok();
 
   // Guards (no state ops)
   if (data?.stop_hook_active) return ok();

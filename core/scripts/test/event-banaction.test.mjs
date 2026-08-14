@@ -250,7 +250,7 @@ test('enabled via aiaddon the module denies; without the entry it is silent', ()
       join(EVENT_SRC, 'rule', 'banaction', 'index.mjs'),
       join(eventDir, 'rule', 'banaction', 'index.mjs'),
     );
-    for (const name of ['aiaddon.mjs', 'agent-memory.mjs']) {
+    for (const name of ['aiaddon.mjs', 'agent-memory.mjs', 'corelib.mjs']) {
       copyFileSync(join(LIB_SRC, name), join(libDir, name));
     }
 

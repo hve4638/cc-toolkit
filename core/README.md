@@ -108,6 +108,10 @@ mcp__github__.*: .*
 
 ## 부록 — 개발자용
 
+### corelib (`scripts/lib/corelib.mjs`)
+
+훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `aiaddon.mjs`)·스크립트·event 모듈은 전부 이 위에 선다.
+
 ### 러너 (`scripts/run.cjs`)
 
 모든 훅의 실제 진입점 (`hooks.json` 이 호출).

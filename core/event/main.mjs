@@ -14,32 +14,16 @@
  */
 
 import { isEventName, dispatch, toHookOutput } from './lib/index.mjs';
-import { resolveProjectRoot } from '../scripts/lib/agent-memory.mjs';
+import { readHookPayload, resolveProjectRoot } from '../scripts/lib/corelib.mjs';
 import { collect } from './collect.mjs';
-
-/** @returns {Promise<string>} */
-function readStdin() {
-  return new Promise((resolve) => {
-    let data = '';
-    process.stdin.setEncoding('utf-8');
-    process.stdin.on('data', (chunk) => { data += chunk; });
-    process.stdin.on('end', () => resolve(data));
-    process.stdin.on('error', () => resolve(''));
-  });
-}
 
 async function main() {
   const event = process.argv[2] ?? '';
   if (!isEventName(event)) return {};
 
-  const raw = await readStdin();
-  let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    // payload 없이는 어느 모듈도 판단할 수 없다.
-    return {};
-  }
+  const payload = await readHookPayload();
+  // payload 없이는 어느 모듈도 판단할 수 없다.
+  if (payload === null) return {};
 
   const modules = await collect(resolveProjectRoot(payload));
   return toHookOutput(event, await dispatch(event, payload, modules));

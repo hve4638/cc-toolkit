@@ -19,9 +19,8 @@
  * config file can never take a hook down with it.
  */
 
-import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { cascadePaths, readTextOr } from './corelib.mjs';
 
 export const NAMESPACES = ['event', 'statusline'];
 
@@ -47,36 +46,6 @@ function toRegExp(pattern) {
   return new RegExp(`^${pattern.split('*').join('.*')}$`);
 }
 
-function readLayer(path) {
-  try {
-    return readFileSync(path, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
-/** The namespace file's path under global, then under each ancestor of
- *  projectRoot from the root down — so the layer closest to the session is
- *  read last and wins. The global path is skipped in the walk (a session
- *  under the home directory would otherwise read it twice, and a layer in
- *  between would then re-order negation matches). */
-function layerPaths(projectRoot, namespace) {
-  const globalPath = join(homedir(), '.config', 'aiaddon', namespace);
-  const paths = [globalPath];
-  if (projectRoot) {
-    const dirs = [];
-    for (let dir = projectRoot; ; dir = dirname(dir)) {
-      dirs.unshift(dir);
-      if (dir === dirname(dir)) break;
-    }
-    for (const dir of dirs) {
-      const path = join(dir, '.config', 'aiaddon', namespace);
-      if (path !== globalPath) paths.push(path);
-    }
-  }
-  return paths;
-}
-
 /**
  * Entries the namespace leaves on, as a Map of `kind:name` → args object
  * (empty when the entry carries none). Entries that end up off are absent.
@@ -88,7 +57,9 @@ export function load(projectRoot, namespace) {
   const entries = new Map();
   if (!NAMESPACES.includes(namespace)) return entries;
 
-  const text = layerPaths(projectRoot, namespace).map(readLayer).join('\n');
+  const text = cascadePaths(projectRoot, join('.config', 'aiaddon', namespace))
+    .map((path) => readTextOr(path, ''))
+    .join('\n');
 
   for (const rawLine of text.split('\n')) {
     const line = rawLine.trim();

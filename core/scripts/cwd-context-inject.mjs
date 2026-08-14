@@ -15,16 +15,15 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readStdin } from './lib/stdin.mjs';
+import { readHookPayload } from './lib/corelib.mjs';
 
 // AGENTS first, CLAUDE second — tool-specific content is read last,
 // mirroring the general→specific order of CLAUDE.md loading.
 const FILES = ['AGENTS.cwd.md', 'CLAUDE.cwd.md'];
 
 try {
-  const input = await readStdin();
-  let data = {};
-  try { data = JSON.parse(input); } catch { /* empty/invalid stdin — fall back below */ }
+  // empty/invalid stdin → null — fall back below
+  const data = await readHookPayload() ?? {};
   const cwd = typeof data.cwd === 'string' && data.cwd ? data.cwd : process.cwd();
 
   const parts = [];

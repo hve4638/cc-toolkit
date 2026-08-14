@@ -17,7 +17,7 @@
 
 import { basename, isAbsolute, relative } from 'node:path';
 import { readText, removeFile, resolveProjectRoot } from './lib/agent-memory.mjs';
-import { readStdin } from './lib/stdin.mjs';
+import { readHookPayload } from './lib/corelib.mjs';
 
 const FLAG_SUBDIR = 'context-hint';
 
@@ -32,9 +32,8 @@ function displayPath(projectRoot, p) {
 }
 
 async function main() {
-  const raw = await readStdin(1000);
-  let data = {};
-  try { data = JSON.parse(raw); } catch { return ok(); }
+  const data = await readHookPayload(1000);
+  if (data === null) return ok();
 
   if (data?.hook_event_name !== 'Stop') return ok();
   if (!data?.session_id) return ok();

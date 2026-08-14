@@ -9,6 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_COLLECT = join(__dirname, '..', '..', 'event', 'collect.mjs');
 const SRC_LIB = join(__dirname, '..', '..', 'event', 'lib', 'index.mjs');
 const SRC_AIADDON = join(__dirname, '..', 'lib', 'aiaddon.mjs');
+const SRC_CORELIB = join(__dirname, '..', 'lib', 'corelib.mjs');
 
 // collect 는 자기 옆의 <종류>/<이름>/index.mjs 를 부르므로, 가짜 모듈을 심으려면
 // core 의 배치를 임시 디렉터리에 그대로 재현해야 한다.
@@ -20,6 +21,7 @@ async function withTree(fn) {
   copyFileSync(SRC_COLLECT, join(eventDir, 'collect.mjs'));
   copyFileSync(SRC_LIB, join(eventDir, 'lib', 'index.mjs'));
   copyFileSync(SRC_AIADDON, join(dir, 'core', 'scripts', 'lib', 'aiaddon.mjs'));
+  copyFileSync(SRC_CORELIB, join(dir, 'core', 'scripts', 'lib', 'corelib.mjs'));
 
   const project = join(dir, 'project');
   const home = join(dir, 'home');

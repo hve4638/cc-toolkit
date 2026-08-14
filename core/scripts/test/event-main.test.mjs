@@ -22,7 +22,7 @@ function withTree(fn) {
     copyFileSync(join(EVENT_SRC, name), join(eventDir, name));
   }
   copyFileSync(join(EVENT_SRC, 'lib', 'index.mjs'), join(eventDir, 'lib', 'index.mjs'));
-  for (const name of ['aiaddon.mjs', 'agent-memory.mjs']) {
+  for (const name of ['aiaddon.mjs', 'agent-memory.mjs', 'corelib.mjs']) {
     copyFileSync(join(LIB_SRC, name), join(libDir, name));
   }
 

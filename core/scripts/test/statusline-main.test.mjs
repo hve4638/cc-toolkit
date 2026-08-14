@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_MAIN = join(__dirname, '..', '..', 'statusline', 'main.mjs');
 const SRC_AIADDON = join(__dirname, '..', 'lib', 'aiaddon.mjs');
+const SRC_CORELIB = join(__dirname, '..', 'lib', 'corelib.mjs');
 const SRC_SANITIZE = join(__dirname, '..', '..', 'statusline', 'lib', 'sanitize.mjs');
 
 // main.mjs 는 자기 옆의 <종류>/<이름>.mjs 를 생산자로 부르므로, 가짜 생산자를
@@ -21,6 +22,7 @@ function withTree(fn) {
   mkdirSync(libDir, { recursive: true });
   copyFileSync(SRC_MAIN, join(statuslineDir, 'main.mjs'));
   copyFileSync(SRC_AIADDON, join(libDir, 'aiaddon.mjs'));
+  copyFileSync(SRC_CORELIB, join(libDir, 'corelib.mjs'));
   mkdirSync(join(statuslineDir, 'lib'), { recursive: true });
   copyFileSync(SRC_SANITIZE, join(statuslineDir, 'lib', 'sanitize.mjs'));
 
