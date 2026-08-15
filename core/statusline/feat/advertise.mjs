@@ -1,6 +1,6 @@
 /**
  * advertise — a rotating one-line skill ad from plugins that opt in with an
- * `.advertisable` marker. Turned on by `feat:advertise` in the aiaddon
+ * `.advertisable` marker. Turned on by `feat:advertise` in the agentaddon
  * statusline namespace; `@lang=ko` picks the ad language.
  *
  * The line sits under whatever else is on screen, so the band is low.

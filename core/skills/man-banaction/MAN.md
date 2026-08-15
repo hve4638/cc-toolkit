@@ -4,11 +4,11 @@ banaction is a tool-call guard shipped with the core plugin, running as an addon
 
 ## Enabling
 
-banaction runs only when an aiaddon `event` file turns it on. Write the line where it should apply:
+banaction runs only when an agentaddon `event` file turns it on. Write the line where it should apply:
 
 ```
-# ~/.config/aiaddon/event — every session
-# <dir>/.config/aiaddon/event — sessions under dir
+# ~/.config/agentaddon/event — every session
+# <dir>/.config/agentaddon/event — sessions under dir
 rule:banaction
 ```
 

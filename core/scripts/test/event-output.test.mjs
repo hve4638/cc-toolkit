@@ -108,14 +108,14 @@ test('SessionStart 의 네 칸이 전부 실린다', () => {
   assert.deepEqual(toHookOutput('SessionStart', draft({
     userMessage: '시작하자',
     title: 'cc-toolkit',
-    watchPaths: ['/repo/AIADDON.md'],
+    watchPaths: ['/repo/AGENTADDON.md'],
     reloadSkills: true,
   })), {
     hookSpecificOutput: {
       hookEventName: 'SessionStart',
       initialUserMessage: '시작하자',
       sessionTitle: 'cc-toolkit',
-      watchPaths: ['/repo/AIADDON.md'],
+      watchPaths: ['/repo/AGENTADDON.md'],
       reloadSkills: true,
     },
   });

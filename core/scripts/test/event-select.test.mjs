@@ -59,3 +59,42 @@ test('null 프로토타입 args 도 그대로 실린다', () => {
   const rules = selectRules(DECL, 'PreToolUse', on(['showcase-heavy', args]));
   assert.deepEqual(rules, { 'showcase-heavy': { lang: 'ko', trigger: true } });
 });
+
+// cwd-context 는 기본 켜짐, showcase-light 는 아니다.
+const DEFAULT_DECL = {
+  rules: {
+    'cwd-context': { events: ['SessionStart'], enabledByDefault: true },
+    'showcase-light': { events: ['SessionStart'] },
+  },
+  handlers: {},
+};
+
+test('enabledByDefault 규칙은 설정에 줄이 없어도 trigger:true — 인자는 없다', () => {
+  const rules = selectRules(DEFAULT_DECL, 'SessionStart', on());
+  assert.deepEqual(rules, {
+    'cwd-context': { trigger: true },
+    'showcase-light': { trigger: false },
+  });
+});
+
+test('부정이 매치한 기본 켜짐 규칙은 꺼진다', () => {
+  const negated = (name) => name === 'cwd-context';
+  assert.equal(selectRules(DEFAULT_DECL, 'SessionStart', on(), negated), null);
+});
+
+test('부정 뒤에 다시 켠 줄은 enabled 로 들어와 이긴다 — 인자도 실린다', () => {
+  const negated = () => true;
+  const rules = selectRules(DEFAULT_DECL, 'SessionStart', on(['cwd-context', { lang: 'ko' }]), negated);
+  assert.deepEqual(rules, {
+    'cwd-context': { lang: 'ko', trigger: true },
+    'showcase-light': { trigger: false },
+  });
+});
+
+test('enabledByDefault 가 true 가 아닌 값이면 기본 켜짐이 아니다', () => {
+  const decl = {
+    rules: { odd: { events: ['Stop'], enabledByDefault: 'yes' } },
+    handlers: {},
+  };
+  assert.equal(selectRules(decl, 'Stop', on()), null);
+});

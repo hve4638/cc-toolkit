@@ -85,7 +85,7 @@ AST 패턴 기반 2 개 툴: `ast_grep_search`, `ast_grep_replace`. 정규식의
 
 ### 5. 액션 차단 (.banaction)
 
-**메커니즘**: 애드온 (`addon/banaction/`), aiaddon `event` 파일에 `rule:banaction` 을 적어야 돈다
+**메커니즘**: 애드온 (`addon/banaction/`), agentaddon `event` 파일에 `rule:banaction` 을 적어야 돈다
 
 `~/.banaction` 과 세션 루트의 각 조상 디렉터리의 `.banaction` (루트부터 세션 루트까지) 의 규칙을 병합해, 매칭되는 도구 호출을 실행 전에 deny 한다. 차단 시 규칙 원문이 사유로 모델에 전달되며, 규칙 파일의 이름·경로는 노출하지 않는다. 파일이 없으면 아무것도 하지 않는다.
 
@@ -104,17 +104,23 @@ mcp__github__.*: .*
 
 잘못된 정규식은 폴백한다 — 패턴은 리터럴 substring 매칭, 도구 매처는 도구명 정확 일치. 백트래킹이 심한 정규식 규칙은 훅 타임아웃 (5s) 에 걸려 파일 전체가 조용히 무력화될 수 있다.
 
+### 6. 컨텍스트 문서 리뷰 힌트
+
+**메커니즘**: 애드온 (`addon/writing-context-hint/`), 기본 켜짐 — 끄려면 agentaddon `event` 파일에 `!writing-context-hint`
+
+SKILL.md·SKILL.ko.md·CLAUDE.md·AGENTS.md 를 편집한 세션이 턴을 끝낼 때, 해당 리뷰 스킬 (`/writing-great-skill`·`/writing-great-agents-md`) 실행을 권하는 한 줄을 사용자에게만 띄운다. 모델 컨텍스트에는 들어가지 않는다.
+
 ---
 
 ## 부록 — 개발자용
 
 ### 애드온 시스템 (`event/` + `addon/` + `skills/*/addon.mjs`)
 
-훅 이벤트를 잡는 애드온의 호스트. 애드온은 `addon/<이름>/addon.mjs` 나 `skills/<이름>/addon.mjs` 에 두고, 구독할 규칙 이름과 트리거 이벤트를 스스로 선언한다 — 규칙 이름과 파일 위치는 무관하며, 연결은 생성물 `event/manifest.json` 이 담당한다 (`node core/event/build-manifest.mjs` 로 재생성). 선언 형식·합침 규칙은 `event/README.md`.
+훅 이벤트를 잡는 애드온의 호스트. 애드온은 `addon/<이름>/addon.mjs` 나 `skills/<이름>/addon.mjs` 에 두고, 구독할 규칙 이름과 트리거 이벤트를 스스로 선언한다 — 규칙 이름과 파일 위치는 무관하며, 연결은 생성물 `event/manifest.json` 이 담당한다 (`node core/event/build-manifest.mjs` 로 재생성). 규칙에 `enabledByDefault: true` 를 달면 agentaddon 에 줄이 없어도 돌고 `!이름` 부정으로만 꺼진다. 선언 형식·합침 규칙은 `event/README.md`.
 
 ### corelib (`scripts/lib/corelib.mjs`)
 
-훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `aiaddon.mjs`)·스크립트·애드온·event 호스트는 전부 이 위에 선다.
+훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `addon-config.mjs`)·스크립트·애드온·event 호스트는 전부 이 위에 선다.
 
 ### 러너 (`scripts/run.cjs`)
 

@@ -15,7 +15,7 @@
  *       },
  *     };
  *
- * 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
+ * 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
  * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
  * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
  * `trigger: false` 로) 셋째 인자로 받는다.
@@ -35,8 +35,8 @@ export function isEventName(name) {
 }
 /**
  * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
- * priority 는 검사하지 않는다 — 값이 이상해도 medium 으로 떨어질 뿐, 선언
- * 전체를 버릴 이유가 아니다.
+ * priority 와 enabledByDefault 는 검사하지 않는다 — 값이 이상해도 각각
+ * medium·꺼짐으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다.
  */
 export function isAddonDecl(value) {
     if (typeof value !== 'object' || value === null)
@@ -299,15 +299,19 @@ export function apiFor(event, draft, payload) {
  *
  * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
  * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
+ *
+ * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
+ * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
+ * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
  */
-export function selectRules(decl, event, enabled) {
+export function selectRules(decl, event, enabled, negated = () => false) {
     const rules = {};
     let triggered = false;
     for (const [name, rule] of Object.entries(decl.rules)) {
         if (!rule.events.includes(event))
             continue;
         const args = enabled.get(name);
-        const trigger = args !== undefined;
+        const trigger = args !== undefined || (rule.enabledByDefault === true && !negated(name));
         triggered ||= trigger;
         // WHY: trigger 는 예약 키 — 인자에 같은 이름이 와도 여기서 덮여 조용히
         //      무시된다. 훅에는 사람에게 경고를 띄울 마땅한 경로가 없다.

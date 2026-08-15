@@ -12,12 +12,12 @@
  *
  * 항목이 없거나, manifest 가 깨졌거나, import 가 던지거나, default 가 애드온
  * 선언이 아니면 조용히 빠진다 — config 오타나 모듈 하나의 고장이 훅 전체를
- * 죽이지 않게 하는 aiaddon 의 fail-open 을 그대로 따른다.
+ * 죽이지 않게 하는 agentaddon 의 fail-open 을 그대로 따른다.
  */
 
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { load } from '../scripts/lib/aiaddon.mjs';
+import { loadState } from '../scripts/lib/addon-config.mjs';
 import { readJsonOr } from '../scripts/lib/corelib.mjs';
 import { isAddonDecl, selectRules } from './lib/index.mjs';
 
@@ -27,19 +27,24 @@ const NAMESPACE = 'event';
 
 /**
  * manifest 항목만 보고 "이번 이벤트에 켜진 규칙이 하나라도 있는가" 를 미리
- * 거른다. import 없이 걸러내는 것이 manifest 의 존재 이유다.
+ * 거른다. import 없이 걸러내는 것이 manifest 의 존재 이유다. 기본 켜짐
+ * (enabledByDefault) 규칙은 설정에 줄이 없어도 켜진 것으로 치되, 부정이
+ * 매치한 적 있으면 꺼진 것으로 본다 — selectRules 와 같은 판정이다.
  *
  * @param {unknown} entry
  * @param {import('./lib/index.mjs').EventName} event
  * @param {ReadonlyMap<string, import('./lib/index.mjs').Args>} enabled
+ * @param {(name: string) => boolean} negated
  */
-function manifestSelects(entry, event, enabled) {
+function manifestSelects(entry, event, enabled, negated) {
   const rules = /** @type {{rules?: unknown}} */ (entry ?? {}).rules;
   if (!rules || typeof rules !== 'object') return false;
   for (const [name, rule] of Object.entries(rules)) {
-    if (!enabled.has(name)) continue;
-    const events = /** @type {{events?: unknown}} */ (rule ?? {}).events;
-    if (Array.isArray(events) && events.includes(event)) return true;
+    const { events, enabledByDefault } =
+      /** @type {{events?: unknown, enabledByDefault?: unknown}} */ (rule ?? {});
+    if (!Array.isArray(events) || !events.includes(event)) continue;
+    if (enabled.has(name)) return true;
+    if (enabledByDefault === true && !negated(name)) return true;
   }
   return false;
 }
@@ -68,18 +73,18 @@ async function importDecl(relPath) {
  * @returns {Promise<import('./lib/index.mjs').LoadedAddon[]>}
  */
 export async function collect(projectRoot, event) {
-  const enabled = load(projectRoot, NAMESPACE);
-  if (enabled.size === 0) return [];
+  // 설정이 비어 있어도 조기 반환하지 않는다 — 기본 켜짐 규칙은 설정 없이 돈다.
+  const { entries: enabled, negated } = loadState(projectRoot, NAMESPACE);
 
   const manifest = readJsonOr(join(HERE, 'manifest.json'));
   const entries = Array.isArray(manifest?.addons) ? manifest.addons : [];
 
   const loaded = [];
   for (const entry of entries) {
-    if (!manifestSelects(entry, event, enabled)) continue;
+    if (!manifestSelects(entry, event, enabled, negated)) continue;
     const decl = await importDecl(entry.path);
     if (!decl) continue;
-    const rules = selectRules(decl, event, enabled);
+    const rules = selectRules(decl, event, enabled, negated);
     if (rules) loaded.push({ decl, rules });
   }
   return loaded;

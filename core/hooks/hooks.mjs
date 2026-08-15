@@ -7,9 +7,12 @@
 // named exactly <EventName> (e.g. `export function PostToolUse(payload, ctx)`)
 // is called. Handlers do their own side-effects and optionally return
 // { context } (inject) and/or { block } (Stop refusal). Results are merged and
-// emitted in the event's hook-output shape. Adding a skill hook requires no
-// change here or in hooks.json — drop a hooks.mjs into the skill folder.
+// emitted in the event's hook-output shape.
 // Fail-open everywhere: any error → { continue:true, suppressOutput:true }.
+//
+// 현재 소비자 0 — 스킬 훅은 전부 애드온 시스템 (core/addon/<이름>/addon.mjs,
+// core/event/README.md) 으로 이관됐다. 새 훅은 애드온으로 만든다. 이 디스패처는
+// 당분간 배선째 남겨둔다 (사용자 결정).
 
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

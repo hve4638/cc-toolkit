@@ -24,9 +24,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const SCAN_DIRS = ['addon', 'skills'];
 
+// agentaddon 항목 이름 문법 (addon-config.mjs 의 ENTRY_RE 와 같은 집합).
+// 벗어난 이름은 설정 줄로 켤 수도 끌 수도 없다 — 보통 규칙이면 영영 안 켜지는
+// 오타고, enabledByDefault 규칙이면 부정이 닿지 않아 끌 수 없는 훅이 된다.
+// 어느 쪽도 런타임에서는 증상이 없으므로 여기서 죽여 개발 시점에 드러낸다.
+const RULE_NAME_RE = /^[a-z0-9:-]+$/;
+
 /**
  * @param {string} pluginRoot
- * @returns {Promise<{addons: {path: string, rules: Record<string, {events: string[]}>}[]}>}
+ * @returns {Promise<{addons: {path: string, rules: Record<string, {events: string[], enabledByDefault?: true}>}[]}>}
  */
 export async function buildManifest(pluginRoot) {
   const addons = [];
@@ -52,10 +58,20 @@ export async function buildManifest(pluginRoot) {
         process.stderr.write(`skip ${rel}: default export 가 애드온 선언이 아니다\n`);
         continue;
       }
+      for (const ruleName of Object.keys(decl.rules)) {
+        if (!RULE_NAME_RE.test(ruleName)) {
+          throw new Error(`${rel}: 규칙 이름 '${ruleName}' 이 agentaddon 이름 문법 (소문자·숫자·'-'·':') 을 벗어난다`);
+        }
+      }
       addons.push({
         path: rel,
         rules: Object.fromEntries(
-          Object.entries(decl.rules).map(([ruleName, rule]) => [ruleName, { events: [...rule.events] }]),
+          Object.entries(decl.rules).map(([ruleName, rule]) => [
+            ruleName,
+            rule.enabledByDefault === true
+              ? { events: [...rule.events], enabledByDefault: true }
+              : { events: [...rule.events] },
+          ]),
         ),
       });
     }

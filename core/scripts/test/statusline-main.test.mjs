@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_MAIN = join(__dirname, '..', '..', 'statusline', 'main.mjs');
-const SRC_AIADDON = join(__dirname, '..', 'lib', 'aiaddon.mjs');
+const SRC_ADDON_CONFIG = join(__dirname, '..', 'lib', 'addon-config.mjs');
 const SRC_CORELIB = join(__dirname, '..', 'lib', 'corelib.mjs');
 const SRC_SANITIZE = join(__dirname, '..', '..', 'statusline', 'lib', 'sanitize.mjs');
 
@@ -21,19 +21,19 @@ function withTree(fn) {
   mkdirSync(statuslineDir, { recursive: true });
   mkdirSync(libDir, { recursive: true });
   copyFileSync(SRC_MAIN, join(statuslineDir, 'main.mjs'));
-  copyFileSync(SRC_AIADDON, join(libDir, 'aiaddon.mjs'));
+  copyFileSync(SRC_ADDON_CONFIG, join(libDir, 'addon-config.mjs'));
   copyFileSync(SRC_CORELIB, join(libDir, 'corelib.mjs'));
   mkdirSync(join(statuslineDir, 'lib'), { recursive: true });
   copyFileSync(SRC_SANITIZE, join(statuslineDir, 'lib', 'sanitize.mjs'));
 
   const project = join(dir, 'project');
-  mkdirSync(join(project, '.config', 'aiaddon'), { recursive: true });
+  mkdirSync(join(project, '.config', 'agentaddon'), { recursive: true });
   const home = join(dir, 'home');
   mkdirSync(home, { recursive: true });
 
   const tree = {
     project,
-    entries: (text) => writeFileSync(join(project, '.config', 'aiaddon', 'statusline'), text),
+    entries: (text) => writeFileSync(join(project, '.config', 'agentaddon', 'statusline'), text),
     producer: (kind, name, body) => {
       mkdirSync(join(statuslineDir, kind), { recursive: true });
       writeFileSync(join(statuslineDir, kind, `${name}.mjs`), body);
@@ -100,7 +100,7 @@ test('an entry with no module is ignored', () => {
   });
 });
 
-// aiaddon 이름 문법 완화로 다중 콜론·평평한 항목이 파서를 통과하게 됐다 —
+// agentaddon 이름 문법 완화로 다중 콜론·평평한 항목이 파서를 통과하게 됐다 —
 // 앞 두 조각으로 절단 해석하면 오타가 실존 모듈을 켜므로, 통째로 무시돼야 한다.
 test('a multi-colon or flat entry is not truncated into a real module', () => {
   withTree((tree) => {
@@ -175,7 +175,7 @@ test('a bare run reports which entries reach a module', () => {
     tree.producer('feat', 'real', emits('real'));
     tree.entries('feat:real\nfeat:imaginary\n');
     const out = tree.run({ stdin: '', cwd: tree.project });
-    assert.match(out, /2 entries in aiaddon statusline/);
+    assert.match(out, /2 entries in agentaddon statusline/);
     assert.match(out, /feat:real {2}ok/);
     assert.match(out, /feat:imaginary {2}no module at/);
   });

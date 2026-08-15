@@ -4,11 +4,11 @@ banaction 은 core 플러그인에 포함된 도구 호출 가드로, PreToolUse
 
 ## 켜기
 
-banaction 은 aiaddon `event` 파일에 적어야 돈다. 적용할 범위에 한 줄 쓴다:
+banaction 은 agentaddon `event` 파일에 적어야 돈다. 적용할 범위에 한 줄 쓴다:
 
 ```
-# ~/.config/aiaddon/event — 모든 세션
-# <디렉터리>/.config/aiaddon/event — 그 아래 세션
+# ~/.config/agentaddon/event — 모든 세션
+# <디렉터리>/.config/agentaddon/event — 그 아래 세션
 rule:banaction
 ```
 

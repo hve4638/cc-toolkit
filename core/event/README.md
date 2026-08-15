@@ -1,11 +1,11 @@
 # core/event
 
-훅 이벤트를 애드온에 배달하는 호스트가 사는 곳. 애드온 자체는 `core/addon/<이름>/addon.mjs` 와 `core/skills/<이름>/addon.mjs` 에 살고, 어느 규칙을 켤지는 aiaddon 의 `event` 네임스페이스가 정한다.
+훅 이벤트를 애드온에 배달하는 호스트가 사는 곳. 애드온 자체는 `core/addon/<이름>/addon.mjs` 와 `core/skills/<이름>/addon.mjs` 에 살고, 어느 규칙을 켤지는 agentaddon 의 `event` 네임스페이스가 정한다.
 
 ```
-~/.config/aiaddon/event                  전역 (가장 약함)
-<조상 디렉터리>/.config/aiaddon/event    루트부터 아래로
-<세션 루트>/.config/aiaddon/event        가장 가까움 (이김)
+~/.config/agentaddon/event                  전역 (가장 약함)
+<조상 디렉터리>/.config/agentaddon/event    루트부터 아래로
+<세션 루트>/.config/agentaddon/event        가장 가까움 (이김)
 ```
 
 `lib/index.mjs` 와 `lib/index.d.mts` 는 생성물이다. 원본은 `core/_build/src/event/index.mts` 고 `_build` 에서 `pnpm build:event` 로 뽑는다.
@@ -40,15 +40,25 @@ export default {
 };
 ```
 
-- `rules` 는 구독 선언이다: 규칙 이름 → 그 규칙이 트리거되는 이벤트 목록. 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다.
+- `rules` 는 구독 선언이다: 규칙 이름 → 그 규칙이 트리거되는 이벤트 목록. 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다.
 - 핸들러는 **이벤트당 하나**다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 셋째 인자로 받는다 — 꺼진 것은 `trigger: false` 로. 규칙별 분기는 핸들러가 이 객체를 보고 한다.
 - 규칙 상태에는 그 항목의 인자도 실린다: `showcase-heavy@mode=strict` → `rules['showcase-heavy']` 는 `{ mode: 'strict', trigger: true }`. `trigger` 는 호스트가 채우는 예약 키라 인자로 같은 이름을 적어도 조용히 무시된다.
 - `priority` 는 이벤트별 실행 밴드다. 생략·모르는 값은 medium.
 - 핸들러는 아무것도 반환하지 않는다. 훅이 낼 것은 전부 api 호출로 적는다. 첫 줄의 `// @ts-check` 와 `@type` 주석이 있어야 타입 오류가 에디터에 뜬다.
 
+### 기본 켜짐
+
+`enabledByDefault: true` 를 단 규칙은 agentaddon 에 줄이 없어도 켜진 것으로 친다 (인자 없음). 구식 `hooks/hooks.mjs` 처럼 설정 없이 항상 도는 훅을 애드온으로 옮기는 데 쓴다.
+
+```js
+rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
+```
+
+끄는 길은 부정이다 — 어느 층에서든 `!cwd-context` (glob 포함) 가 매치하면 기본값이 죽는다. 부정 뒤에 다시 적은 켜는 줄은 여느 항목처럼 살아나고, 그때 붙인 인자도 실린다.
+
 ## manifest
 
-`manifest.json` 은 생성물이다 — 규칙 이름 → 애드온 경로·이벤트 목록의 표. `collect.mjs` 는 이 표와 켜진 규칙만 보고 이번 이벤트에 불릴 애드온을 고르므로, 존재하는 애드온을 전부 import 하지 않는다.
+`manifest.json` 은 생성물이다 — 규칙 이름 → 애드온 경로·이벤트 목록 (기본 켜짐 플래그 포함) 의 표. `collect.mjs` 는 이 표와 켜진 규칙만 보고 이번 이벤트에 불릴 애드온을 고르므로, 존재하는 애드온을 전부 import 하지 않는다.
 
 addon.mjs 를 만들거나 `rules` 선언을 바꿨으면 재생성해 같이 커밋한다:
 

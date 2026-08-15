@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Turns statusline producers on, by appending their entries to the global
- * aiaddon file at ~/.config/aiaddon/statusline.
+ * agentaddon file at ~/.config/agentaddon/statusline.
  *
  *   node statusline-enable.mjs feat:hud feat:advertise@lang=ko
  *
@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { load } from './lib/aiaddon.mjs';
+import { load } from './lib/addon-config.mjs';
 
 const NAMESPACE = 'statusline';
 const ENTRY_RE = /^[a-z0-9-]+:[a-z0-9-]+(?:@\S+)?$/;
@@ -26,11 +26,11 @@ if (requested.length === 0) {
 
 const malformed = requested.filter((entry) => !ENTRY_RE.test(entry));
 if (malformed.length > 0) {
-  console.error(`[statusline] ERROR: not an aiaddon entry: ${malformed.join(' ')}`);
+  console.error(`[statusline] ERROR: not an agentaddon entry: ${malformed.join(' ')}`);
   process.exit(1);
 }
 
-const path = join(homedir(), '.config', 'aiaddon', NAMESPACE);
+const path = join(homedir(), '.config', 'agentaddon', NAMESPACE);
 const already = load(null, NAMESPACE);
 
 const additions = [];

@@ -15,7 +15,7 @@
  *       },
  *     };
  *
- * 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
+ * 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
  * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
  * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
  * `trigger: false` 로) 셋째 인자로 받는다.
@@ -67,12 +67,12 @@ export interface StopPayload extends BasePayload {
 /** 실행 순서 밴드. 생략하면 medium. */
 export type Band = 'high' | 'medium' | 'low';
 
-/** aiaddon 항목에 붙은 인자. `showcase-light@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
+/** agentaddon 항목에 붙은 인자. `showcase-light@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
 export type Args = Readonly<Record<string, string | true>>;
 
 /**
  * 핸들러가 받는 규칙 하나의 상태. `trigger` 는 호스트가 채우는 예약 키고
- * (그 규칙이 aiaddon 에 켜져 있는가), 나머지는 그 항목의 인자다.
+ * (그 규칙이 agentaddon 에 켜져 있는가), 나머지는 그 항목의 인자다.
  */
 export interface RuleState {
   readonly trigger: boolean;
@@ -211,6 +211,13 @@ export type Handler<E extends EventName> = (
 /** 규칙 하나의 선언 — 어느 이벤트에서 트리거되는가. */
 export interface RuleDecl {
   events: readonly EventName[];
+  /**
+   * true 면 agentaddon 에 줄이 없어도 켜진 것으로 본다 (인자 없음). 끄는 길은
+   * 부정뿐이다 — `!<이름>` 이 매치한 적 있으면 기본값이 죽고, 그 뒤에 다시
+   * 적은 켜는 줄이 살린다. 구식 hooks.mjs 처럼 설정 없이 항상 도는 훅을
+   * 애드온으로 옮기기 위한 것.
+   */
+  enabledByDefault?: boolean;
 }
 
 /**
@@ -220,7 +227,7 @@ export interface RuleDecl {
  * 불리고, 규칙별 분기는 핸들러가 셋째 인자를 보고 한다.
  */
 export interface AddonDecl {
-  /** 구독하는 규칙들. 이름은 aiaddon 항목 이름과 문자열로 이어진다. */
+  /** 구독하는 규칙들. 이름은 agentaddon 항목 이름과 문자열로 이어진다. */
   rules: Readonly<Record<string, RuleDecl>>;
   /** 이벤트별 실행 밴드. 생략·모르는 값은 medium. */
   priority?: Readonly<Partial<Record<EventName, Band>>>;
@@ -229,8 +236,8 @@ export interface AddonDecl {
 
 /**
  * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
- * priority 는 검사하지 않는다 — 값이 이상해도 medium 으로 떨어질 뿐, 선언
- * 전체를 버릴 이유가 아니다.
+ * priority 와 enabledByDefault 는 검사하지 않는다 — 값이 이상해도 각각
+ * medium·꺼짐으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다.
  */
 export function isAddonDecl(value: unknown): value is AddonDecl {
   if (typeof value !== 'object' || value === null) return false;
@@ -550,18 +557,24 @@ export interface LoadedAddon {
  *
  * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
  * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
+ *
+ * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
+ * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
+ * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
  */
 export function selectRules(
   decl: AddonDecl,
   event: EventName,
   enabled: ReadonlyMap<string, Args>,
+  negated: (name: string) => boolean = () => false,
 ): Rules | null {
   const rules: Record<string, RuleState> = {};
   let triggered = false;
   for (const [name, rule] of Object.entries(decl.rules)) {
     if (!rule.events.includes(event)) continue;
     const args = enabled.get(name);
-    const trigger = args !== undefined;
+    const trigger =
+      args !== undefined || (rule.enabledByDefault === true && !negated(name));
     triggered ||= trigger;
     // WHY: trigger 는 예약 키 — 인자에 같은 이름이 와도 여기서 덮여 조용히
     //      무시된다. 훅에는 사람에게 경고를 띄울 마땅한 경로가 없다.

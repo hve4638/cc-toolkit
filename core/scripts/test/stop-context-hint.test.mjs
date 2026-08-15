@@ -6,8 +6,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PostToolUse as skillPostToolUse } from '../../skills/writing-great-skill/hooks.mjs';
-import { PostToolUse as agentsMdPostToolUse } from '../../skills/writing-great-agents-md/hooks.mjs';
+import decl from '../../addon/writing-context-hint/addon.mjs';
+import { apiFor, emptyDraft } from '../../event/lib/index.mjs';
+
+// producer 는 writing-context-hint 애드온이다. 여기서는 소비자를 검증하므로
+// 핸들러를 직접 불러 플래그를 만든다 — dispatch 경유는 애드온 자기 테스트가 한다.
+// api 는 진짜를 준다: 핸들러가 api 를 쓰기 시작해도 여기가 엉뚱하게 깨지지 않게.
+const flag = (payload) => decl.handlers.PostToolUse(apiFor('PostToolUse', emptyDraft(), payload), payload);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_PATH = join(__dirname, '..', 'stop-context-hint.mjs');
@@ -61,44 +66,12 @@ function withTmpDir(fn) {
   });
 }
 
-test('skill handler flags SKILL.md edits, ignores others', async () => {
-  await withTmpDir(async (tmpDir) => {
-    withProjectEnv(tmpDir, () => {
-      skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/a/SKILL.md' }, session_id: 's1' });
-      skillPostToolUse({ tool_name: 'Write', tool_input: { file_path: '/x/a/SKILL.ko.md' }, session_id: 's1' });
-      skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/a/CLAUDE.md' }, session_id: 's1' });
-      skillPostToolUse({ tool_name: 'Bash', tool_input: { file_path: '/x/a/SKILL.md' }, session_id: 's1' });
-      skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/src/index.ts' }, session_id: 's1' });
-    });
-    const lines = readFileSync(flagPathFor(tmpDir, 's1'), 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
-    assert.deepEqual(lines, [
-      { cmd: '/writing-great-skill', path: '/x/a/SKILL.md' },
-      { cmd: '/writing-great-skill', path: '/x/a/SKILL.ko.md' },
-    ]);
-  });
-});
-
-test('agents-md handler flags CLAUDE.md / AGENTS.md edits only', async () => {
-  await withTmpDir(async (tmpDir) => {
-    withProjectEnv(tmpDir, () => {
-      agentsMdPostToolUse({ tool_name: 'Write', tool_input: { file_path: '/x/CLAUDE.md' }, session_id: 's2' });
-      agentsMdPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/AGENTS.md' }, session_id: 's2' });
-      agentsMdPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/a/SKILL.md' }, session_id: 's2' });
-    });
-    const lines = readFileSync(flagPathFor(tmpDir, 's2'), 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
-    assert.deepEqual(lines, [
-      { cmd: '/writing-great-agents-md', path: '/x/CLAUDE.md' },
-      { cmd: '/writing-great-agents-md', path: '/x/AGENTS.md' },
-    ]);
-  });
-});
-
 test('Stop consumes flags into per-command hint lines and deletes the file', async () => {
   await withTmpDir(async (tmpDir) => {
     const flagPath = flagPathFor(tmpDir, 'sess-1');
     withProjectEnv(tmpDir, () => {
-      skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: join(tmpDir, 'core/skills/foo/SKILL.md') }, session_id: 'sess-1' });
-      agentsMdPostToolUse({ tool_name: 'Write', tool_input: { file_path: join(tmpDir, 'CLAUDE.md') }, session_id: 'sess-1' });
+      flag({ tool_name: 'Edit', tool_input: { file_path: join(tmpDir, 'core/skills/foo/SKILL.md') }, session_id: 'sess-1' });
+      flag({ tool_name: 'Write', tool_input: { file_path: join(tmpDir, 'CLAUDE.md') }, session_id: 'sess-1' });
     });
 
     const { stdout } = await runHook('sess-1', tmpDir);
@@ -120,7 +93,7 @@ test('duplicate edits dedupe; paths outside the project root stay absolute', asy
   await withTmpDir(async (tmpDir) => {
     withProjectEnv(tmpDir, () => {
       for (let i = 0; i < 3; i++) {
-        skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/outside/SKILL.ko.md' }, session_id: 'sess-2' });
+        flag({ tool_name: 'Edit', tool_input: { file_path: '/outside/SKILL.ko.md' }, session_id: 'sess-2' });
       }
     });
     const { stdout } = await runHook('sess-2', tmpDir);
@@ -136,7 +109,7 @@ test('non-Stop events leave the flag file untouched', async () => {
   await withTmpDir(async (tmpDir) => {
     const flagPath = flagPathFor(tmpDir, 'sess-3');
     withProjectEnv(tmpDir, () => {
-      agentsMdPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/AGENTS.md' }, session_id: 'sess-3' });
+      flag({ tool_name: 'Edit', tool_input: { file_path: '/x/AGENTS.md' }, session_id: 'sess-3' });
     });
     const { stdout } = await runHook('sess-3', tmpDir, 'PostToolUse');
     assert.equal(JSON.parse(stdout).systemMessage, undefined);
@@ -148,7 +121,7 @@ test('malformed flag lines are skipped; all-bad file stays silent', async () => 
   await withTmpDir(async (tmpDir) => {
     const flagPath = flagPathFor(tmpDir, 'sess-4');
     withProjectEnv(tmpDir, () => {
-      skillPostToolUse({ tool_name: 'Edit', tool_input: { file_path: '/x/SKILL.md' }, session_id: 'sess-4' });
+      flag({ tool_name: 'Edit', tool_input: { file_path: '/x/SKILL.md' }, session_id: 'sess-4' });
     });
     writeFileSync(flagPath, `not-json\n{"cmd":123}\n${readFileSync(flagPath, 'utf-8')}`);
     const good = JSON.parse((await runHook('sess-4', tmpDir)).stdout);

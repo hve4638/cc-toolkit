@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { load } from '../lib/aiaddon.mjs';
+import { load, loadState } from '../lib/addon-config.mjs';
 
-// HOME 을 임시 디렉터리로 격리 — 실제 사용자의 ~/.config/aiaddon 이 결과에 새어
+// HOME 을 임시 디렉터리로 격리 — 실제 사용자의 ~/.config/agentaddon 이 결과에 새어
 // 들어오지 않게 한다. os.homedir() 는 호출 시점의 $HOME 을 본다.
 // ancestor 는 project 의 부모 디렉터리 층이다 (전역과 로컬 사이).
 function withLayers({ global: globalText, ancestor: ancestorText, local: localText }, fn) {
-  const dir = mkdtempSync(join(tmpdir(), 'aiaddon-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'agentaddon-test-'));
   const home = join(dir, 'home');
   const project = join(dir, 'project');
   for (const [base, text] of [[home, globalText], [dir, ancestorText], [project, localText]]) {
     if (text === undefined) continue;
-    mkdirSync(join(base, '.config', 'aiaddon'), { recursive: true });
-    writeFileSync(join(base, '.config', 'aiaddon', 'event'), text);
+    mkdirSync(join(base, '.config', 'agentaddon'), { recursive: true });
+    writeFileSync(join(base, '.config', 'agentaddon', 'event'), text);
   }
   const saved = process.env.HOME;
   process.env.HOME = home;
@@ -111,12 +111,12 @@ test('closer layers win: local over ancestor over global', () => {
 });
 
 test('a session under home reads the global layer once, in global position', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'aiaddon-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'agentaddon-test-'));
   const home = join(dir, 'home');
   const project = join(home, 'project');
   for (const [base, text] of [[dir, 'feat:a\n'], [home, '!feat:a\n']]) {
-    mkdirSync(join(base, '.config', 'aiaddon'), { recursive: true });
-    writeFileSync(join(base, '.config', 'aiaddon', 'event'), text);
+    mkdirSync(join(base, '.config', 'agentaddon'), { recursive: true });
+    writeFileSync(join(base, '.config', 'agentaddon', 'event'), text);
   }
   const saved = process.env.HOME;
   process.env.HOME = home;
@@ -135,6 +135,24 @@ test('flat names without a colon are entries — the colon is just a character',
   const entries = on({ global: 'showcase-light@lang=ko\nplain\na:b:c\n!plain\n' });
   assert.deepEqual([...entries.keys()], ['showcase-light', 'a:b:c']);
   assert.deepEqual({ ...entries.get('showcase-light') }, { lang: 'ko' });
+});
+
+test('loadState reports negation history across layers, globs included', () => {
+  withLayers({ global: '!cwd-*\n', local: '!feat:inlay\n' }, (project) => {
+    const { negated } = loadState(project, 'event');
+    assert.equal(negated('cwd-context'), true);
+    assert.equal(negated('feat:inlay'), true);
+    assert.equal(negated('feat:other'), false);
+  });
+});
+
+test('a name re-enabled after negation is in entries and still counts as negated', () => {
+  withLayers({ global: '!cwd-context\n', local: 'cwd-context@lang=ko\n' }, (project) => {
+    const { entries, negated } = loadState(project, 'event');
+    // entries 가 이기는 쪽이다 — negated 는 이력일 뿐 소비자가 entries 부터 본다.
+    assert.deepEqual({ ...entries.get('cwd-context') }, { lang: 'ko' });
+    assert.equal(negated('cwd-context'), true);
+  });
 });
 
 test('malformed lines are ignored', () => {

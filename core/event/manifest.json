@@ -9,6 +9,17 @@
           ]
         }
       }
+    },
+    {
+      "path": "addon/writing-context-hint/addon.mjs",
+      "rules": {
+        "writing-context-hint": {
+          "events": [
+            "PostToolUse"
+          ],
+          "enabledByDefault": true
+        }
+      }
     }
   ]
 }

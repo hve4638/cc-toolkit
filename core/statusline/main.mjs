@@ -1,16 +1,16 @@
 /**
- * statusline host — builds the line out of the producers aiaddon turns on.
+ * statusline host — builds the line out of the producers agentaddon turns on.
  *
  * Reached through <claude config dir>/statusline.mjs, the installed wrapper,
  * which resolves the newest core and imports this file.
  *
  * A producer owns whole lines: two of them never share one. So placement is a
  * single question — which line — answered by the module's own `priority` band
- * and, within a band, by the order the entries appear in the aiaddon file.
+ * and, within a band, by the order the entries appear in the agentaddon file.
  *
  * Entry `<kind>:<name>` resolves to `<kind>/<name>.mjs` beside this file, and a
  * module the convention does not reach is simply not rendered — the same
- * "unknown entries are ignored" the aiaddon format is built on. Each module
+ * "unknown entries are ignored" the agentaddon format is built on. Each module
  * exports:
  *
  *   render(context, args) -> string | null   (may be async)
@@ -20,7 +20,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { load } from '../scripts/lib/aiaddon.mjs';
+import { load } from '../scripts/lib/addon-config.mjs';
 import { sanitize } from './lib/sanitize.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -44,14 +44,14 @@ async function readStdin() {
   }
 }
 
-// The aiaddon local layer is keyed to the session root, the same basis that
+// The agentaddon local layer is keyed to the session root, the same basis that
 // .agent-memory uses.
 function projectRootOf(stdin) {
   return stdin?.workspace?.project_dir ?? stdin?.cwd ?? process.cwd();
 }
 
 function modulePathOf(entry) {
-  // WHY: aiaddon 이름 문법은 콜론 개수를 강제하지 않지만 (평평한 이름·다중 콜론도
+  // WHY: agentaddon 이름 문법은 콜론 개수를 강제하지 않지만 (평평한 이름·다중 콜론도
   //      항목이다), statusline 모듈 해석은 kind:name 두 조각이다. 다른 형태를 앞
   //      두 조각으로 절단 해석하면 오타 (feat:advertise:ko) 가 실존 모듈을 기본
   //      인자로 켜므로, 두 조각이 아니면 모듈 없음으로 취급한다.
@@ -103,7 +103,7 @@ async function renderLines(producers, context) {
 // someone is checking the install by hand.
 async function diagnose() {
   const entries = [...load(process.cwd(), NAMESPACE)];
-  console.log(`[statusline] ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} in aiaddon ${NAMESPACE}`);
+  console.log(`[statusline] ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} in agentaddon ${NAMESPACE}`);
   for (const [entry] of entries) {
     const path = modulePathOf(entry);
     if (path === null) {

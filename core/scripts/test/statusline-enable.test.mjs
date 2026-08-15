@@ -10,10 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENABLE = join(__dirname, '..', 'statusline-enable.mjs');
 
 // 스크립트는 HOME 아래 전역 파일만 건드린다. HOME 을 임시 디렉터리로 돌려
-// 사용자의 실제 aiaddon 설정과 격리한다.
+// 사용자의 실제 agentaddon 설정과 격리한다.
 function withHome(fn) {
   const home = mkdtempSync(join(tmpdir(), 'statusline-enable-test-'));
-  const path = join(home, '.config', 'aiaddon', 'statusline');
+  const path = join(home, '.config', 'agentaddon', 'statusline');
 
   const tools = {
     path,
@@ -101,7 +101,7 @@ test('항목 형식이 아니면 파일을 건드리지 않고 거부한다', ()
   withHome((t) => {
     const { status, err } = t.run('feat:hud', 'Nope!');
     assert.equal(status, 1);
-    assert.match(err, /not an aiaddon entry: Nope!/);
+    assert.match(err, /not an agentaddon entry: Nope!/);
     assert.equal(t.read(), null);
   });
 });

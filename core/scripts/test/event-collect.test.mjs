@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_COLLECT = join(__dirname, '..', '..', 'event', 'collect.mjs');
 const SRC_LIB = join(__dirname, '..', '..', 'event', 'lib', 'index.mjs');
-const SRC_AIADDON = join(__dirname, '..', 'lib', 'aiaddon.mjs');
+const SRC_ADDON_CONFIG = join(__dirname, '..', 'lib', 'addon-config.mjs');
 const SRC_CORELIB = join(__dirname, '..', 'lib', 'corelib.mjs');
 
 // collect 는 자기 옆의 manifest.json 과 플러그인 루트 기준 상대 경로의 addon.mjs
@@ -20,12 +20,12 @@ async function withTree(fn) {
   mkdirSync(join(dir, 'core', 'scripts', 'lib'), { recursive: true });
   copyFileSync(SRC_COLLECT, join(eventDir, 'collect.mjs'));
   copyFileSync(SRC_LIB, join(eventDir, 'lib', 'index.mjs'));
-  copyFileSync(SRC_AIADDON, join(dir, 'core', 'scripts', 'lib', 'aiaddon.mjs'));
+  copyFileSync(SRC_ADDON_CONFIG, join(dir, 'core', 'scripts', 'lib', 'addon-config.mjs'));
   copyFileSync(SRC_CORELIB, join(dir, 'core', 'scripts', 'lib', 'corelib.mjs'));
 
   const project = join(dir, 'project');
   const home = join(dir, 'home');
-  mkdirSync(join(project, '.config', 'aiaddon'), { recursive: true });
+  mkdirSync(join(project, '.config', 'agentaddon'), { recursive: true });
   mkdirSync(home, { recursive: true });
 
   // 임시 디렉터리마다 URL 이 달라 ESM 캐시가 테스트끼리 섞이지 않는다.
@@ -38,13 +38,20 @@ async function withTree(fn) {
 
   const tree = {
     project,
-    entries: (text) => writeFileSync(join(project, '.config', 'aiaddon', 'event'), text),
-    /** addon.mjs 를 심고 manifest 항목을 등록한다. base 는 'addon' 또는 'skills'. */
+    entries: (text) => writeFileSync(join(project, '.config', 'agentaddon', 'event'), text),
+    /**
+     * addon.mjs 를 심고 manifest 항목을 등록한다. base 는 'addon' 또는 'skills'.
+     * ruleEvents 값은 이벤트 배열, 또는 manifest 항목 그대로의 객체
+     * ({ events, enabledByDefault }).
+     */
     install: (base, name, ruleEvents, source) => {
       mkdirSync(join(dir, 'core', base, name), { recursive: true });
       writeFileSync(join(dir, 'core', base, name, 'addon.mjs'), source);
       const rules = Object.fromEntries(
-        Object.entries(ruleEvents).map(([rule, events]) => [rule, { events }]),
+        Object.entries(ruleEvents).map(([rule, spec]) => [
+          rule,
+          Array.isArray(spec) ? { events: spec } : spec,
+        ]),
       );
       autoEntries.push({ path: `${base}/${name}/addon.mjs`, rules });
     },
@@ -231,6 +238,87 @@ test('이번 이벤트에 안 걸린 애드온은 import 조차 안 된다', asy
     const loaded = await tree.collect('Stop');
     assert.equal(loaded.length, 1);
     assert.equal(existsSync(marker), false);
+  });
+});
+
+/** 기본 켜짐 규칙 하나를 구독하는 애드온 소스. */
+function defaultCatcher(rule, event) {
+  return `
+    export default {
+      rules: { '${rule}': { events: ['${event}'], enabledByDefault: true } },
+      handlers: { ${event}() {} },
+    };
+  `;
+}
+
+const DEFAULT_ON = (event) => ({ events: [event], enabledByDefault: true });
+
+test('기본 켜짐 규칙은 설정이 아예 없어도 불려 온다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
+      defaultCatcher('cwd-context', 'SessionStart'));
+
+    const loaded = await tree.collect('SessionStart');
+    assert.equal(loaded.length, 1);
+    assert.deepEqual(loaded[0].rules, { 'cwd-context': { trigger: true } });
+  });
+});
+
+test('부정이 기본 켜짐 규칙을 끈다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
+      defaultCatcher('cwd-context', 'SessionStart'));
+    tree.entries('!cwd-context\n');
+
+    assert.deepEqual(await tree.collect('SessionStart'), []);
+  });
+});
+
+test('부정 뒤에 다시 켠 줄이 이긴다 — 인자도 실린다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
+      defaultCatcher('cwd-context', 'SessionStart'));
+    tree.entries('!cwd-*\ncwd-context@lang=ko\n');
+
+    const [loaded] = await tree.collect('SessionStart');
+    assert.deepEqual(loaded.rules, { 'cwd-context': { lang: 'ko', trigger: true } });
+  });
+});
+
+test('부정된 기본 켜짐 애드온은 import 조차 안 된다 — manifest 사전 필터가 판정을 공유', async () => {
+  await withTree(async (tree) => {
+    const marker = join(tree.project, 'probe-marker');
+    tree.install('addon', 'probe', { 'cwd-context': DEFAULT_ON('SessionStart') }, `
+      import { writeFileSync } from 'node:fs';
+      writeFileSync(${JSON.stringify(marker)}, 'imported');
+      export default {
+        rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
+        handlers: { SessionStart() {} },
+      };
+    `);
+    tree.entries('!cwd-context\n');
+
+    assert.deepEqual(await tree.collect('SessionStart'), []);
+    assert.equal(existsSync(marker), false);
+  });
+});
+
+test('manifest 만 기본 켜짐이라 해도 선언이 아니면 안 불린다 — 선언이 기준', async () => {
+  await withTree(async (tree) => {
+    // manifest 는 낡아서 기본 켜짐이라 하지만 실제 선언은 아니다.
+    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
+      catcher('cwd-context', 'SessionStart'));
+
+    assert.deepEqual(await tree.collect('SessionStart'), []);
+  });
+});
+
+test('선언만 기본 켜짐이고 manifest 에 플래그가 빠졌으면 못 찾는다 — 낡은 manifest 의 한계', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'ctx', { 'cwd-context': ['SessionStart'] },
+      defaultCatcher('cwd-context', 'SessionStart'));
+
+    assert.deepEqual(await tree.collect('SessionStart'), []);
   });
 });
 

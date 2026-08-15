@@ -237,9 +237,9 @@ test('CRLF line endings parse correctly', async () => {
   });
 });
 
-// aiaddon 배선의 e2e — core 배치를 임시 트리에 재현하고 실제 main.mjs 를 띄워,
-// rule:banaction 이 aiaddon 에 적혀 있을 때만 도는 것을 본다.
-test('enabled via aiaddon the module denies; without the entry it is silent', () => {
+// agentaddon 배선의 e2e — core 배치를 임시 트리에 재현하고 실제 main.mjs 를 띄워,
+// rule:banaction 이 agentaddon 에 적혀 있을 때만 도는 것을 본다.
+test('enabled via agentaddon the module denies; without the entry it is silent', () => {
   const EVENT_SRC = join(__dirname, '..', '..', 'event');
   const ADDON_SRC = join(__dirname, '..', '..', 'addon', 'banaction', 'addon.mjs');
   const LIB_SRC = join(__dirname, '..', 'lib');
@@ -256,13 +256,13 @@ test('enabled via aiaddon the module denies; without the entry it is silent', ()
     }
     copyFileSync(join(EVENT_SRC, 'lib', 'index.mjs'), join(eventDir, 'lib', 'index.mjs'));
     copyFileSync(ADDON_SRC, join(addonDir, 'addon.mjs'));
-    for (const name of ['aiaddon.mjs', 'corelib.mjs']) {
+    for (const name of ['addon-config.mjs', 'corelib.mjs']) {
       copyFileSync(join(LIB_SRC, name), join(libDir, name));
     }
 
     const project = join(dir, 'project');
     const home = join(dir, 'home');
-    mkdirSync(join(project, '.config', 'aiaddon'), { recursive: true });
+    mkdirSync(join(project, '.config', 'agentaddon'), { recursive: true });
     mkdirSync(home, { recursive: true });
     writeFileSync(join(project, '.banaction'), 'git push\n');
 
@@ -279,7 +279,7 @@ test('enabled via aiaddon the module denies; without the entry it is silent', ()
 
     assert.deepEqual(runMain(), {});
 
-    writeFileSync(join(project, '.config', 'aiaddon', 'event'), 'rule:banaction\n');
+    writeFileSync(join(project, '.config', 'agentaddon', 'event'), 'rule:banaction\n');
     const out = runMain();
     assert.equal(out.hookSpecificOutput?.permissionDecision, 'deny');
     assert.match(out.hookSpecificOutput?.permissionDecisionReason ?? '', /git push/);

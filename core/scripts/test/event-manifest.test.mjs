@@ -61,6 +61,40 @@ test('addon 과 skills 두 트리를 훑고 경로·규칙을 적는다', async 
   });
 });
 
+test('enabledByDefault 는 true 일 때만 manifest 에 실린다', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'mixed', `
+      export default {
+        rules: {
+          'on-by-default': { events: ['SessionStart'], enabledByDefault: true },
+          'off-by-default': { events: ['SessionStart'] },
+          'odd-value': { events: ['SessionStart'], enabledByDefault: 'yes' },
+        },
+        handlers: { SessionStart() {} },
+      };
+    `);
+
+    assert.deepEqual((await buildManifest(root)).addons[0].rules, {
+      'on-by-default': { events: ['SessionStart'], enabledByDefault: true },
+      'off-by-default': { events: ['SessionStart'] },
+      'odd-value': { events: ['SessionStart'] },
+    });
+  });
+});
+
+test('agentaddon 이름 문법을 벗어난 규칙 이름은 생성기를 죽인다', async () => {
+  await withRoot(async (root) => {
+    // 설정 줄로 켤 수도 끌 수도 없는 이름 — 기본 켜짐이면 끌 수 없는 훅이 된다.
+    install(root, 'addon', 'typo', `
+      export default {
+        rules: { cwd_context: { events: ['SessionStart'], enabledByDefault: true } },
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /cwd_context/);
+  });
+});
+
 test('addon.mjs 가 없는 폴더와 없는 트리는 조용히 지나간다', async () => {
   await withRoot(async (root) => {
     mkdirSync(join(root, 'addon', 'empty'), { recursive: true });

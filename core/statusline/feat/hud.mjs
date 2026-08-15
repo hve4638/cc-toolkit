@@ -3,7 +3,7 @@
  *
  *   📁 repo | 🌿 repo(branch) | ⏳ 5h:19%(3h42m) wk:41%(2d5h) | 📦 context:37% | 💻 Opus 5
  *
- * Turned on by `feat:hud` in the aiaddon statusline namespace. Everything comes
+ * Turned on by `feat:hud` in the agentaddon statusline namespace. Everything comes
  * from the payload Claude Code hands the statusline plus a couple of git
  * lookups, so a render costs no network call.
  *

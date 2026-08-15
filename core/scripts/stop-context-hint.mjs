@@ -2,8 +2,8 @@
 /**
  * Stop Hook: Context-file review hint (user-only).
  *
- * Consumes flag lines appended by skill PostToolUse handlers
- * (core/skills/writing-great-skill/hooks.mjs, core/skills/writing-great-agents-md/hooks.mjs)
+ * Consumes flag lines appended by the writing-context-hint addon
+ * (core/addon/writing-context-hint/addon.mjs, PostToolUse)
  * to <projectRoot>/.agent-memory/context-hint/<session_id>.jsonl — one JSON
  * line { cmd, path } per detected context-file edit. On Stop: read, delete the
  * flag file, dedupe, and emit one hint line per command via systemMessage

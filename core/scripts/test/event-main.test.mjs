@@ -23,26 +23,32 @@ function withTree(fn) {
     copyFileSync(join(EVENT_SRC, name), join(eventDir, name));
   }
   copyFileSync(join(EVENT_SRC, 'lib', 'index.mjs'), join(eventDir, 'lib', 'index.mjs'));
-  for (const name of ['aiaddon.mjs', 'corelib.mjs']) {
+  for (const name of ['addon-config.mjs', 'corelib.mjs']) {
     copyFileSync(join(LIB_SRC, name), join(libDir, name));
   }
 
   const project = join(dir, 'project');
   const home = join(dir, 'home');
-  mkdirSync(join(project, '.config', 'aiaddon'), { recursive: true });
+  mkdirSync(join(project, '.config', 'agentaddon'), { recursive: true });
   mkdirSync(home, { recursive: true });
 
   const manifestEntries = [];
 
   const tree = {
     project,
-    entries: (text) => writeFileSync(join(project, '.config', 'aiaddon', 'event'), text),
-    /** addon.mjs 를 core/addon/<이름>/ 에 심고 manifest 항목을 등록한다. */
+    entries: (text) => writeFileSync(join(project, '.config', 'agentaddon', 'event'), text),
+    /**
+     * addon.mjs 를 core/addon/<이름>/ 에 심고 manifest 항목을 등록한다.
+     * ruleEvents 값은 이벤트 배열, 또는 manifest 항목 그대로의 객체.
+     */
     install: (name, ruleEvents, source) => {
       mkdirSync(join(dir, 'core', 'addon', name), { recursive: true });
       writeFileSync(join(dir, 'core', 'addon', name, 'addon.mjs'), source);
       const rules = Object.fromEntries(
-        Object.entries(ruleEvents).map(([rule, events]) => [rule, { events }]),
+        Object.entries(ruleEvents).map(([rule, spec]) => [
+          rule,
+          Array.isArray(spec) ? { events: spec } : spec,
+        ]),
       );
       manifestEntries.push({ path: `addon/${name}/addon.mjs`, rules });
     },
@@ -195,6 +201,28 @@ test('Stop 의 keepGoing 은 최상위 decision 으로 나간다', () => {
       decision: 'block',
       reason: '아직 안 끝났다',
     });
+  });
+});
+
+test('기본 켜짐 규칙은 설정 없이 발화하고 부정 한 줄이 끈다', () => {
+  withTree((tree) => {
+    tree.install('ctx', { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } }, `
+      export default {
+        rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
+        handlers: { SessionStart(api) { api.injectContext('작업 위치 안내'); } },
+      };
+    `);
+
+    // 설정 파일이 아예 없다.
+    assert.deepEqual(tree.run('SessionStart'), {
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: '작업 위치 안내',
+      },
+    });
+
+    tree.entries('!cwd-context\n');
+    assert.deepEqual(tree.run('SessionStart'), {});
   });
 });
 
