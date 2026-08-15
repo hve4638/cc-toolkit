@@ -2,136 +2,63 @@
 // /wtree 셋업 step 1 — 작업장 생성. `--answer` JSON 이 완성됐을 때만 한 동작
 // (회전·생성·셰이프 반영·훅 병합·settings 기록)을 수행하고, 그 외 호출은 어떤
 // 변화도 없이 현 상황과 채워야 할 키만 출력한다.
+// 결정적 동작(게이트·사실 수집·실행)은 lib/actions.mjs 와 공유한다 — 이 파일이
+// 들고 있는 것은 폼 프로토콜(라운드·검증·페이지 출력)뿐이다.
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+  collectFacts,
+  executeStep1,
+  isDir,
+  isFile,
+  planStep1,
+  runGates,
+} from './lib/actions.mjs';
 import {
   SCRIPTS_DIR,
   SKILL_DIR,
   fail,
-  git,
-  listTemplates,
   parseAnswer,
   render,
   run,
   say,
-  sh,
   templateList,
 } from './lib/setuplib.mjs';
 
-const isFile = (p) => existsSync(p) && statSync(p).isFile();
-const isDir = (p) => existsSync(p) && statSync(p).isDirectory();
 const SELF = join(SCRIPTS_DIR, 'step1.mjs');
 const STEP2 = join(SCRIPTS_DIR, 'step2.mjs');
 const ALLOWED = ['path', 'allow_overwrite', 'branch_shape', 'hooks', 'root', 'drop', 'where', 'copy_hooks'];
-
-// rules 텍스트에서 섹션 하나를 제거하고, 다른 섹션의 children 참조도 지운다.
-function dropSection(text, name) {
-  let skip = false;
-  const kept = text.split('\n').filter((line) => {
-    const h = line.match(/^\[([^\]]+)\]\s*$/);
-    if (h) skip = h[1] === name;
-    return !skip;
-  });
-  const cleaned = kept
-    .map((l) => {
-      const m = l.match(/^(\s*children\s*=\s*)(.*)$/);
-      if (!m) return l;
-      const items = m[2].split(',').map((s) => s.trim()).filter((s) => s && s !== name);
-      return items.length ? m[1] + items.join(', ') : null;
-    })
-    .filter((l) => l !== null);
-  return cleaned.join('\n').replace(/\n{3,}/g, '\n\n');
-}
-
-// 훅 기능 여러 개를 post-create 하나로 병합한다. 기능마다 서브셸로 격리해
-// 한 기능의 exit 0 가드가 다음 기능을 삼키지 않게 한다.
-function mergeHooks(tpls) {
-  if (tpls.length === 1) return readFileSync(join(tpls[0].dir, 'post-create'), 'utf8');
-  const bodies = tpls.map((t) => {
-    const b = readFileSync(join(t.dir, 'post-create'), 'utf8').replace(/^#!.*\n/, '');
-    return `# === ${t.name} ===\n(\n${b.trimEnd()}\n)`;
-  });
-  return `#!/bin/sh\n# wtree post-create — merged by the /wtree setup (per-feature subshell isolation)\n\n${bodies.join('\n\n')}\n`;
-}
 
 run(() => {
   const badAnswer = (p) => fail('bad-answer', { PROBLEM: p, ALLOWED: ALLOWED.join(', ') });
   const a = parseAnswer(ALLOWED, badAnswer);
 
-  // ---- 게이트 (수집형: 문제를 전부 모아 한 번에) ----
-  const problems = [];
-  const alerts = [];
-  const ver = sh('wtree', ['--version']);
-  if (!ver.ok || !ver.stdout.includes('(gitwtree)')) {
-    problems.push('standalone wtree CLI not found — `wtree --version` output lacks `(gitwtree)`');
-    alerts.push('The wtree CLI is not installed, or the `wtree` on PATH is a different tool. This setup configures that CLI and cannot proceed without it. Do not attempt to install it.');
-  }
-  const gitOk = git(['rev-parse', '--is-inside-work-tree']).ok;
-  let common = '';
-  if (!gitOk) {
-    problems.push('cwd is not inside a git work tree');
-    alerts.push('/wtree sets up the repo the cwd belongs to. Confirm with the user which repo to set up and re-run inside it.');
-  } else {
-    common = git(['rev-parse', '--path-format=absolute', '--git-common-dir']).stdout;
-    if (isFile(join(common, 'wtree', 'rules'))) {
-      problems.push(`already configured — ${join(common, 'wtree', 'rules')} exists`);
-      alerts.push('This repo already carries a wtree policy, so there is nothing to set up. If the current policy is the question, `wtree info` is the starting point.');
-    }
-  }
-  if (problems.length)
+  // ---- 게이트 ----
+  const gate = runGates(
+    'This repo already carries a wtree policy, so there is nothing to set up. If the current policy is the question, `wtree info` is the starting point.',
+  );
+  if (gate.problems.length)
     fail('step1-blocked', {
-      PROBLEMS: problems.join('\n'),
-      ALERTS: alerts.map((s) => `- ${s}`).join('\n'),
+      PROBLEMS: gate.problems.join('\n'),
+      ALERTS: gate.alerts.map((s) => `- ${s}`).join('\n'),
     });
 
   // ---- 사실 수집 (읽기 전용) ----
-  const toplevel = git(['rev-parse', '--show-toplevel']).stdout;
-  const primary = dirname(common);
-  const candidates = [...new Set([toplevel, primary])].map((r) => join(r, '.wtree'));
-  const dotwtree = candidates.find((d) => isFile(join(d, 'rules')) || isFile(join(d, 'settings')));
-
-  let detRoot = git(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']).stdout.replace(
-    /^refs\/remotes\/origin\//,
-    '',
-  );
-  if (!detRoot)
-    detRoot =
-      ['main', 'master'].find(
-        (c) => git(['show-ref', '--verify', '--quiet', `refs/heads/${c}`]).ok,
-      ) || '';
-  if (!detRoot) detRoot = git(['branch', '--show-current']).stdout;
-
-  const shapes = listTemplates('shapes');
-  const hookTpls = listTemplates('hooks');
-
-  const dwHooksDir = dotwtree ? join(dotwtree, 'hooks') : '';
-  const dwHookFiles =
-    dotwtree && isDir(dwHooksDir)
-      ? readdirSync(dwHooksDir).filter((f) => isFile(join(dwHooksDir, f)))
-      : [];
-  const dwContents = dotwtree
-    ? [
-        isFile(join(dotwtree, 'rules')) ? 'rules' : null,
-        isFile(join(dotwtree, 'settings')) ? 'settings' : null,
-        dwHookFiles.length ? `hooks: ${dwHookFiles.join(', ')}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
+  const {
+    primary,
+    dotwtree,
+    detRoot,
+    shapes,
+    hookTpls,
+    dwHooksDir,
+    dwHookFiles,
+    dwContents,
+  } = collectFacts(gate.common);
 
   const facts = render('frag-facts', {
-    WTREE_VERSION: ver.stdout,
+    WTREE_VERSION: gate.ver.stdout,
     PRIMARY: primary,
-    COMMON: common,
+    COMMON: gate.common,
     ROOT: detRoot || 'detection failed',
     DOTWTREE_LINE: dotwtree ? `found — ${dotwtree} (${dwContents})` : 'none',
   }).trimEnd();
@@ -274,58 +201,21 @@ run(() => {
   }
 
   // ---- 실행 (완전한 answer — 여기서만 파일시스템이 변한다) ----
-  const actions = [];
-  if (existsSync(ws)) {
-    const old = ws + '.old';
-    if (existsSync(old)) {
-      rmSync(old, { recursive: true });
-      actions.push(`- deleted: ${old}/ (previous backup)`);
-    }
-    renameSync(ws, old);
-    actions.push(`- moved: ${ws}/ -> ${old}/`);
-  }
-  mkdirSync(ws, { recursive: true });
-  actions.push(`- created: ${ws}/`);
-
-  if (shapeTpl) {
-    let text = readFileSync(join(shapeTpl.dir, 'rules'), 'utf8');
-    const tplRoot = text.match(/^\[([^\]]+)\]/m)[1];
-    const effRoot = a.root || detRoot;
-    if (effRoot !== tplRoot) {
-      text = text.replace(`[${tplRoot}]`, `[${effRoot}]`);
-      actions.push(`- applied: root branch ${tplRoot} -> ${effRoot}`);
-    }
-    for (const d of a.drop || []) {
-      text = dropSection(text, d);
-      actions.push(`- applied: dropped section ${d} and its references`);
-    }
-    writeFileSync(join(ws, 'rules'), text);
-    actions.push(`- created: ${join(ws, 'rules')} (from templates/shapes/${shapeTpl.name})`);
-  }
-
-  const chosen = a.hooks.map((h) => hookTpls.find((t) => t.name === h));
-  if (chosen.length) {
-    mkdirSync(join(ws, 'hooks'));
-    writeFileSync(join(ws, 'hooks', 'post-create'), mergeHooks(chosen));
-    actions.push(
-      `- created: ${join(ws, 'hooks', 'post-create')} (${chosen.map((t) => t.name).join(' + ')}${chosen.length > 1 ? ' merged' : ''})`,
-    );
-  }
-
-  writeFileSync(
-    join(ws, 'settings'),
-    `# wtree machine-local settings — written by the /wtree setup\nworktree-dir = ${a.where}${basename(primary)}.worktrees\n`,
+  const steps = planStep1(
+    { ws, shapeTpl, root: a.root, drop: a.drop, hooks: a.hooks, where: a.where },
+    { detRoot, hookTpls, primary },
   );
-  actions.push(`- created: ${join(ws, 'settings')} (worktree-dir = ${a.where}${basename(primary)}.worktrees)`);
+  const actions = executeStep1(steps);
 
+  const chosenCount = a.hooks.length;
   const before = [];
   if (a.branch_shape === 'custom')
     before.push(render('frag-before-custom', { WS: ws, VOCAB: join(SKILL_DIR, 'vocabulary.md') }).trimEnd());
-  if (chosen.length)
+  if (chosenCount)
     before.push(render('frag-before-hooks', { HOOK_PATH: join(ws, 'hooks', 'post-create') }).trimEnd());
   before.push(render('frag-before-review', { RULES: join(ws, 'rules') }).trimEnd());
 
-  const step2Answer = { path: ws, ...(chosen.length ? { copy_hooks: true } : {}) };
+  const step2Answer = { path: ws, ...(chosenCount ? { copy_hooks: true } : {}) };
   say('step1-done', {
     ACTIONS: actions.join('\n'),
     BEFORE_STEP2: before.join('\n'),

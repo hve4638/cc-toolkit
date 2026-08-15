@@ -1,21 +1,14 @@
 #!/bin/sh
-# wtree post-create 훅 — 새 워크트리마다 tmux 윈도우를 연다.
-# 받는 환경: WT_PATH(워크트리 경로) WT_BRANCH(브랜치명) WT_PARENT(부모 브랜치)
-#            WT_REPO(repo 루트) WT_INTERACTIVE(터미널 실행이면 1)
+# wtree post-create hook — opens a tmux window per new worktree.
+# Env: WT_PATH(worktree path) WT_BRANCH(branch) WT_PARENT(parent branch)
+#      WT_REPO(repo root) WT_INTERACTIVE(1 on a terminal run)
 
-[ -n "${TMUX:-}" ] || exit 0   # tmux 밖에서는 아무것도 하지 않는다
+[ -n "${TMUX:-}" ] || exit 0   # outside tmux, do nothing
 
-# [조정 1] 포커스 — 기본: interactive 실행일 때만 새 윈도우로 이동.
-#   항상 이동     -> 아래 두 줄을 detach= 한 줄로 교체
-#   이동하지 않음 -> 아래 두 줄을 detach=-d 한 줄로 교체
-detach=-d
-[ "${WT_INTERACTIVE:-0}" = 1 ] && detach=
+{FOCUS}
 
-# [조정 2] 윈도우명 접두어 — 비우면 브랜치명 그대로 (예: prefix=wt: -> "wt:fix/x")
-prefix=
+{PREFIX}
 
 win=$(tmux new-window $detach -P -F '#{window_id}' -c "$WT_PATH" -n "${prefix}${WT_BRANCH}") || exit 0
 
-# [조정 3] 윈도우 안에서 실행할 명령 — 필요 없으면 아래 줄을 지운다.
-# send-keys 를 쓰는 이유: tmux new-window <명령> 은 비대화 셸이라 사용자의 alias·함수를 건너뛴다.
-tmux send-keys -t "$win" 'claude' Enter
+{COMMAND}

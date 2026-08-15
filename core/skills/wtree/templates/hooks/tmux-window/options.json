@@ -1,0 +1,58 @@
+{
+  "options": [
+    {
+      "key": "FOCUS",
+      "type": "select",
+      "label": { "en": "focus — move to the new window?", "ko": "포커스 — 새 윈도우로 이동할까?" },
+      "cases": [
+        {
+          "id": "interactive",
+          "label": { "en": "only on interactive runs", "ko": "interactive 실행일 때만" },
+          "note": { "en": "wtree new typed in a terminal", "ko": "터미널에서 직접 친 wtree new" },
+          "code": "# focus: move only on interactive runs\ndetach=-d\n[ \"${WT_INTERACTIVE:-0}\" = 1 ] && detach="
+        },
+        {
+          "id": "always",
+          "label": { "en": "always", "ko": "항상 이동" },
+          "code": "# focus: always move\ndetach="
+        },
+        {
+          "id": "never",
+          "label": { "en": "never", "ko": "이동하지 않음" },
+          "code": "# focus: never move\ndetach=-d"
+        }
+      ]
+    },
+    {
+      "key": "PREFIX",
+      "type": "input",
+      "label": { "en": "window-name prefix (empty = branch name as-is)", "ko": "윈도우명 접두어 (비우면 브랜치명 그대로)" },
+      "default": "",
+      "template": "prefix={VALUE}"
+    },
+    {
+      "key": "COMMAND",
+      "type": "select",
+      "label": { "en": "command to run in the window", "ko": "윈도우 안에서 실행할 명령" },
+      "cases": [
+        {
+          "id": "claude",
+          "label": { "en": "claude", "ko": "claude" },
+          "code": "# send-keys, because tmux new-window <cmd> runs a non-interactive shell that skips the user's aliases and functions\ntmux send-keys -t \"$win\" 'claude' Enter"
+        },
+        {
+          "id": "custom",
+          "label": { "en": "another command…", "ko": "다른 명령…" },
+          "input": { "en": "command to run:", "ko": "실행할 명령:" },
+          "code": "# send-keys, because tmux new-window <cmd> runs a non-interactive shell that skips the user's aliases and functions\ntmux send-keys -t \"$win\" {VALUE} Enter"
+        },
+        {
+          "id": "none",
+          "label": { "en": "none", "ko": "없음" },
+          "note": { "en": "just open the window", "ko": "윈도우만 연다" },
+          "code": ""
+        }
+      ]
+    }
+  ]
+}

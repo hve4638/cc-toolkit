@@ -1,0 +1,1 @@
+- Decide the hook verdict for the apply command below: `--hooks yes` (propose copying them into the repo policy) or `--hooks no`. The user double-checks it in the apply pane either way.

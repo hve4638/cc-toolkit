@@ -1,1 +1,1 @@
-- Open {HOOK_PATH} and check its adjustment comments (focus, window-name prefix, command to run); edit them when the defaults differ from the user's taste
+- Open {HOOK_PATH} and walk it through with the user — it was assembled with each option's default; the alternatives per adjustment point are listed in the chosen hook templates' INFO.md. Edit the file when their taste differs

@@ -40,6 +40,10 @@ const PLACEHOLDER = /\{([A-Z][A-Z0-9_]*)\}/g;
 // --ko 를 받으면 <이름>.ko.md 를 먼저 찾고, 없으면 영문 <이름>.md 로 폴백한다.
 let ko = false;
 export const isKo = () => ko;
+// parseAnswer 를 거치지 않는 진입점(tui.mjs)용 — 폼 스크립트는 --ko 플래그로 켠다.
+export function setKo(on) {
+  ko = Boolean(on);
+}
 const localized = (dir, base) => {
   const k = join(dir, base + '.ko.md');
   return ko && existsSync(k) ? k : join(dir, base + '.md');
