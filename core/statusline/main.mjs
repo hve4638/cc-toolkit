@@ -51,13 +51,18 @@ function projectRootOf(stdin) {
 }
 
 function modulePathOf(entry) {
-  const [kind, name] = entry.split(':');
-  return join(HERE, kind, `${name}.mjs`);
+  // WHY: aiaddon 이름 문법은 콜론 개수를 강제하지 않지만 (평평한 이름·다중 콜론도
+  //      항목이다), statusline 모듈 해석은 kind:name 두 조각이다. 다른 형태를 앞
+  //      두 조각으로 절단 해석하면 오타 (feat:advertise:ko) 가 실존 모듈을 기본
+  //      인자로 켜므로, 두 조각이 아니면 모듈 없음으로 취급한다.
+  const parts = entry.split(':');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return join(HERE, parts[0], `${parts[1]}.mjs`);
 }
 
 async function importProducer(entry) {
   const path = modulePathOf(entry);
-  if (!existsSync(path)) return null;
+  if (!path || !existsSync(path)) return null;
   try {
     const module = await import(pathToFileURL(path).href);
     return typeof module.render === 'function' ? module : null;
@@ -100,8 +105,12 @@ async function diagnose() {
   const entries = [...load(process.cwd(), NAMESPACE)];
   console.log(`[statusline] ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} in aiaddon ${NAMESPACE}`);
   for (const [entry] of entries) {
-    const reached = existsSync(modulePathOf(entry));
-    console.log(`  ${entry}  ${reached ? 'ok' : `no module at ${modulePathOf(entry)}`}`);
+    const path = modulePathOf(entry);
+    if (path === null) {
+      console.log(`  ${entry}  not a kind:name entry`);
+      continue;
+    }
+    console.log(`  ${entry}  ${existsSync(path) ? 'ok' : `no module at ${path}`}`);
   }
 }
 

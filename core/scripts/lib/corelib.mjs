@@ -3,7 +3,7 @@
  * corelib v1 — 훅 스크립트가 반복해서 쓰는 패턴 모음.
  *
  * 의존 계층의 뿌리: node 내장만 의존하는 self-contained 한 파일이고, core 의
- * lib·스크립트·event 모듈이 전부 이 위에 선다. 타 플러그인은 이 파일을 통째로
+ * lib·스크립트·애드온·event 호스트가 전부 이 위에 선다. 타 플러그인은 이 파일을 통째로
  * 복사해 쓴다 — 수정은 이 원본 (core/scripts/lib/corelib.mjs) 에서 하고,
  * 사본은 diff 로 동기화한다.
  *

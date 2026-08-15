@@ -1,57 +1,86 @@
 // @ts-check
 /**
- * 켜진 이벤트 모듈을 불러온다.
+ * 켜진 규칙이 가리키는 애드온을 manifest 로 찾아 불러온다.
  *
- * 항목 `<kind>:<name>` 은 이 파일 옆의 `<kind>/<name>/index.mjs` 로 간다.
- * 그 자리에 없거나, import 가 던지거나, addon 을 default 로 내놓지 않는
- * 항목은 조용히 빠진다 — config 오타나 모듈 하나의 고장이 훅 전체를
+ * 규칙 이름과 애드온 위치는 무관하다 — 어느 addon.mjs 가 어느 규칙을 구독하는지는
+ * manifest.json (생성물, build-manifest.mjs 로 굽는다) 이 말해 준다. 덕분에
+ * 이번 이벤트에 불릴 애드온만 import 하고, 나머지는 파일이 있어도 건드리지 않는다.
+ *
+ * manifest 는 길잡이일 뿐 판정의 기준이 아니다 — 규칙 상태(trigger)는 import 한
+ * 선언(decl)의 rules 로 다시 고른다(selectRules). manifest 가 낡아 선언과 어긋나면
+ * 그 애드온은 조용히 빠진다.
+ *
+ * 항목이 없거나, manifest 가 깨졌거나, import 가 던지거나, default 가 애드온
+ * 선언이 아니면 조용히 빠진다 — config 오타나 모듈 하나의 고장이 훅 전체를
  * 죽이지 않게 하는 aiaddon 의 fail-open 을 그대로 따른다.
- *
- * 어느 이벤트를 잡는지는 여기서 거르지 않는다. 그건 import 를 마쳐야 알 수
- * 있어 걸러도 아낄 것이 없고, dispatch 가 어차피 이벤트로 추린다.
  */
 
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load } from '../scripts/lib/aiaddon.mjs';
+import { readJsonOr } from '../scripts/lib/corelib.mjs';
+import { isAddonDecl, selectRules } from './lib/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const PLUGIN_ROOT = dirname(HERE);
 const NAMESPACE = 'event';
 
-// WHY: aiaddon 의 ENTRY_RE 가 `[a-z0-9-]+:[a-z0-9-]+` 만 통과시켜 콜론은 하나고
-//      `.` 도 `/` 도 못 들어온다. 설정에서 온 문자열로 경로를 짓지만 상위로
-//      새어나갈 수 없다.
-/** @param {string} entry */
-function modulePathOf(entry) {
-  const [kind, name] = entry.split(':');
-  return join(HERE, kind, name, 'index.mjs');
+/**
+ * manifest 항목만 보고 "이번 이벤트에 켜진 규칙이 하나라도 있는가" 를 미리
+ * 거른다. import 없이 걸러내는 것이 manifest 의 존재 이유다.
+ *
+ * @param {unknown} entry
+ * @param {import('./lib/index.mjs').EventName} event
+ * @param {ReadonlyMap<string, import('./lib/index.mjs').Args>} enabled
+ */
+function manifestSelects(entry, event, enabled) {
+  const rules = /** @type {{rules?: unknown}} */ (entry ?? {}).rules;
+  if (!rules || typeof rules !== 'object') return false;
+  for (const [name, rule] of Object.entries(rules)) {
+    if (!enabled.has(name)) continue;
+    const events = /** @type {{events?: unknown}} */ (rule ?? {}).events;
+    if (Array.isArray(events) && events.includes(event)) return true;
+  }
+  return false;
 }
 
 /**
- * @param {string} entry
- * @returns {Promise<import('./lib/index.mjs').Addon | null>}
+ * @param {unknown} relPath manifest 가 적어둔 플러그인 루트 기준 상대 경로
+ * @returns {Promise<import('./lib/index.mjs').AddonDecl | null>}
  */
-async function importAddon(entry) {
+async function importDecl(relPath) {
+  if (typeof relPath !== 'string') return null;
   try {
-    const module = await import(pathToFileURL(modulePathOf(entry)).href);
-    const addon = module.default;
-    return Array.isArray(addon?.registrations) ? addon : null;
+    const module = await import(pathToFileURL(join(PLUGIN_ROOT, relPath)).href);
+    const decl = module.default;
+    return isAddonDecl(decl) ? decl : null;
   } catch {
     return null;
   }
 }
 
 /**
- * aiaddon 이 켜둔 순서 그대로.
+ * 이번 이벤트에서 불릴 애드온들. 순서는 manifest 에 적힌 순서다 — 같은 밴드
+ * 안의 실행 순서는 어차피 정의하지 않는다.
  *
  * @param {string} projectRoot 로컬 층을 읽을 세션 루트
- * @returns {Promise<import('./lib/index.mjs').LoadedModule[]>}
+ * @param {import('./lib/index.mjs').EventName} event
+ * @returns {Promise<import('./lib/index.mjs').LoadedAddon[]>}
  */
-export async function collect(projectRoot) {
-  const modules = [];
-  for (const [entry, args] of load(projectRoot, NAMESPACE)) {
-    const addon = await importAddon(entry);
-    if (addon) modules.push({ addon, args });
+export async function collect(projectRoot, event) {
+  const enabled = load(projectRoot, NAMESPACE);
+  if (enabled.size === 0) return [];
+
+  const manifest = readJsonOr(join(HERE, 'manifest.json'));
+  const entries = Array.isArray(manifest?.addons) ? manifest.addons : [];
+
+  const loaded = [];
+  for (const entry of entries) {
+    if (!manifestSelects(entry, event, enabled)) continue;
+    const decl = await importDecl(entry.path);
+    if (!decl) continue;
+    const rules = selectRules(decl, event, enabled);
+    if (rules) loaded.push({ decl, rules });
   }
-  return modules;
+  return loaded;
 }

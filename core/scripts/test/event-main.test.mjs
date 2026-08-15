@@ -10,8 +10,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVENT_SRC = join(__dirname, '..', '..', 'event');
 const LIB_SRC = join(__dirname, '..', 'lib');
 
-// main.mjs 는 자기 옆의 <종류>/<이름>/index.mjs 를 부르고 ../scripts/lib 을
-// import 하므로, core 의 배치를 임시 디렉터리에 그대로 재현해야 한다.
+// main.mjs 는 collect 를 거쳐 manifest.json 과 플러그인 루트의 addon.mjs 를
+// 보고 ../scripts/lib 을 import 하므로, core 의 배치를 임시 디렉터리에 그대로
+// 재현해야 한다.
 function withTree(fn) {
   const dir = mkdtempSync(join(tmpdir(), 'event-main-test-'));
   const eventDir = join(dir, 'core', 'event');
@@ -22,7 +23,7 @@ function withTree(fn) {
     copyFileSync(join(EVENT_SRC, name), join(eventDir, name));
   }
   copyFileSync(join(EVENT_SRC, 'lib', 'index.mjs'), join(eventDir, 'lib', 'index.mjs'));
-  for (const name of ['aiaddon.mjs', 'agent-memory.mjs', 'corelib.mjs']) {
+  for (const name of ['aiaddon.mjs', 'corelib.mjs']) {
     copyFileSync(join(LIB_SRC, name), join(libDir, name));
   }
 
@@ -31,14 +32,22 @@ function withTree(fn) {
   mkdirSync(join(project, '.config', 'aiaddon'), { recursive: true });
   mkdirSync(home, { recursive: true });
 
+  const manifestEntries = [];
+
   const tree = {
     project,
     entries: (text) => writeFileSync(join(project, '.config', 'aiaddon', 'event'), text),
-    module: (kind, name, body) => {
-      mkdirSync(join(eventDir, kind, name), { recursive: true });
-      writeFileSync(join(eventDir, kind, name, 'index.mjs'), body);
+    /** addon.mjs 를 core/addon/<이름>/ 에 심고 manifest 항목을 등록한다. */
+    install: (name, ruleEvents, source) => {
+      mkdirSync(join(dir, 'core', 'addon', name), { recursive: true });
+      writeFileSync(join(dir, 'core', 'addon', name, 'addon.mjs'), source);
+      const rules = Object.fromEntries(
+        Object.entries(ruleEvents).map(([rule, events]) => [rule, { events }]),
+      );
+      manifestEntries.push({ path: `addon/${name}/addon.mjs`, rules });
     },
     run: (event, options = {}) => {
+      writeFileSync(join(eventDir, 'manifest.json'), JSON.stringify({ addons: manifestEntries }));
       const { CLAUDE_PROJECT_DIR: _drop, ...env } = process.env;
       const result = spawnSync('node', [join(eventDir, 'main.mjs'), ...(event ? [event] : [])], {
         encoding: 'utf8',
@@ -61,20 +70,20 @@ function withTree(fn) {
   }
 }
 
-/** 이벤트 하나를 잡아 api 를 한 번 부르는 모듈. */
-function catcher(event, body) {
+/** 규칙 하나를 구독하고 이벤트 하나를 잡는 애드온 소스. */
+function catcher(rule, event, body) {
   return `
-    import { create } from '../../lib/index.mjs';
-    const a = create();
-    a.register('${event}', {}, (api, payload) => { ${body} });
-    export default a;
+    export default {
+      rules: { '${rule}': { events: ['${event}'] } },
+      handlers: { ${event}(api, payload, rules) { ${body} } },
+    };
   `;
 }
 
 test('모르는 이벤트 이름은 빈 JSON', () => {
   withTree((tree) => {
-    tree.module('feat', 'one', catcher('PreToolUse', "api.permission.deny('막아');"));
-    tree.entries('feat:one\n');
+    tree.install('one', { 'guard-bash': ['PreToolUse'] }, catcher('guard-bash', 'PreToolUse', "api.permission.deny('막아');"));
+    tree.entries('guard-bash\n');
     assert.deepEqual(tree.run('NotAnEvent'), {});
   });
 });
@@ -93,18 +102,18 @@ test('켜진 게 없으면 빈 JSON', () => {
 
 test('stdin 이 JSON 이 아니면 빈 JSON 이고 종료 코드는 0', () => {
   withTree((tree) => {
-    tree.module('feat', 'one', catcher('PreToolUse', "api.permission.deny('막아');"));
-    tree.entries('feat:one\n');
+    tree.install('one', { 'guard-bash': ['PreToolUse'] }, catcher('guard-bash', 'PreToolUse', "api.permission.deny('막아');"));
+    tree.entries('guard-bash\n');
     assert.deepEqual(tree.run('PreToolUse', { stdin: 'JSON 아님' }), {});
   });
 });
 
-test('deny 가 훅 규약 JSON 으로 나간다', () => {
+test('평평한 규칙 이름의 deny 가 훅 규약 JSON 으로 나간다', () => {
   withTree((tree) => {
-    tree.module('feat', 'guard', catcher('PreToolUse', `
+    tree.install('guard', { 'guard-bash': ['PreToolUse'] }, catcher('guard-bash', 'PreToolUse', `
       if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
     `));
-    tree.entries('feat:guard\n');
+    tree.entries('guard-bash\n');
 
     assert.deepEqual(tree.run('PreToolUse', { payload: { tool_name: 'Bash' } }), {
       hookSpecificOutput: {
@@ -118,22 +127,22 @@ test('deny 가 훅 규약 JSON 으로 나간다', () => {
 
 test('payload 를 보고 아무것도 안 하면 빈 JSON', () => {
   withTree((tree) => {
-    tree.module('feat', 'guard', catcher('PreToolUse', `
+    tree.install('guard', { 'guard-bash': ['PreToolUse'] }, catcher('guard-bash', 'PreToolUse', `
       if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
     `));
-    tree.entries('feat:guard\n');
+    tree.entries('guard-bash\n');
     assert.deepEqual(tree.run('PreToolUse', { payload: { tool_name: 'Read' } }), {});
   });
 });
 
-test('여러 모듈의 결과가 한 JSON 으로 합쳐진다', () => {
+test('여러 애드온의 결과가 한 JSON 으로 합쳐진다', () => {
   withTree((tree) => {
-    tree.module('feat', 'denier', catcher('PreToolUse', "api.permission.deny('첫째');"));
-    tree.module('feat', 'asker', catcher('PreToolUse', `
+    tree.install('denier', { 'rule:deny': ['PreToolUse'] }, catcher('rule:deny', 'PreToolUse', "api.permission.deny('첫째');"));
+    tree.install('asker', { 'rule:ask': ['PreToolUse'] }, catcher('rule:ask', 'PreToolUse', `
       api.permission.ask('묻기');
       api.injectContext('배경 한 줄');
     `));
-    tree.entries('feat:denier\nfeat:asker\n');
+    tree.entries('rule:deny\nrule:ask\n');
 
     const out = tree.run('PreToolUse');
     // deny 가 ask 를 이기고, 진 종류의 사유는 버려진다.
@@ -143,28 +152,44 @@ test('여러 모듈의 결과가 한 JSON 으로 합쳐진다', () => {
   });
 });
 
-test('모듈 하나가 던져도 나머지 결과는 나간다', () => {
+test('애드온 하나가 던져도 나머지 결과는 나간다', () => {
   withTree((tree) => {
-    tree.module('feat', 'broken', catcher('PreToolUse', "throw new Error('터짐');"));
-    tree.module('feat', 'fine', catcher('PreToolUse', "api.notify('멀쩡하다');"));
-    tree.entries('feat:broken\nfeat:fine\n');
+    tree.install('broken', { 'rule-broken': ['PreToolUse'] }, catcher('rule-broken', 'PreToolUse', "throw new Error('터짐');"));
+    tree.install('fine', { 'rule-fine': ['PreToolUse'] }, catcher('rule-fine', 'PreToolUse', "api.notify('멀쩡하다');"));
+    tree.entries('rule-broken\nrule-fine\n');
 
     assert.deepEqual(tree.run('PreToolUse'), { systemMessage: '멀쩡하다' });
   });
 });
 
-test('args 가 모듈에 전달된다', () => {
+test('args 가 규칙 상태로 핸들러에 온다', () => {
   withTree((tree) => {
-    tree.module('feat', 'one', catcher('PreToolUse', "api.notify(api.args.mode);"));
-    tree.entries('feat:one@mode=strict\n');
+    tree.install('one', { 'rule-one': ['PreToolUse'] }, catcher('rule-one', 'PreToolUse', "api.notify(rules['rule-one'].mode);"));
+    tree.entries('rule-one@mode=strict\n');
     assert.deepEqual(tree.run('PreToolUse'), { systemMessage: 'strict' });
+  });
+});
+
+test('직렬화 불가 값을 낸 애드온이 있어도 유효한 JSON 과 다른 애드온의 deny 가 나간다', () => {
+  withTree((tree) => {
+    tree.install('cyclic', { 'rule-cyclic': ['PreToolUse'] }, catcher('rule-cyclic', 'PreToolUse', `
+      const cyclic = {}; cyclic.self = cyclic;
+      api.tool.rewrite(cyclic);
+    `));
+    tree.install('denier', { 'rule-deny': ['PreToolUse'] }, catcher('rule-deny', 'PreToolUse', "api.permission.deny('막아');"));
+    tree.entries('rule-cyclic\nrule-deny\n');
+
+    // run 이 exit 0 과 JSON.parse 가능한 stdout 을 이미 단언한다.
+    const out = tree.run('PreToolUse');
+    assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');
+    assert.equal('updatedInput' in out.hookSpecificOutput, false);
   });
 });
 
 test('Stop 의 keepGoing 은 최상위 decision 으로 나간다', () => {
   withTree((tree) => {
-    tree.module('feat', 'nag', catcher('Stop', "api.turn.keepGoing('아직 안 끝났다');"));
-    tree.entries('feat:nag\n');
+    tree.install('nag', { 'rule-nag': ['Stop'] }, catcher('rule-nag', 'Stop', "api.turn.keepGoing('아직 안 끝났다');"));
+    tree.entries('rule-nag\n');
 
     assert.deepEqual(tree.run('Stop', { payload: { stop_hook_active: false } }), {
       decision: 'block',
@@ -175,8 +200,8 @@ test('Stop 의 keepGoing 은 최상위 decision 으로 나간다', () => {
 
 test('CLAUDE_PROJECT_DIR 이 payload.cwd 보다 앞선다', () => {
   withTree((tree) => {
-    tree.module('feat', 'one', catcher('PreToolUse', "api.notify('켜졌다');"));
-    tree.entries('feat:one\n');
+    tree.install('one', { 'rule-one': ['PreToolUse'] }, catcher('rule-one', 'PreToolUse', "api.notify('켜졌다');"));
+    tree.entries('rule-one\n');
 
     // 세션 루트를 형제 디렉터리로 돌리면 조상 walk 에도 설정이 없어 아무것도
     // 안 켜진다 (하위 디렉터리는 cascade 로 설정이 보이므로 못 쓴다).

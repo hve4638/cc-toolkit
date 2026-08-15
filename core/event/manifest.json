@@ -1,0 +1,14 @@
+{
+  "addons": [
+    {
+      "path": "addon/banaction/addon.mjs",
+      "rules": {
+        "rule:banaction": {
+          "events": [
+            "PreToolUse"
+          ]
+        }
+      }
+    }
+  ]
+}

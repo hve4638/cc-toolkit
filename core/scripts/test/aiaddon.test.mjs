@@ -131,11 +131,16 @@ test('a session under home reads the global layer once, in global position', () 
   }
 });
 
+test('flat names without a colon are entries — the colon is just a character', () => {
+  const entries = on({ global: 'showcase-light@lang=ko\nplain\na:b:c\n!plain\n' });
+  assert.deepEqual([...entries.keys()], ['showcase-light', 'a:b:c']);
+  assert.deepEqual({ ...entries.get('showcase-light') }, { lang: 'ko' });
+});
+
 test('malformed lines are ignored', () => {
   const entries = on({
     global: [
       'Know:upper',        // 대문자
-      'noKind',            // 종류 없음
       'feat:*',            // 켜는 쪽의 와일드카드
       'feat:a@1bad=x',     // 숫자로 시작하는 키
       'feat:b@k=has space', // 값의 공백

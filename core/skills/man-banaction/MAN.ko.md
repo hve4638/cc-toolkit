@@ -1,6 +1,6 @@
 # banaction
 
-banaction 은 core 플러그인에 포함된 도구 호출 가드로, PreToolUse 훅의 event 모듈로 돈다. Claude Code 가 도구 호출 — Bash, Write, MCP 도구 등 전부 — 을 실행하기 직전에 `.banaction` 파일의 규칙과 대조해, 매칭되면 그 호출을 거부한다. `.banaction` 파일이 없으면 아무것도 하지 않는다.
+banaction 은 core 플러그인에 포함된 도구 호출 가드로, PreToolUse 훅의 애드온으로 돈다. Claude Code 가 도구 호출 — Bash, Write, MCP 도구 등 전부 — 을 실행하기 직전에 `.banaction` 파일의 규칙과 대조해, 매칭되면 그 호출을 거부한다. `.banaction` 파일이 없으면 아무것도 하지 않는다.
 
 ## 켜기
 
@@ -62,4 +62,4 @@ Blocked by BAN Action rule '<rule text>'. The user has banned this action. Do no
 
 ## 실패 동작
 
-banaction 은 fail-open 이다: 읽을 수 없는 파일, 잘못된 줄, 모듈 크래시, 훅 타임아웃 (5s, event 호스트와 공유) 은 모두 세션을 깨는 대신 도구 호출을 통과시킨다. 백트래킹이 심한 정규식은 매 호출마다 훅을 타임아웃으로 몰아 규칙 파일 전체를 조용히 무력화할 수 있다.
+banaction 은 fail-open 이다: 읽을 수 없는 파일, 잘못된 줄, 애드온 크래시, 훅 타임아웃 (5s, event 호스트와 공유) 은 모두 세션을 깨는 대신 도구 호출을 통과시킨다. 백트래킹이 심한 정규식은 매 호출마다 훅을 타임아웃으로 몰아 규칙 파일 전체를 조용히 무력화할 수 있다.

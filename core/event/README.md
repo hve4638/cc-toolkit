@@ -1,6 +1,6 @@
 # core/event
 
-훅 이벤트를 잡는 모듈이 사는 곳. 어느 항목을 켤지는 aiaddon 의 `event` 네임스페이스가 정한다.
+훅 이벤트를 애드온에 배달하는 호스트가 사는 곳. 애드온 자체는 `core/addon/<이름>/addon.mjs` 와 `core/skills/<이름>/addon.mjs` 에 살고, 어느 규칙을 켤지는 aiaddon 의 `event` 네임스페이스가 정한다.
 
 ```
 ~/.config/aiaddon/event                  전역 (가장 약함)
@@ -10,32 +10,55 @@
 
 `lib/index.mjs` 와 `lib/index.d.mts` 는 생성물이다. 원본은 `core/_build/src/event/index.mts` 고 `_build` 에서 `pnpm build:event` 로 뽑는다.
 
-lib 은 파일시스템도 프로세스도 건드리지 않는다 — 타입·api·`dispatch`·`toHookOutput` 뿐이다. IO 는 lib 밖의 손으로 쓴 `.mjs` 가 한다. `collect.mjs` 가 켜진 모듈을 불러오고, 훅이 부르는 진입점은 `main.mjs` 다.
+lib 은 파일시스템도 프로세스도 건드리지 않는다 — 타입·api·`selectRules`·`dispatch`·`toHookOutput` 뿐이다. IO 는 lib 밖의 손으로 쓴 `.mjs` 가 한다. `collect.mjs` 가 이번 이벤트에 불릴 애드온을 찾아오고, 훅이 부르는 진입점은 `main.mjs` 다.
 
 ```
 main.mjs <EventName>    stdin = 훅 payload JSON, stdout = 훅 규약 JSON
 ```
 
-`hooks/hooks.json` 이 네 이벤트 전부에 매처 `*` 로 걸어둔다. `source` 나 `tool_name` 으로 좁히는 것은 모듈이 payload 를 보고 직접 한다. 종료 코드는 언제나 0 이고, 모르는 이벤트 이름·깨진 stdin·예외는 전부 `{}` 로 떨어진다.
+`hooks/hooks.json` 이 네 이벤트 전부에 매처 `*` 로 걸어둔다. `source` 나 `tool_name` 으로 좁히는 것은 애드온이 payload 를 보고 직접 한다. 종료 코드는 언제나 0 이고, 모르는 이벤트 이름·깨진 stdin·예외는 전부 `{}` 로 떨어진다.
 
-## 모듈 하나
+## 애드온 하나
 
-`core/event/<종류>/<이름>/index.mjs` 에 놓는다. 종류(`feat`·`rule`·`know` 등)는 폴더 이름일 뿐 동작에 영향이 없다.
+`core/addon/<이름>/addon.mjs` 또는 `core/skills/<이름>/addon.mjs` 에 놓는다. 폴더 이름은 동작과 무관하다 — 규칙 이름과 애드온을 잇는 것은 선언과 manifest 다.
 
 ```js
 // @ts-check
-import { create } from '../../lib/index.mjs';
-
-const a = create();
-
-a.register('PreToolUse', { priority: 'high' }, (api, payload) => {
-  if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
-});
-
-export default a;
+/** @type {import('../../event/lib/index.mjs').AddonDecl} */
+export default {
+  rules: {
+    'showcase-light': { events: ['SessionStart'] },
+    'showcase-heavy': { events: ['SessionStart', 'PreToolUse'] },
+  },
+  priority: { PreToolUse: 'high' },
+  handlers: {
+    SessionStart(api, payload, rules) {
+      if (rules['showcase-heavy'].trigger) api.injectContext('무거운 안내');
+    },
+    PreToolUse(api, payload, rules) { /* … */ },
+  },
+};
 ```
 
-핸들러는 아무것도 반환하지 않는다. 훅이 낼 것은 전부 api 호출로 적는다. 첫 줄의 `// @ts-check` 가 있어야 타입 오류가 에디터에 뜬다.
+- `rules` 는 구독 선언이다: 규칙 이름 → 그 규칙이 트리거되는 이벤트 목록. 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다.
+- 핸들러는 **이벤트당 하나**다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 셋째 인자로 받는다 — 꺼진 것은 `trigger: false` 로. 규칙별 분기는 핸들러가 이 객체를 보고 한다.
+- 규칙 상태에는 그 항목의 인자도 실린다: `showcase-heavy@mode=strict` → `rules['showcase-heavy']` 는 `{ mode: 'strict', trigger: true }`. `trigger` 는 호스트가 채우는 예약 키라 인자로 같은 이름을 적어도 조용히 무시된다.
+- `priority` 는 이벤트별 실행 밴드다. 생략·모르는 값은 medium.
+- 핸들러는 아무것도 반환하지 않는다. 훅이 낼 것은 전부 api 호출로 적는다. 첫 줄의 `// @ts-check` 와 `@type` 주석이 있어야 타입 오류가 에디터에 뜬다.
+
+## manifest
+
+`manifest.json` 은 생성물이다 — 규칙 이름 → 애드온 경로·이벤트 목록의 표. `collect.mjs` 는 이 표와 켜진 규칙만 보고 이번 이벤트에 불릴 애드온을 고르므로, 존재하는 애드온을 전부 import 하지 않는다.
+
+addon.mjs 를 만들거나 `rules` 선언을 바꿨으면 재생성해 같이 커밋한다:
+
+```bash
+node core/event/build-manifest.mjs
+```
+
+낡은 manifest 는 `event-manifest.test.mjs` 가 실스캔과 diff 해서 잡는다. 배포된 플러그인은 버전별 캐시 디렉터리에 얼어 있어 필드에서 낡을 일이 없다.
+
+manifest 는 길잡이일 뿐 판정의 기준이 아니다 — trigger 판정은 import 한 선언의 `rules` 로 다시 한다. 어긋나면 그 애드온은 조용히 빠진다.
 
 ## api 의 층
 
@@ -43,7 +66,7 @@ export default a;
 
 | 층 | 뜻 | 가진 이벤트 |
 |---|---|---|
-| 평평 | 정보만 준다 — `args`·`notify`·`injectContext` | 넷 다 |
+| 평평 | 정보만 준다 — `notify`·`injectContext` | 넷 다 |
 | `permission` | 권한 판정 | PreToolUse |
 | `tool` | 도구 호출을 건드린다 | PreToolUse(인자)·PostToolUse(결과) |
 | `turn` | 턴 자체를 건드린다 | 넷 다 |
@@ -53,7 +76,7 @@ export default a;
 
 ## 합침 규칙
 
-여러 모듈이 같은 이벤트를 잡으면 priority 밴드 순(high → medium → low), 같은 밴드 안에서는 aiaddon 파일에 적힌 순서로 돈다. 결과는 세 방식으로 합쳐진다.
+여러 애드온이 같은 이벤트에서 불리면 priority 밴드 순 (high → medium → low) 으로 돈다. 같은 밴드 안의 순서는 정의하지 않는다. 결과는 네 방식으로 합쳐진다.
 
 | 방식 | 해당 | 규칙 |
 |---|---|---|
@@ -69,7 +92,7 @@ permission   deny > ask > allow
 turn         halt > block(feedback·keepGoing)
 ```
 
-같은 등급끼리는 사유를 모은다. 진 등급의 사유는 버린다 — `allow` 를 원한 모듈의 사유는 `deny` 앞에서 의미가 없다. 사유가 하나면 그대로 나가고, 둘 이상이면 번호를 붙여 감싼다.
+같은 등급끼리는 사유를 모은다. 진 등급의 사유는 버린다 — `ask` 를 원한 애드온의 사유는 `deny` 앞에서 의미가 없다. 사유가 하나면 그대로 나가고, 둘 이상이면 번호를 붙여 감싼다.
 
 ```
 <reason_1>생성물이다</reason_1>
@@ -78,7 +101,7 @@ turn         halt > block(feedback·keepGoing)
 
 슬롯이 서로 다르면 같이 나간다. `permission.deny()` 와 `tool.rewrite()` 도, `permission.deny()` 와 `turn.halt()` 도 둘 다 실린다. 권한은 `hookSpecificOutput` 안이고 `halt` 는 최상위라 자리가 안 겹친다.
 
-한 핸들러가 던지면 그 핸들러가 적은 것만 버리고 나머지는 계속 돈다. 모듈마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적으므로, 도중에 터진 모듈이 슬롯을 선점해 뒤 모듈의 판정을 묻어버리는 일이 없다.
+한 핸들러가 던지면 그 핸들러가 적은 것만 버리고 나머지는 계속 돈다. 애드온마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적으므로, 도중에 터진 애드온이 슬롯을 선점해 뒤 애드온의 판정을 묻어버리는 일이 없다.
 
 ## 이벤트별 주의사항
 
@@ -128,7 +151,7 @@ api 가 내는 필드와 스키마 설명 원문. 이벤트 31종 전체 규약�
 | `session.setTitle` | `hookSpecificOutput.sessionTitle` | Set the session title |
 | `session.watchPaths` | `hookSpecificOutput.watchPaths` | Absolute paths to watch for FileChanged hooks |
 | `session.reloadSkills` | `hookSpecificOutput.reloadSkills` | Re-scan skill and command directories after SessionStart hooks complete, so skills installed by the hook are available in the same session |
-| `permission.allow/deny/ask` | `hookSpecificOutput.permissionDecision` + `permissionDecisionReason` | |
+| `permission.deny/ask` | `hookSpecificOutput.permissionDecision` + `permissionDecisionReason` | |
 | `tool.rewrite` | `hookSpecificOutput.updatedInput` | Modified tool input to use |
 | `tool.rewriteOutput` | `hookSpecificOutput.updatedToolOutput` | Replaces the tool output before it is sent to the model |
 | `turn.feedback` / `turn.keepGoing` | 최상위 `decision: "block"` + `reason` | Explanation for the decision |
@@ -140,26 +163,17 @@ api 가 내는 필드와 스키마 설명 원문. 이벤트 31종 전체 규약�
 
 | 필드 | 이벤트 | 이유 |
 |---|---|---|
+| `permissionDecision: "allow"` | PreToolUse | 사용자 권한 설정을 무력화하는 쪽이고 그 사실이 화면에 안 뜬다. 쓸 데가 생기면 연다 |
 | `permissionDecision: "defer"` | PreToolUse | 대화형 세션에서 무시된다. print 모드 전용 |
 | `updatedMCPToolOutput` | PostToolUse | MCP 도구 전용. 스키마 설명이 `updatedToolOutput` 을 권한다 |
 | `suppressOutput` | 공통 | 이 lib 은 stdout 에 제어 JSON 만 뱉어 실효가 불분명하다 |
 | `terminalSequence` | 공통 | 데스크톱 알림·창 제목·비프. 어느 OSC 가 먹는지가 터미널마다 달라 lib 이 고를 수 없다 |
 | `decision: "approve"` / 최상위 `decision` | PreToolUse | PreToolUse 에서는 deprecated |
 
-## 모듈은 import 될 때 register 만 한다
+## 애드온은 import 될 때 선언만 한다
 
-어느 모듈이 어느 이벤트를 잡는지는 import 해서 `register()` 가 돌아야 안다. 그래서 `collect.mjs` 는 켜둔 모듈을 매번 전부 import 하고, PreToolUse 하나 때문에 Stop 만 잡는 모듈도 불러온다. 무거운 일을 import 시점에 하면 그 값을 관계없는 이벤트마다 치른다. 파일 읽기든 프로세스 띄우기든 핸들러 안으로 미룬다.
+manifest 생성기는 addon.mjs 를 전부 import 해서 선언을 읽고, 호스트도 불릴 애드온을 import 한다. import 시점에 무거운 일을 하면 그 값을 선언 읽기와 관계없는 이벤트까지 치른다. 파일 읽기든 프로세스 띄우기든 핸들러 안으로 미룬다.
 
-## 캐시 (미룸)
+## manifest 가 캐시를 되살린 이유
 
-잡는 이벤트를 미리 표로 적어두고 필요한 모듈만 import 하는 안이 있었다. 값이 안 맞아 미뤘다.
-
-| 켜둔 모듈 | 훅 한 번 | 캐시가 아낄 몫 |
-|---|---|---|
-| 0 | 27.4 ms | — |
-| 10 | 32.3 ms | 3.0 ms |
-| 40 | 40.1 ms | 6.2 ms |
-
-훅은 매번 새 프로세스라 27 ms 는 node 가 뜨는 값이고 캐시가 건드릴 수 없다. 모듈 하나는 0.3 ms 다. 표를 만드는 모드, 표를 둘 자리, 낡은 표 판정과 그 버그를 들일 만한 몫이 아니다.
-
-위 절의 전제가 깨지면 — 어떤 모듈이 import 되면서 실제로 무거운 일을 하면 — 다시 재고 판단한다.
+규칙 이름과 애드온 위치가 무관해지면서, 표가 없으면 "어느 애드온이 이 규칙을 구독하나" 를 알기 위해 존재하는 addon.mjs 전부를 매 이벤트마다 import 해야 한다 — import 수가 켜진 개수가 아니라 존재하는 개수에 비례하게 된다. 예전에 캐시를 미뤘던 근거 (켜진 것만 import 하니 모듈당 0.3 ms 뿐) 가 정확히 그 지점에서 깨져서, 그 discovery 를 개발 시점의 생성기로 옮기고 런타임은 표만 읽는다.

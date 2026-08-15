@@ -85,7 +85,7 @@ AST 패턴 기반 2 개 툴: `ast_grep_search`, `ast_grep_replace`. 정규식의
 
 ### 5. 액션 차단 (.banaction)
 
-**메커니즘**: event 모듈 (`event/rule/banaction/`), aiaddon `event` 파일에 `rule:banaction` 을 적어야 돈다
+**메커니즘**: 애드온 (`addon/banaction/`), aiaddon `event` 파일에 `rule:banaction` 을 적어야 돈다
 
 `~/.banaction` 과 세션 루트의 각 조상 디렉터리의 `.banaction` (루트부터 세션 루트까지) 의 규칙을 병합해, 매칭되는 도구 호출을 실행 전에 deny 한다. 차단 시 규칙 원문이 사유로 모델에 전달되며, 규칙 파일의 이름·경로는 노출하지 않는다. 파일이 없으면 아무것도 하지 않는다.
 
@@ -108,9 +108,13 @@ mcp__github__.*: .*
 
 ## 부록 — 개발자용
 
+### 애드온 시스템 (`event/` + `addon/` + `skills/*/addon.mjs`)
+
+훅 이벤트를 잡는 애드온의 호스트. 애드온은 `addon/<이름>/addon.mjs` 나 `skills/<이름>/addon.mjs` 에 두고, 구독할 규칙 이름과 트리거 이벤트를 스스로 선언한다 — 규칙 이름과 파일 위치는 무관하며, 연결은 생성물 `event/manifest.json` 이 담당한다 (`node core/event/build-manifest.mjs` 로 재생성). 선언 형식·합침 규칙은 `event/README.md`.
+
 ### corelib (`scripts/lib/corelib.mjs`)
 
-훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `aiaddon.mjs`)·스크립트·event 모듈은 전부 이 위에 선다.
+훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `aiaddon.mjs`)·스크립트·애드온·event 호스트는 전부 이 위에 선다.
 
 ### 러너 (`scripts/run.cjs`)
 

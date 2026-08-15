@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import addon from '../../event/rule/banaction/index.mjs';
+import decl from '../../addon/banaction/addon.mjs';
 import { dispatch, toHookOutput } from '../../event/lib/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +36,8 @@ async function run({ toolName, toolInput, projectDir, homeDir }) {
   process.env.CLAUDE_PROJECT_DIR = projectDir;
   try {
     const payload = { tool_name: toolName, tool_input: toolInput, cwd: projectDir };
-    return toHookOutput('PreToolUse', await dispatch('PreToolUse', payload, [{ addon, args: {} }]));
+    const loaded = { decl, rules: { 'rule:banaction': { trigger: true } } };
+    return toHookOutput('PreToolUse', await dispatch('PreToolUse', payload, [loaded]));
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];
@@ -47,6 +48,12 @@ async function run({ toolName, toolInput, projectDir, homeDir }) {
 
 const denied = (out) => out.hookSpecificOutput?.permissionDecision === 'deny';
 const reason = (out) => out.hookSpecificOutput?.permissionDecisionReason ?? '';
+
+test('declaration: rule:banaction subscribes PreToolUse at high priority', () => {
+  assert.deepEqual(Object.keys(decl.rules), ['rule:banaction']);
+  assert.deepEqual([...decl.rules['rule:banaction'].events], ['PreToolUse']);
+  assert.deepEqual(decl.priority, { PreToolUse: 'high' });
+});
 
 test('no .banaction file → empty output, not denied', async () => {
   await withDirs(async ({ projectDir, homeDir }) => {
@@ -234,23 +241,22 @@ test('CRLF line endings parse correctly', async () => {
 // rule:banaction 이 aiaddon 에 적혀 있을 때만 도는 것을 본다.
 test('enabled via aiaddon the module denies; without the entry it is silent', () => {
   const EVENT_SRC = join(__dirname, '..', '..', 'event');
+  const ADDON_SRC = join(__dirname, '..', '..', 'addon', 'banaction', 'addon.mjs');
   const LIB_SRC = join(__dirname, '..', 'lib');
   const dir = mkdtempSync(join(tmpdir(), 'event-banaction-e2e-'));
   try {
     const eventDir = join(dir, 'core', 'event');
+    const addonDir = join(dir, 'core', 'addon', 'banaction');
     const libDir = join(dir, 'core', 'scripts', 'lib');
     mkdirSync(join(eventDir, 'lib'), { recursive: true });
-    mkdirSync(join(eventDir, 'rule', 'banaction'), { recursive: true });
+    mkdirSync(addonDir, { recursive: true });
     mkdirSync(libDir, { recursive: true });
-    for (const name of ['main.mjs', 'collect.mjs']) {
+    for (const name of ['main.mjs', 'collect.mjs', 'manifest.json']) {
       copyFileSync(join(EVENT_SRC, name), join(eventDir, name));
     }
     copyFileSync(join(EVENT_SRC, 'lib', 'index.mjs'), join(eventDir, 'lib', 'index.mjs'));
-    copyFileSync(
-      join(EVENT_SRC, 'rule', 'banaction', 'index.mjs'),
-      join(eventDir, 'rule', 'banaction', 'index.mjs'),
-    );
-    for (const name of ['aiaddon.mjs', 'agent-memory.mjs', 'corelib.mjs']) {
+    copyFileSync(ADDON_SRC, join(addonDir, 'addon.mjs'));
+    for (const name of ['aiaddon.mjs', 'corelib.mjs']) {
       copyFileSync(join(LIB_SRC, name), join(libDir, name));
     }
 

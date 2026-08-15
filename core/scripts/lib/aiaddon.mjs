@@ -9,7 +9,10 @@
  *      root first, projectRoot itself last
  *
  * Lines:
- *   <kind>:<name>[@k=v,flag]  turn on; a later line replaces the whole entry
+ *   <name>[@k=v,flag]         turn on; a later line replaces the whole entry.
+ *                             A name is lowercase letters, digits, `-` and `:`
+ *                             — the colon is just a character (a `kind:name`
+ *                             prefix is naming convention, not syntax)
  *   !<pattern>                turn off what the pattern matches; `*` matches
  *                             any characters, `:` included
  *   blank / leading `#`       ignored
@@ -24,7 +27,7 @@ import { cascadePaths, readTextOr } from './corelib.mjs';
 
 export const NAMESPACES = ['event', 'statusline'];
 
-const ENTRY_RE = /^([a-z0-9-]+:[a-z0-9-]+)(?:@(\S+))?$/;
+const ENTRY_RE = /^([a-z0-9:-]+)(?:@(\S+))?$/;
 const NEGATION_RE = /^!([a-z0-9:*-]+)$/;
 const ARG_RE = /^([A-Za-z_][A-Za-z0-9_]*)(?:=([^\s,=]+))?$/;
 
@@ -47,7 +50,7 @@ function toRegExp(pattern) {
 }
 
 /**
- * Entries the namespace leaves on, as a Map of `kind:name` → args object
+ * Entries the namespace leaves on, as a Map of entry name → args object
  * (empty when the entry carries none). Entries that end up off are absent.
  *
  * A null `projectRoot` skips the ancestor layers, leaving the global state

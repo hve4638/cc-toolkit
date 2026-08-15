@@ -1,5 +1,5 @@
 {
-  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md) + showcase inject when inside tmux, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher, and the event host (core/event) on all four events (aiaddon-enabled modules, e.g. rule:banaction)",
+  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md) + showcase inject when inside tmux, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher, and the event host (core/event) on all four events (aiaddon-enabled addons, e.g. rule:banaction)",
   "hooks": {
     "SessionStart": [
       {

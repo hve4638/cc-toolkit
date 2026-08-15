@@ -9,8 +9,7 @@
  *                             filesystem root first, session root last
  */
 
-import { cascadePaths, readTextOr, resolveProjectRoot } from '../../../scripts/lib/corelib.mjs';
-import { create } from '../../lib/index.mjs';
+import { cascadePaths, readTextOr, resolveProjectRoot } from '../../scripts/lib/corelib.mjs';
 
 // WHY: 콜론 뒤 공백을 요구해 `http://x` 같은 URL 패턴이 도구 스코프 규칙으로 오인되지 않게 한다.
 const TOOL_RULE_RE = /^([^\s:]+):\s+(.+)$/;
@@ -80,20 +79,23 @@ function subjectsFor(toolName, toolInput) {
   return collectStrings(toolInput, []);
 }
 
-const a = create();
-
-// 매 호출마다 규칙을 새로 읽고 위에서부터 순회 — 첫 매칭 규칙이 deny 하고 끝.
-a.register('PreToolUse', { priority: 'high' }, (api, payload) => {
-  const toolName = payload.tool_name ?? '';
-  if (!toolName) return;
-  const subjects = subjectsFor(toolName, payload.tool_input);
-  for (const rule of loadRules(resolveProjectRoot(payload))) {
-    if (!matchesTool(rule.matcher, toolName)) continue;
-    if (subjects.some((s) => matchesPattern(rule.pattern, s))) {
-      api.permission.deny(`Blocked by BAN Action rule '${rule.raw}'. The user has banned this action. Do not retry or work around it; ask the user if it is truly required.`);
-      return;
-    }
-  }
-});
-
-export default a;
+/** @type {import('../../event/lib/index.mjs').AddonDecl} */
+export default {
+  rules: { 'rule:banaction': { events: ['PreToolUse'] } },
+  priority: { PreToolUse: 'high' },
+  handlers: {
+    // 매 호출마다 규칙을 새로 읽고 위에서부터 순회 — 첫 매칭 규칙이 deny 하고 끝.
+    PreToolUse(api, payload) {
+      const toolName = payload.tool_name ?? '';
+      if (!toolName) return;
+      const subjects = subjectsFor(toolName, payload.tool_input);
+      for (const rule of loadRules(resolveProjectRoot(payload))) {
+        if (!matchesTool(rule.matcher, toolName)) continue;
+        if (subjects.some((s) => matchesPattern(rule.pattern, s))) {
+          api.permission.deny(`Blocked by BAN Action rule '${rule.raw}'. The user has banned this action. Do not retry or work around it; ask the user if it is truly required.`);
+          return;
+        }
+      }
+    },
+  },
+};

@@ -100,6 +100,16 @@ test('an entry with no module is ignored', () => {
   });
 });
 
+// aiaddon 이름 문법 완화로 다중 콜론·평평한 항목이 파서를 통과하게 됐다 —
+// 앞 두 조각으로 절단 해석하면 오타가 실존 모듈을 켜므로, 통째로 무시돼야 한다.
+test('a multi-colon or flat entry is not truncated into a real module', () => {
+  withTree((tree) => {
+    tree.producer('feat', 'real', emits('real'));
+    tree.entries('feat:real\nfeat:real:ko\nplainname\n');
+    assert.equal(tree.run(), 'real\n');
+  });
+});
+
 test('a producer with nothing to say takes no line', () => {
   withTree((tree) => {
     tree.producer('feat', 'a', 'export function render() { return null; }\n');

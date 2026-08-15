@@ -1,16 +1,24 @@
 /**
- * addon — core/event/ 의 이벤트 모듈이 쓰는 등록 도구.
+ * addon — core/addon/ 과 core/skills/ 의 addon.mjs 가 쓰는 선언 도구.
  *
  *     // @ts-check
- *     import { create } from '../../lib/index.mjs';
+ *     export default {
+ *       rules: {
+ *         'showcase-light': { events: ['SessionStart'] },
+ *         'showcase-heavy': { events: ['SessionStart', 'PreToolUse'] },
+ *       },
+ *       priority: { PreToolUse: 'high' },
+ *       handlers: {
+ *         SessionStart(api, payload, rules) {
+ *           if (rules['showcase-heavy'].trigger) api.injectContext('무거운 안내');
+ *         },
+ *       },
+ *     };
  *
- *     const a = create();
- *
- *     a.register('PreToolUse', { priority: 'high' }, (api, payload) => {
- *       if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
- *     });
- *
- *     export default a;
+ * 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
+ * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
+ * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
+ * `trigger: false` 로) 셋째 인자로 받는다.
  *
  * 합침 규칙, 이벤트별 주의사항, 열지 않은 필드는 core/event/README.md.
  */
@@ -44,12 +52,20 @@ export interface StopPayload extends BasePayload {
 }
 /** 실행 순서 밴드. 생략하면 medium. */
 export type Band = 'high' | 'medium' | 'low';
-/** aiaddon 항목에 붙은 인자. `feat:x@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
+/** aiaddon 항목에 붙은 인자. `showcase-light@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
 export type Args = Readonly<Record<string, string | true>>;
+/**
+ * 핸들러가 받는 규칙 하나의 상태. `trigger` 는 호스트가 채우는 예약 키고
+ * (그 규칙이 aiaddon 에 켜져 있는가), 나머지는 그 항목의 인자다.
+ */
+export interface RuleState {
+    readonly trigger: boolean;
+    readonly [arg: string]: string | boolean;
+}
+/** 규칙 이름 → 상태. 이번 이벤트를 선언한 자기 규칙만 실린다. */
+export type Rules = Readonly<Record<string, RuleState>>;
 /** 어느 이벤트에서나 쓸 수 있다. */
 export interface BaseApi {
-    /** 이 항목을 켠 aiaddon 줄의 인자. */
-    readonly args: Args;
     /** 사용자에게만 보이는 한 줄. → `systemMessage` */
     notify(message: string): void;
 }
@@ -125,7 +141,7 @@ export interface PostToolUseApi extends BaseApi, ContextApi {
 export interface StopApi extends BaseApi, ContextApi {
     turn: StopTurnApi;
 }
-/** 잡을 수 있는 이벤트와 그 짝. 여기 없는 이름은 register() 가 거부한다. */
+/** 잡을 수 있는 이벤트와 그 짝. 여기 없는 이름은 선언할 수 없다. */
 export interface EventMap {
     SessionStart: {
         api: SessionStartApi;
@@ -147,23 +163,32 @@ export interface EventMap {
 export type EventName = keyof EventMap;
 /** 호스트가 argv 로 받은 이름을 거를 때. */
 export declare function isEventName(name: string): name is EventName;
-export type Handler<E extends EventName> = (api: EventMap[E]['api'], payload: EventMap[E]['payload']) => void | Promise<void>;
-export interface RegisterOptions {
-    priority?: Band;
+export type Handler<E extends EventName> = (api: EventMap[E]['api'], payload: EventMap[E]['payload'], rules: Rules) => void | Promise<void>;
+/** 규칙 하나의 선언 — 어느 이벤트에서 트리거되는가. */
+export interface RuleDecl {
+    events: readonly EventName[];
 }
-interface Registration {
-    event: EventName;
-    priority: Band;
-    handler: Handler<EventName>;
+/**
+ * addon.mjs 가 default 로 내보내는 선언.
+ *
+ * 이벤트당 핸들러는 하나다. 여러 규칙이 같은 이벤트를 선언해도 핸들러는 한 번
+ * 불리고, 규칙별 분기는 핸들러가 셋째 인자를 보고 한다.
+ */
+export interface AddonDecl {
+    /** 구독하는 규칙들. 이름은 aiaddon 항목 이름과 문자열로 이어진다. */
+    rules: Readonly<Record<string, RuleDecl>>;
+    /** 이벤트별 실행 밴드. 생략·모르는 값은 medium. */
+    priority?: Readonly<Partial<Record<EventName, Band>>>;
+    handlers: {
+        readonly [E in EventName]?: Handler<E>;
+    };
 }
-export interface Addon {
-    /** 한 모듈이 여러 이벤트를 잡아도 되고, 같은 이벤트를 두 번 잡아도 된다. */
-    register<E extends EventName>(event: E, options: RegisterOptions, handler: Handler<E>): void;
-    /** 호스트가 읽는다. */
-    readonly registrations: readonly Registration[];
-}
-/** 모듈마다 하나씩 만들어 default 로 내보낸다. */
-export declare function create(): Addon;
+/**
+ * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
+ * priority 는 검사하지 않는다 — 값이 이상해도 medium 으로 떨어질 뿐, 선언
+ * 전체를 버릴 이유가 아니다.
+ */
+export declare function isAddonDecl(value: unknown): value is AddonDecl;
 type PermissionKind = 'allow' | 'deny' | 'ask';
 type TurnKind = 'block' | 'halt';
 /** 한 슬롯. 이긴 종류 하나와 그 종류로 들어온 사유 전부. */
@@ -204,20 +229,28 @@ export declare function emptyDraft(): Draft;
  */
 export declare function toHookOutput(event: EventName, draft: Draft): Record<string, unknown>;
 /** 이벤트별 api 를 만든다. 테스트 때문에 내보낸다. */
-export declare function apiFor<E extends EventName>(event: E, args: Args, draft: Draft, payload: EventMap[E]['payload']): EventMap[E]['api'];
-/** 켜진 모듈 하나. */
-export interface LoadedModule {
-    addon: Addon;
-    args: Args;
+export declare function apiFor<E extends EventName>(event: E, draft: Draft, payload: EventMap[E]['payload']): EventMap[E]['api'];
+/** 불러온 애드온 하나 — 선언과, 이번 이벤트에 해당하는 규칙 상태. */
+export interface LoadedAddon {
+    decl: AddonDecl;
+    rules: Rules;
 }
 /**
- * 켜진 모듈을 밴드 순으로 세워 차례로 돌린다. 테스트 때문에 내보낸다.
+ * 이번 이벤트에 핸들러가 받을 규칙 상태를 고른다. 호스트가 쓴다.
  *
- * 모듈마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적는다. 종이 한 장을
- * 같이 쓰면 도중에 던진 모듈이 이미 채운 슬롯 때문에 뒤 모듈의 판정이
- * 조용히 무시된다 — 고장난 모듈이 멀쩡한 모듈을 덮는 것을 막는다.
+ * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
+ * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
+ */
+export declare function selectRules(decl: AddonDecl, event: EventName, enabled: ReadonlyMap<string, Args>): Rules | null;
+/**
+ * 불러온 애드온을 밴드 순 (high → medium → low) 으로 세워 차례로 돌린다.
+ * 같은 밴드 안의 순서는 정의하지 않는다. 테스트 때문에 내보낸다.
+ *
+ * 애드온마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적는다. 종이 한 장을
+ * 같이 쓰면 도중에 던진 애드온이 이미 채운 슬롯 때문에 뒤 애드온의 판정이
+ * 조용히 무시된다 — 고장난 애드온이 멀쩡한 애드온을 덮는 것을 막는다.
  *
  * 순차 실행이다. 한꺼번에 돌리면 순서가 시간에 좌우돼 결과가 실행마다 달라진다.
  */
-export declare function dispatch<E extends EventName>(event: E, payload: EventMap[E]['payload'], modules: readonly LoadedModule[]): Promise<Draft>;
+export declare function dispatch<E extends EventName>(event: E, payload: EventMap[E]['payload'], addons: readonly LoadedAddon[]): Promise<Draft>;
 export {};

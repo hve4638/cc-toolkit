@@ -1,16 +1,24 @@
 /**
- * addon — core/event/ 의 이벤트 모듈이 쓰는 등록 도구.
+ * addon — core/addon/ 과 core/skills/ 의 addon.mjs 가 쓰는 선언 도구.
  *
  *     // @ts-check
- *     import { create } from '../../lib/index.mjs';
+ *     export default {
+ *       rules: {
+ *         'showcase-light': { events: ['SessionStart'] },
+ *         'showcase-heavy': { events: ['SessionStart', 'PreToolUse'] },
+ *       },
+ *       priority: { PreToolUse: 'high' },
+ *       handlers: {
+ *         SessionStart(api, payload, rules) {
+ *           if (rules['showcase-heavy'].trigger) api.injectContext('무거운 안내');
+ *         },
+ *       },
+ *     };
  *
- *     const a = create();
- *
- *     a.register('PreToolUse', { priority: 'high' }, (api, payload) => {
- *       if (payload.tool_name === 'Bash') api.permission.deny('bash 는 막혀 있다');
- *     });
- *
- *     export default a;
+ * 규칙 이름은 aiaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
+ * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
+ * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
+ * `trigger: false` 로) 셋째 인자로 받는다.
  *
  * 합침 규칙, 이벤트별 주의사항, 열지 않은 필드는 core/event/README.md.
  */
@@ -59,13 +67,23 @@ export interface StopPayload extends BasePayload {
 /** 실행 순서 밴드. 생략하면 medium. */
 export type Band = 'high' | 'medium' | 'low';
 
-/** aiaddon 항목에 붙은 인자. `feat:x@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
+/** aiaddon 항목에 붙은 인자. `showcase-light@mode=strict,quiet` → `{ mode: 'strict', quiet: true }` */
 export type Args = Readonly<Record<string, string | true>>;
+
+/**
+ * 핸들러가 받는 규칙 하나의 상태. `trigger` 는 호스트가 채우는 예약 키고
+ * (그 규칙이 aiaddon 에 켜져 있는가), 나머지는 그 항목의 인자다.
+ */
+export interface RuleState {
+  readonly trigger: boolean;
+  readonly [arg: string]: string | boolean;
+}
+
+/** 규칙 이름 → 상태. 이번 이벤트를 선언한 자기 규칙만 실린다. */
+export type Rules = Readonly<Record<string, RuleState>>;
 
 /** 어느 이벤트에서나 쓸 수 있다. */
 export interface BaseApi {
-  /** 이 항목을 켠 aiaddon 줄의 인자. */
-  readonly args: Args;
   /** 사용자에게만 보이는 한 줄. → `systemMessage` */
   notify(message: string): void;
 }
@@ -158,10 +176,10 @@ export interface StopApi extends BaseApi, ContextApi {
 }
 
 // ---------------------------------------------------------------------------
-// 등록
+// 선언
 // ---------------------------------------------------------------------------
 
-/** 잡을 수 있는 이벤트와 그 짝. 여기 없는 이름은 register() 가 거부한다. */
+/** 잡을 수 있는 이벤트와 그 짝. 여기 없는 이름은 선언할 수 없다. */
 export interface EventMap {
   SessionStart: { api: SessionStartApi; payload: SessionStartPayload };
   PreToolUse: { api: PreToolUseApi; payload: PreToolUsePayload };
@@ -187,38 +205,47 @@ export function isEventName(name: string): name is EventName {
 export type Handler<E extends EventName> = (
   api: EventMap[E]['api'],
   payload: EventMap[E]['payload'],
+  rules: Rules,
 ) => void | Promise<void>;
 
-export interface RegisterOptions {
-  priority?: Band;
+/** 규칙 하나의 선언 — 어느 이벤트에서 트리거되는가. */
+export interface RuleDecl {
+  events: readonly EventName[];
 }
 
-interface Registration {
-  event: EventName;
-  priority: Band;
-  handler: Handler<EventName>;
+/**
+ * addon.mjs 가 default 로 내보내는 선언.
+ *
+ * 이벤트당 핸들러는 하나다. 여러 규칙이 같은 이벤트를 선언해도 핸들러는 한 번
+ * 불리고, 규칙별 분기는 핸들러가 셋째 인자를 보고 한다.
+ */
+export interface AddonDecl {
+  /** 구독하는 규칙들. 이름은 aiaddon 항목 이름과 문자열로 이어진다. */
+  rules: Readonly<Record<string, RuleDecl>>;
+  /** 이벤트별 실행 밴드. 생략·모르는 값은 medium. */
+  priority?: Readonly<Partial<Record<EventName, Band>>>;
+  handlers: { readonly [E in EventName]?: Handler<E> };
 }
 
-export interface Addon {
-  /** 한 모듈이 여러 이벤트를 잡아도 되고, 같은 이벤트를 두 번 잡아도 된다. */
-  register<E extends EventName>(event: E, options: RegisterOptions, handler: Handler<E>): void;
-  /** 호스트가 읽는다. */
-  readonly registrations: readonly Registration[];
-}
-
-/** 모듈마다 하나씩 만들어 default 로 내보낸다. */
-export function create(): Addon {
-  const registrations: Registration[] = [];
-  return {
-    register(event, options, handler) {
-      registrations.push({
-        event,
-        priority: options.priority ?? 'medium',
-        handler: handler as Handler<EventName>,
-      });
-    },
-    registrations,
-  };
+/**
+ * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
+ * priority 는 검사하지 않는다 — 값이 이상해도 medium 으로 떨어질 뿐, 선언
+ * 전체를 버릴 이유가 아니다.
+ */
+export function isAddonDecl(value: unknown): value is AddonDecl {
+  if (typeof value !== 'object' || value === null) return false;
+  const decl = value as Record<string, unknown>;
+  if (typeof decl.rules !== 'object' || decl.rules === null) return false;
+  for (const rule of Object.values(decl.rules)) {
+    const events: unknown = (rule as { events?: unknown } | null)?.events;
+    if (!Array.isArray(events)) return false;
+    if (!events.every((e) => typeof e === 'string' && isEventName(e))) return false;
+  }
+  if (typeof decl.handlers !== 'object' || decl.handlers === null) return false;
+  for (const handler of Object.values(decl.handlers)) {
+    if (typeof handler !== 'function') return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +294,7 @@ export function emptyDraft(): Draft {
   };
 }
 
-// 제한적인 쪽이 이긴다. 진 종류의 사유는 버린다 — allow 를 원한 모듈의 사유는
+// 제한적인 쪽이 이긴다. 진 종류의 사유는 버린다 — allow 를 원한 애드온의 사유는
 // deny 앞에서 의미가 없다.
 const PERMISSION_RANK: Record<PermissionKind, number> = { deny: 3, ask: 2, allow: 1 };
 const TURN_RANK: Record<TurnKind, number> = { halt: 2, block: 1 };
@@ -381,9 +408,8 @@ function setTurn(draft: Draft, kind: TurnKind, reason: string): void {
   draft.turn = pickSlot(TURN_RANK, draft.turn, { kind, reasons: [reason] });
 }
 
-function baseParts(args: Args, draft: Draft): BaseApi & ContextApi {
+function baseParts(draft: Draft): BaseApi & ContextApi {
   return {
-    args,
     notify(message) {
       draft.notify.push(message);
     },
@@ -401,9 +427,9 @@ function haltOnly(draft: Draft): TurnApi {
   };
 }
 
-function sessionStartApi(args: Args, draft: Draft): SessionStartApi {
+function sessionStartApi(draft: Draft): SessionStartApi {
   return {
-    ...baseParts(args, draft),
+    ...baseParts(draft),
     injectUserMessage(text) {
       draft.userMessage ??= text;
     },
@@ -422,9 +448,9 @@ function sessionStartApi(args: Args, draft: Draft): SessionStartApi {
   };
 }
 
-function preToolUseApi(args: Args, draft: Draft): PreToolUseApi {
+function preToolUseApi(draft: Draft): PreToolUseApi {
   return {
-    ...baseParts(args, draft),
+    ...baseParts(draft),
     permission: {
       deny(reason) {
         setPermission(draft, 'deny', reason);
@@ -435,19 +461,26 @@ function preToolUseApi(args: Args, draft: Draft): PreToolUseApi {
     },
     tool: {
       rewrite(input) {
-        draft.patch ??= { kind: 'input', value: input };
+        // WHY: JSON 왕복으로 직렬화 가능을 여기서 강제한다. 직렬화 불가 값
+        //      (순환·BigInt) 을 호스트의 최종 stringify 까지 끌고 가면 그 시점의
+        //      실패가 다른 애드온의 판정까지 같이 지우므로, 이 핸들러의 try
+        //      안에서 터뜨려 per-addon 격리에 맡긴다.
+        const value = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
+        draft.patch ??= { kind: 'input', value };
       },
     },
     turn: haltOnly(draft),
   };
 }
 
-function postToolUseApi(args: Args, draft: Draft): PostToolUseApi {
+function postToolUseApi(draft: Draft): PostToolUseApi {
   return {
-    ...baseParts(args, draft),
+    ...baseParts(draft),
     tool: {
       rewriteOutput(output) {
-        draft.patch ??= { kind: 'output', value: output };
+        // WHY: rewrite 와 같다 — 직렬화 실패는 이 애드온의 몫이어야 한다.
+        const value: unknown = JSON.parse(JSON.stringify(output));
+        draft.patch ??= { kind: 'output', value };
       },
     },
     turn: {
@@ -461,9 +494,9 @@ function postToolUseApi(args: Args, draft: Draft): PostToolUseApi {
   };
 }
 
-function stopApi(args: Args, draft: Draft, payload: StopPayload): StopApi {
+function stopApi(draft: Draft, payload: StopPayload): StopApi {
   return {
-    ...baseParts(args, draft),
+    ...baseParts(draft),
     turn: {
       keepGoing(reason) {
         // 이미 훅이 막아서 이어진 턴이다. 또 막으면 무한 루프가 되므로
@@ -480,40 +513,70 @@ function stopApi(args: Args, draft: Draft, payload: StopPayload): StopApi {
 
 // 제네릭 안에서 switch 는 반환 타입을 안 좁혀준다. 콘크리트 타입으로 만드는
 // 빌더에서 검사를 다 받고, 캐스팅은 apiFor 한 곳에만 둔다.
-function buildApi(event: EventName, args: Args, draft: Draft, payload: BasePayload) {
+function buildApi(event: EventName, draft: Draft, payload: BasePayload) {
   switch (event) {
     case 'SessionStart':
-      return sessionStartApi(args, draft);
+      return sessionStartApi(draft);
     case 'PreToolUse':
-      return preToolUseApi(args, draft);
+      return preToolUseApi(draft);
     case 'PostToolUse':
-      return postToolUseApi(args, draft);
+      return postToolUseApi(draft);
     case 'Stop':
-      return stopApi(args, draft, payload as StopPayload);
+      return stopApi(draft, payload as StopPayload);
   }
 }
 
 /** 이벤트별 api 를 만든다. 테스트 때문에 내보낸다. */
 export function apiFor<E extends EventName>(
   event: E,
-  args: Args,
   draft: Draft,
   payload: EventMap[E]['payload'],
 ): EventMap[E]['api'] {
-  return buildApi(event, args, draft, payload) as EventMap[E]['api'];
+  return buildApi(event, draft, payload) as EventMap[E]['api'];
 }
 
 // ---------------------------------------------------------------------------
-// 실행 순서와 통합
+// 규칙 고르기와 실행
 // ---------------------------------------------------------------------------
 
-/** 켜진 모듈 하나. */
-export interface LoadedModule {
-  addon: Addon;
-  args: Args;
+/** 불러온 애드온 하나 — 선언과, 이번 이벤트에 해당하는 규칙 상태. */
+export interface LoadedAddon {
+  decl: AddonDecl;
+  rules: Rules;
+}
+
+/**
+ * 이번 이벤트에 핸들러가 받을 규칙 상태를 고른다. 호스트가 쓴다.
+ *
+ * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
+ * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
+ */
+export function selectRules(
+  decl: AddonDecl,
+  event: EventName,
+  enabled: ReadonlyMap<string, Args>,
+): Rules | null {
+  const rules: Record<string, RuleState> = {};
+  let triggered = false;
+  for (const [name, rule] of Object.entries(decl.rules)) {
+    if (!rule.events.includes(event)) continue;
+    const args = enabled.get(name);
+    const trigger = args !== undefined;
+    triggered ||= trigger;
+    // WHY: trigger 는 예약 키 — 인자에 같은 이름이 와도 여기서 덮여 조용히
+    //      무시된다. 훅에는 사람에게 경고를 띄울 마땅한 경로가 없다.
+    rules[name] = { ...args, trigger };
+  }
+  return triggered ? rules : null;
 }
 
 const BANDS: readonly Band[] = ['high', 'medium', 'low'];
+
+// 모르는 밴드 값은 medium 으로. indexOf 의 -1 을 그대로 쓰면 high 보다 앞선다.
+function bandIndex(band: unknown): number {
+  const i = BANDS.indexOf(band as Band);
+  return i === -1 ? 1 : i;
+}
 
 /** 성공한 핸들러의 Draft 를 옮겨 적는다. 겨루는 규칙은 apiFor 안과 같다. */
 function mergeDraft(into: Draft, from: Draft): void {
@@ -529,31 +592,31 @@ function mergeDraft(into: Draft, from: Draft): void {
 }
 
 /**
- * 켜진 모듈을 밴드 순으로 세워 차례로 돌린다. 테스트 때문에 내보낸다.
+ * 불러온 애드온을 밴드 순 (high → medium → low) 으로 세워 차례로 돌린다.
+ * 같은 밴드 안의 순서는 정의하지 않는다. 테스트 때문에 내보낸다.
  *
- * 모듈마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적는다. 종이 한 장을
- * 같이 쓰면 도중에 던진 모듈이 이미 채운 슬롯 때문에 뒤 모듈의 판정이
- * 조용히 무시된다 — 고장난 모듈이 멀쩡한 모듈을 덮는 것을 막는다.
+ * 애드온마다 새 Draft 를 주고 무사히 끝났을 때만 옮겨 적는다. 종이 한 장을
+ * 같이 쓰면 도중에 던진 애드온이 이미 채운 슬롯 때문에 뒤 애드온의 판정이
+ * 조용히 무시된다 — 고장난 애드온이 멀쩡한 애드온을 덮는 것을 막는다.
  *
  * 순차 실행이다. 한꺼번에 돌리면 순서가 시간에 좌우돼 결과가 실행마다 달라진다.
  */
 export async function dispatch<E extends EventName>(
   event: E,
   payload: EventMap[E]['payload'],
-  modules: readonly LoadedModule[],
+  addons: readonly LoadedAddon[],
 ): Promise<Draft> {
-  const ordered = modules
-    .flatMap(({ addon, args }) =>
-      addon.registrations.filter((r) => r.event === event).map((r) => ({ ...r, args })),
-    )
-    .sort((a, b) => BANDS.indexOf(a.priority) - BANDS.indexOf(b.priority));
+  const ordered = [...addons].sort(
+    (a, b) => bandIndex(a.decl.priority?.[event]) - bandIndex(b.decl.priority?.[event]),
+  );
 
   const merged = emptyDraft();
-  for (const reg of ordered) {
+  for (const { decl, rules } of ordered) {
+    const handler = decl.handlers[event];
+    if (!handler) continue;
     const local = emptyDraft();
     try {
-      // Registration 은 이벤트를 잊은 채 보관되므로 여기서 되살린다.
-      await (reg.handler as Handler<E>)(apiFor(event, reg.args, local, payload), payload);
+      await handler(apiFor(event, local, payload), payload, rules);
     } catch {
       continue;
     }

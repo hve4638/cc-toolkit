@@ -1,6 +1,6 @@
 # banaction
 
-banaction is a tool-call guard shipped with the core plugin, running as an event module on the PreToolUse hook. Before Claude Code executes any tool call — Bash, Write, MCP tools, anything — it checks the call against rules in `.banaction` files and denies it on a match. Without a `.banaction` file it does nothing.
+banaction is a tool-call guard shipped with the core plugin, running as an addon on the PreToolUse hook. Before Claude Code executes any tool call — Bash, Write, MCP tools, anything — it checks the call against rules in `.banaction` files and denies it on a match. Without a `.banaction` file it does nothing.
 
 ## Enabling
 
@@ -62,4 +62,4 @@ The rule text is included so the model stops retrying variants; the `.banaction`
 
 ## Failure behavior
 
-banaction fails open: unreadable files, malformed lines, module crashes, and the hook timeout (5s, shared with the event host) all let the tool call proceed rather than break the session. A catastrophically backtracking regex can push the hook past the timeout on every call, silently disabling the entire rule file.
+banaction fails open: unreadable files, malformed lines, addon crashes, and the hook timeout (5s, shared with the event host) all let the tool call proceed rather than break the session. A catastrophically backtracking regex can push the hook past the timeout on every call, silently disabling the entire rule file.
