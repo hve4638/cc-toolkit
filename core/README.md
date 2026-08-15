@@ -34,6 +34,7 @@
 | 스킬 설명서 | `/man` | 스킬의 `MAN.md` 를 읽고 설명·질의응답. 인자 없으면 문서화된 스킬 색인 |
 | | `/mkman` | 스킬을 분석해 그 폴더에 `MAN.md` (사용자용 설명서) 생성 |
 | 도메인 지식 | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
+| | `/available-addon-rule` | agentaddon `event` 파일에 적어 켤 수 있는 규칙 이름 목록 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
 | 스펙 | `/interview` | 계획·결정·아이디어를 질문 하나씩 + 추천 답으로 집요하게 인터뷰. 종료는 사용자가 선언, 요약 파일은 opt-in |
 
@@ -106,9 +107,15 @@ mcp__github__.*: .*
 
 ### 6. 컨텍스트 문서 리뷰 힌트
 
-**메커니즘**: 애드온 (`addon/writing-context-hint/`), 기본 켜짐 — 끄려면 agentaddon `event` 파일에 `!writing-context-hint`
+**메커니즘**: 애드온 (`addon/writing-context-hint/`), 규칙 없는 상시 훅 — 항상 돌고 끄는 스위치가 없다
 
 SKILL.md·SKILL.ko.md·CLAUDE.md·AGENTS.md 를 편집한 세션이 턴을 끝낼 때, 해당 리뷰 스킬 (`/writing-great-skill`·`/writing-great-agents-md`) 실행을 권하는 한 줄을 사용자에게만 띄운다. 모델 컨텍스트에는 들어가지 않는다.
+
+### 7. ponytail 모드
+
+**메커니즘**: 애드온 (`skills/ponytail/addon.mjs`), agentaddon `event` 파일에 `ponytail` 줄로 켬
+
+켜진 프로젝트에서는 세션 시작 시 `/ponytail` 스킬 본문 (최소·게으른 해법 규율) 을 컨텍스트로 주입해 세션 내내 lazy 모드를 유지한다. 스킬 자체 (`/ponytail`, `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt`) 는 애드온과 무관하게 단독 호출할 수 있다.
 
 ---
 

@@ -42,14 +42,17 @@ export function isAddonDecl(value) {
     if (typeof value !== 'object' || value === null)
         return false;
     const decl = value;
-    if (typeof decl.rules !== 'object' || decl.rules === null)
-        return false;
-    for (const rule of Object.values(decl.rules)) {
-        const events = rule?.events;
-        if (!Array.isArray(events))
+    // rules 는 생략 가능 (상시 애드온). 있으면 형태를 검사한다.
+    if (decl.rules !== undefined) {
+        if (typeof decl.rules !== 'object' || decl.rules === null)
             return false;
-        if (!events.every((e) => typeof e === 'string' && isEventName(e)))
-            return false;
+        for (const rule of Object.values(decl.rules)) {
+            const events = rule?.events;
+            if (!Array.isArray(events))
+                return false;
+            if (!events.every((e) => typeof e === 'string' && isEventName(e)))
+                return false;
+        }
     }
     if (typeof decl.handlers !== 'object' || decl.handlers === null)
         return false;
@@ -303,11 +306,17 @@ export function apiFor(event, draft, payload) {
  * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
  * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
  * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
+ *
+ * 규칙이 하나도 없는 선언 (상시 애드온) 은 설정과 무관하다 — 이 이벤트의
+ * 핸들러가 있으면 빈 규칙 상태로 발화한다.
  */
 export function selectRules(decl, event, enabled, negated = () => false) {
+    const declared = Object.entries(decl.rules ?? {});
+    if (declared.length === 0)
+        return decl.handlers[event] ? {} : null;
     const rules = {};
     let triggered = false;
-    for (const [name, rule] of Object.entries(decl.rules)) {
+    for (const [name, rule] of declared) {
         if (!rule.events.includes(event))
             continue;
         const args = enabled.get(name);

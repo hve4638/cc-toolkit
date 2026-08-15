@@ -1,12 +1,10 @@
 ---
 name: ponytail-debt
-description: >
-  코드베이스의 모든 `ponytail:` 주석을 부채 원장으로 수확한다. ponytail 이 남긴
-  의도적 지름길과 유예가 "나중에 = 영영 안 함" 으로 썩지 않고 추적되게 하기
-  위해서다. 사용자가 "ponytail debt", "/ponytail-debt", "what did ponytail
-  defer", "list the shortcuts", "ponytail ledger", "what did we mark to do
-  later" 라고 할 때 적용한다. 일회성 리포트이며 아무것도 바꾸지 않는다.
+description: "코드베이스의 `ponytail:` 주석 전부를 부채 원장으로 수확. 리포트만."
+disable-model-invocation: true
 ---
+
+<ponytail-debt>
 
 의도적인 ponytail 지름길은 전부 `ponytail:` 주석으로 표시되어 한계와 업그레이드
 경로를 담고 있다. 이 스킬은 그것들을 원장 하나로 모아, 유예가 조용히 영구가
@@ -39,3 +37,5 @@ description: >
 
 읽고 보고할 뿐 아무것도 바꾸지 않는다. 남기고 싶으면 말하면 원장을 파일로 쓴다
 (예: `PONYTAIL-DEBT.md`). 일회성.
+
+</ponytail-debt>

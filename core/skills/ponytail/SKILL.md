@@ -1,16 +1,11 @@
 ---
 name: ponytail
-description: >
-  Forces the laziest solution that actually works, simplest, shortest, most
-  minimal. Channels a senior dev who has seen everything: question whether the
-  task needs to exist at all (YAGNI), reach for the standard library before
-  custom code, native platform features before dependencies, one line before
-  fifty. Use whenever the user says "ponytail", "be lazy", "lazy mode",
-  "simplest solution", "minimal solution", "yagni", "do less", or "shortest
-  path", and whenever they complain about over-engineering, bloat,
-  boilerplate, or unnecessary dependencies.
+description: "게으르고 짧고 효율적인 코드 작성 모드 (YAGNI, 표준 라이브러리 우선, 최소 diff)."
+disable-model-invocation: true
 license: MIT
 ---
+
+<ponytail>
 
 # Ponytail
 
@@ -96,3 +91,5 @@ test, YAGNI applies to tests too.
 Ponytail governs what you build, not how you talk.
 
 The shortest path to done is the right path.
+
+</ponytail>

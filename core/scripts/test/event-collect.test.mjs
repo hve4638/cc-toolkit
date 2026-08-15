@@ -333,3 +333,68 @@ test('!패턴 으로 끈 규칙은 불러오지 않는다', async () => {
     assert.deepEqual(loaded[0].rules, { 'rule-two': { trigger: true } });
   });
 });
+
+// 규칙 없는 상시 애드온 — manifest 항목은 { path, events } 형태다.
+test('상시 애드온은 설정이 비어 있어도 로드되고 규칙 상태는 빈 객체다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'always', {}, `
+      export default { handlers: { PostToolUse() {} } };
+    `);
+    tree.manifest({ addons: [{ path: 'addon/always/addon.mjs', events: ['PostToolUse'] }] });
+
+    const loaded = await tree.collect('PostToolUse');
+    assert.equal(loaded.length, 1);
+    assert.deepEqual(loaded[0].rules, {});
+
+    // 이벤트가 안 맞으면 사전 필터에서 빠진다.
+    assert.deepEqual(await tree.collect('Stop'), []);
+  });
+});
+
+test('상시 애드온은 부정 줄로도 꺼지지 않는다 — 이름이 없다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'always', {}, `
+      export default { handlers: { PostToolUse() {} } };
+    `);
+    tree.manifest({ addons: [{ path: 'addon/always/addon.mjs', events: ['PostToolUse'] }] });
+    tree.entries('!*\n');
+    assert.equal((await tree.collect('PostToolUse')).length, 1);
+  });
+});
+
+test('낡은 manifest: 상시 항목인데 선언이 규칙형이면 선언이 이긴다 — 안 켜져 있으면 빠진다', async () => {
+  await withTree(async (tree) => {
+    tree.install('addon', 'ruled', {}, `
+      export default {
+        rules: { 'some-rule': { events: ['PostToolUse'] } },
+        handlers: { PostToolUse() {} },
+      };
+    `);
+    tree.manifest({ addons: [{ path: 'addon/ruled/addon.mjs', events: ['PostToolUse'] }] });
+    // 사전 필터는 통과하지만 selectRules 가 null — 켜진 규칙이 없다.
+    assert.deepEqual(await tree.collect('PostToolUse'), []);
+  });
+});
+
+test('낡은 manifest: 기본 켜짐 규칙형 항목인데 선언이 상시면 — 재생성 전에는 부정 줄이 사전 필터를 막는다', async () => {
+  await withTree(async (tree) => {
+    // 이번 전환이 개발 중 실제로 만드는 방향: 선언은 상시로 바꿨는데 manifest
+    // 는 아직 기본 켜짐 규칙형. 낡음의 한계를 문서화한다 — 낡은 manifest 는
+    // event-manifest.test.mjs 의 실스캔 diff 가 잡는다.
+    tree.install('addon', 'always', {}, `
+      export default { handlers: { PostToolUse() {} } };
+    `);
+    tree.manifest({
+      addons: [{
+        path: 'addon/always/addon.mjs',
+        rules: { 'old-name': { events: ['PostToolUse'], enabledByDefault: true } },
+      }],
+    });
+
+    // 설정이 없으면 기본 켜짐으로 사전 필터를 통과하고, 선언(상시)이 로드를 정한다.
+    assert.equal((await tree.collect('PostToolUse')).length, 1);
+    // 부정 줄은 사전 필터에서 옛 이름을 죽여 상시인데도 안 불린다 — 낡음의 대가.
+    tree.entries('!old-name\n');
+    assert.deepEqual(await tree.collect('PostToolUse'), []);
+  });
+});

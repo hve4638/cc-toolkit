@@ -20,7 +20,7 @@
     {
       "name": "frame",
       "source": "./frame",
-      "description": "Opt-in code-work guardrails behind per-project markers (.inlay/.ponytail) — one dispatcher routes hook events to active guardrails"
+      "description": "Opt-in code-work guardrails behind per-project markers (.inlay) — one dispatcher routes hook events to active guardrails"
     },
     {
       "name": "expert",

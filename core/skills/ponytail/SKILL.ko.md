@@ -1,15 +1,11 @@
 ---
 name: ponytail
-description: >
-  실제로 동작하는 가장 게으른 해법 — 가장 단순하고, 가장 짧고, 가장 최소한인
-  것 — 을 강제한다. 볼 것 다 본 시니어 개발자로 행동한다: 이 일이 존재할
-  필요가 있는지부터 묻고 (YAGNI), 커스텀 코드보다 표준 라이브러리를, 의존성보다
-  네이티브 플랫폼 기능을, 50 줄보다 1 줄을 집는다. 사용자가 "ponytail",
-  "be lazy", "lazy mode", "simplest solution", "minimal solution", "yagni",
-  "do less", "shortest path" 라고 하거나, 과잉 설계·비대함·보일러플레이트·불필요한
-  의존성에 불만을 표할 때 적용한다.
+description: "게으르고 짧고 효율적인 코드 작성 모드 (YAGNI, 표준 라이브러리 우선, 최소 diff)."
+disable-model-invocation: true
 license: MIT
 ---
+
+<ponytail>
 
 # Ponytail
 
@@ -91,3 +87,5 @@ lru_cache 가 측정상 부족해지면 그때 추가.
 ponytail 이 다스리는 건 무엇을 만드느냐지 어떻게 말하느냐가 아니다.
 
 완료로 가는 가장 짧은 길이 옳은 길이다.
+
+</ponytail>

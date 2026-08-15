@@ -30,7 +30,7 @@ async function edit(projectDir, { toolName = 'Edit', filePath, sessionId = 'sess
       session_id: sessionId,
       cwd: projectDir,
     };
-    const loaded = { decl, rules: { 'writing-context-hint': { trigger: true } } };
+    const loaded = { decl, rules: {} };
     await dispatch('PostToolUse', payload, [loaded]);
   } finally {
     if (saved === undefined) delete process.env.CLAUDE_PROJECT_DIR;
@@ -44,10 +44,9 @@ function flagLines(projectDir, sessionId = 'sess-1') {
   return readFileSync(path, 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
 }
 
-test('declaration: writing-context-hint 는 PostToolUse 를 기본 켜짐으로 구독한다', () => {
-  assert.deepEqual(Object.keys(decl.rules), ['writing-context-hint']);
-  assert.deepEqual([...decl.rules['writing-context-hint'].events], ['PostToolUse']);
-  assert.equal(decl.rules['writing-context-hint'].enabledByDefault, true);
+test('declaration: 규칙 없는 상시 애드온으로 PostToolUse 만 잡는다', () => {
+  assert.equal(decl.rules, undefined);
+  assert.deepEqual(Object.keys(decl.handlers), ['PostToolUse']);
 });
 
 test('SKILL.md 편집이 /writing-great-skill 플래그 줄을 남긴다', async () => {
@@ -97,7 +96,7 @@ test('험한 payload 형태에 직접 호출로도 던지지 않는다', () => {
 // 실제 호스트 배선의 e2e — 커밋된 manifest 와 진짜 addon.mjs 를 그대로 쓴다.
 // fail-open 이라 배선이 끊겨도 증상이 없으므로, 여기가 그걸 잡는 자리다.
 // HOME 을 임시 디렉터리로 돌려 실제 사용자의 agentaddon 설정이 새지 않게 한다.
-test('e2e: 설정 없이 main.mjs 경유로 플래그가 남고 !부정 한 줄이 끈다', async () => {
+test('e2e: 설정 없이 main.mjs 경유로 플래그가 남고, 상시라 !부정으로도 안 꺼진다', async () => {
   await withProject(async (projectDir) => {
     const home = join(projectDir, 'home');
     mkdirSync(home);
@@ -122,11 +121,14 @@ test('e2e: 설정 없이 main.mjs 경유로 플래그가 남고 !부정 한 줄�
       { cmd: '/writing-great-skill', path: '/x/SKILL.md' },
     ]);
 
+    // 이름이 없으니 부정도 !* 도 닿지 않는다 — 끄는 길 없음이 설계다.
     rmSync(join(projectDir, '.agent-memory'), { recursive: true, force: true });
     mkdirSync(join(projectDir, '.config', 'agentaddon'), { recursive: true });
-    writeFileSync(join(projectDir, '.config', 'agentaddon', 'event'), '!writing-context-hint\n');
+    writeFileSync(join(projectDir, '.config', 'agentaddon', 'event'), '!writing-context-hint\n!*\n');
     run();
-    assert.equal(flagLines(projectDir, 'e2e-1'), null);
+    assert.deepEqual(flagLines(projectDir, 'e2e-1'), [
+      { cmd: '/writing-great-skill', path: '/x/SKILL.md' },
+    ]);
   });
 });
 

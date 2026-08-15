@@ -98,3 +98,21 @@ test('enabledByDefault 가 true 가 아닌 값이면 기본 켜짐이 아니다'
   };
   assert.equal(selectRules(decl, 'Stop', on()), null);
 });
+
+// 규칙 없는 상시 애드온 — 설정과 무관하게 핸들러 유무만 본다.
+test('규칙 없는 선언은 이벤트 핸들러가 있으면 빈 규칙 상태로 발화한다', () => {
+  const decl = { handlers: { PostToolUse() {} } };
+  assert.deepEqual(selectRules(decl, 'PostToolUse', on()), {});
+  // 설정에 뭐가 있든 영향 없다.
+  assert.deepEqual(selectRules(decl, 'PostToolUse', on(['other', {}])), {});
+});
+
+test('규칙 없는 선언도 핸들러가 없는 이벤트에서는 null', () => {
+  const decl = { handlers: { PostToolUse() {} } };
+  assert.equal(selectRules(decl, 'Stop', on()), null);
+});
+
+test('빈 rules 객체도 규칙 없는 선언으로 친다', () => {
+  const decl = { rules: {}, handlers: { Stop() {} } };
+  assert.deepEqual(selectRules(decl, 'Stop', on()), {});
+});

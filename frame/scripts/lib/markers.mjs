@@ -1,6 +1,6 @@
 // frame marker resolution — gate guardrails on a per-project marker file.
 //
-// A guardrail is active when its marker (e.g. .inlay, .ponytail) exists in the
+// A guardrail is active when its marker (e.g. .inlay) exists in the
 // resolved cwd or any ancestor up to the filesystem root. The directory holding
 // the marker is returned so a guardrail can use it as its root / upward-walk
 // ceiling (e.g. inlay never looks for INLAY.md above its .inlay).

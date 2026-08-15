@@ -12,12 +12,17 @@
     },
     {
       "path": "addon/writing-context-hint/addon.mjs",
+      "events": [
+        "PostToolUse"
+      ]
+    },
+    {
+      "path": "skills/ponytail/addon.mjs",
       "rules": {
-        "writing-context-hint": {
+        "ponytail": {
           "events": [
-            "PostToolUse"
-          ],
-          "enabledByDefault": true
+            "SessionStart"
+          ]
         }
       }
     }

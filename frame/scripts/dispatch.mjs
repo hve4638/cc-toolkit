@@ -19,7 +19,6 @@ import { findMarkerDir, resolveCwd } from './lib/markers.mjs';
 // ships a guardrails/<name>/hooks/<event>.mjs file.
 const GUARDRAILS = [
   { name: 'inlay', marker: '.inlay' },
-  { name: 'ponytail', marker: '.ponytail' },
 ];
 
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));

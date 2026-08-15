@@ -182,8 +182,14 @@ export interface RuleDecl {
  * 불리고, 규칙별 분기는 핸들러가 셋째 인자를 보고 한다.
  */
 export interface AddonDecl {
-    /** 구독하는 규칙들. 이름은 agentaddon 항목 이름과 문자열로 이어진다. */
-    rules: Readonly<Record<string, RuleDecl>>;
+    /**
+     * 구독하는 규칙들. 이름은 agentaddon 항목 이름과 문자열로 이어진다.
+     *
+     * 규칙이 하나도 없으면 (생략 또는 빈 객체) 상시 애드온이다 — handlers 가
+     * 잡는 이벤트에 무조건 발화하고, 이름이 없으니 agentaddon 으로 끌 수도
+     * 없다 (`!*` 도 닿지 않는다). 켜고 끌 일이 없는 배관성 훅용.
+     */
+    rules?: Readonly<Record<string, RuleDecl>>;
     /** 이벤트별 실행 밴드. 생략·모르는 값은 medium. */
     priority?: Readonly<Partial<Record<EventName, Band>>>;
     handlers: {
@@ -251,6 +257,9 @@ export interface LoadedAddon {
  * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
  * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
  * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
+ *
+ * 규칙이 하나도 없는 선언 (상시 애드온) 은 설정과 무관하다 — 이 이벤트의
+ * 핸들러가 있으면 빈 규칙 상태로 발화한다.
  */
 export declare function selectRules(decl: AddonDecl, event: EventName, enabled: ReadonlyMap<string, Args>, negated?: (name: string) => boolean): Rules | null;
 /**

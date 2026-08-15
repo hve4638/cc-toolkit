@@ -1,12 +1,10 @@
 ---
 name: ponytail-debt
-description: >
-  Harvest every `ponytail:` comment in the codebase into a debt ledger, so the
-  deliberate shortcuts and deferrals ponytail leaves behind get tracked instead
-  of rotting into "later means never". Use when the user says "ponytail debt",
-  "/ponytail-debt", "what did ponytail defer", "list the shortcuts", "ponytail
-  ledger", or "what did we mark to do later". One-shot report, changes nothing.
+description: "코드베이스의 `ponytail:` 주석 전부를 부채 원장으로 수확. 리포트만."
+disable-model-invocation: true
 ---
+
+<ponytail-debt>
 
 Every deliberate ponytail shortcut is marked with a `ponytail:` comment naming
 its ceiling and upgrade path. This collects them into one ledger so a deferral
@@ -41,3 +39,5 @@ End with `<N> markers, <M> with no trigger.` Nothing found: `No ponytail: debt. 
 
 Reads and reports only, changes nothing. To persist it, ask and it writes the
 ledger to a file (e.g. `PONYTAIL-DEBT.md`). One-shot.
+
+</ponytail-debt>

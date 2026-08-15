@@ -31,13 +31,18 @@ const NAMESPACE = 'event';
  * (enabledByDefault) 규칙은 설정에 줄이 없어도 켜진 것으로 치되, 부정이
  * 매치한 적 있으면 꺼진 것으로 본다 — selectRules 와 같은 판정이다.
  *
+ * 규칙 없는 상시 애드온의 항목은 rules 대신 events 를 갖는다 — 설정과 무관하게
+ * 이벤트만 맞으면 통과한다.
+ *
  * @param {unknown} entry
  * @param {import('./lib/index.mjs').EventName} event
  * @param {ReadonlyMap<string, import('./lib/index.mjs').Args>} enabled
  * @param {(name: string) => boolean} negated
  */
 function manifestSelects(entry, event, enabled, negated) {
-  const rules = /** @type {{rules?: unknown}} */ (entry ?? {}).rules;
+  const { rules, events: alwaysEvents } =
+    /** @type {{rules?: unknown, events?: unknown}} */ (entry ?? {});
+  if (Array.isArray(alwaysEvents)) return alwaysEvents.includes(event);
   if (!rules || typeof rules !== 'object') return false;
   for (const [name, rule] of Object.entries(rules)) {
     const { events, enabledByDefault } =

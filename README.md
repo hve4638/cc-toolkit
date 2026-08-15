@@ -7,7 +7,7 @@ Claude Code 용 개인 플러그인 마켓플레이스.
 | 이름 | 설명 |
 |---|---|
 | [`core`](./core) | 기본 번들 — 범용 에이전트 13 + 훅 (규칙 리마인더·컨텍스트 가드) + MCP 서버 (LSP·AST Grep·Codex) + 공통 슬래시 스킬 (commit/PR, review, handoff, docs, rules) |
-| [`frame`](./frame) | 코드 작업 가드레일 — 프로젝트별 마커 (`.inlay`/`.ponytail`) 로 켜고, dispatcher 하나가 훅 이벤트를 활성 가드레일에 라우팅 |
+| [`frame`](./frame) | 코드 작업 가드레일 — 프로젝트별 마커 (`.inlay`) 로 켜고, dispatcher 하나가 훅 이벤트를 활성 가드레일에 라우팅 |
 | [`expert`](./expert) | 고급·특수 툴 — Python REPL MCP. 향후 ralph 같은 무거운 워크플로 스킬 예정 |
 | [`hud`](./hud) | statusline — cwd/git/ctx%/rate-limit/모델명 |
 | [`research`](./research) | 리서치 워크플로 (journal, plan, report, commit) |

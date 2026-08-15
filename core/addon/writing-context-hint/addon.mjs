@@ -8,7 +8,8 @@
  * 서브에이전트의 도구 호출에도 발화한다 — session_id 는 메인 세션 것이 유지된다.
  *
  * 구식 스킬 훅 (skills/writing-great-skill·writing-great-agents-md 의
- * hooks.mjs) 을 합쳐 이관한 것.
+ * hooks.mjs) 을 합쳐 이관한 것. 규칙 없는 상시 애드온 — 켜고 끄는 개념 없이
+ * 항상 돈다 (구식 훅과 같은 성격의 배관).
  */
 
 import { basename } from 'node:path';
@@ -26,9 +27,6 @@ const HINT_COMMANDS = new Map([
 
 /** @type {import('../../event/lib/index.mjs').AddonDecl} */
 export default {
-  rules: {
-    'writing-context-hint': { events: ['PostToolUse'], enabledByDefault: true },
-  },
   handlers: {
     PostToolUse(api, payload) {
       if (!EDIT_TOOLS.has(payload.tool_name)) return;
