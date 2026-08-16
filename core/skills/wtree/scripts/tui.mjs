@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// /wtree 셋업 TUI — showcase pane 에서 사용자가 직접 답하는 인라인 프롬프트
+// /wtree 셋업 TUI — useterminal pane 에서 사용자가 직접 답하는 인라인 프롬프트
 // (npm init 류: 흐르는 출력 + 방향키 선택). 결정적 동작은 step1/step2 와 같은
 // lib/actions.mjs 를 쓰고, 에이전트와는 handoff 파일 하나로만 대화한다 —
 // exec pane 은 종료 즉시 사라져 stdout 이 에이전트에게 돌아가지 않아서다.

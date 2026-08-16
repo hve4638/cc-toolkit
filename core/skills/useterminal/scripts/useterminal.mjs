@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * showcase — panes the user watches, inside the tmux window the caller sits in.
+ * useterminal — panes the user watches, inside the tmux window the caller sits in.
  *
  * Everything is derived from tmux on every call and nothing is stored anywhere:
  * the anchor window, the pane keys and the position labels are all recomputed
@@ -16,19 +16,24 @@ import { spawnSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const USAGE = `showcase — demo panes in the window you are already in
+const USAGE = `useterminal — demo panes in the window you are already in
 
-  showcase new                             open a pane running a shell; prints its key
-  showcase exec <command...>               open a pane running command; prints its key
-  showcase ls                              panes in this window (yours excluded)
-  showcase send KEY <text...>              type text literally (no Enter)
-  showcase key KEY <key...>                press keys: enter esc tab up c-c f5 ...
-  showcase read KEY [-n N | --all] [--ansi]  capture the pane's screen
-  showcase kill KEY                        close the pane
+  useterminal new                             open a pane running a shell; prints its key
+  useterminal exec <command...>               open a pane running command; prints its key
+  useterminal ls                              panes in this window (yours excluded)
+  useterminal send KEY <text...>              type text literally (no Enter)
+  useterminal key KEY <key...>                press keys: enter esc tab up c-c f5 ...
+  useterminal read KEY [-n N | --all] [--ansi]  capture the pane's screen
+  useterminal wait KEY                        block until the pane is gone; prints closed
+  useterminal kill KEY                        close the pane
 
 The first pane opens a column beside the one you sit in; the rest stack at the
 bottom of that column, sharing its height evenly. An exec pane disappears when
 its command ends. Terminal work the user does not need to watch belongs in vt.
+
+wait blocks with no timeout. From an agent shell, start it with
+run_in_background so the end arrives as a notification — a foreground call
+risks its own tool timeout, not the pane's command.
 `;
 
 // Key names, kept identical to vt so both tools take the same spelling.
@@ -43,10 +48,10 @@ const COL_NAMES = { 1: [''], 2: ['left', 'right'], 3: ['left', 'center', 'right'
 const ROW_NAMES = { 1: [''], 2: ['top', 'bottom'], 3: ['top', 'middle', 'bottom'] };
 
 // the whole refusal: the caller has to hear what to do, not just what failed
-const OUTSIDE = 'not inside tmux — tell the user showcase is unavailable here and stop';
+const OUTSIDE = 'not inside tmux — tell the user useterminal is unavailable here and stop';
 
 function die(msg) {
-  process.stderr.write(`showcase: ${msg}\n`);
+  process.stderr.write(`useterminal: ${msg}\n`);
   process.exit(1);
 }
 
@@ -381,10 +386,10 @@ function rezoom(v) {
  */
 const zoomedSelf = (v) => v.zoomed && v.panes.find((p) => p.active)?.id === v.self;
 
-const ZOOM_NOTE = 'showcase: the window is zoomed, so the new pane is hidden behind it\n';
-const UNZOOM_NOTE = 'showcase: dropped the zoom on this session\'s pane so the new one shows\n';
+const ZOOM_NOTE = 'useterminal: the window is zoomed, so the new pane is hidden behind it\n';
+const UNZOOM_NOTE = 'useterminal: dropped the zoom on this session\'s pane so the new one shows\n';
 // said wherever a WHERE is handed out, since the value is only good right now
-const WHERE_NOTE = 'showcase: WHERE shifts as panes come and go — re-read it rather than reuse it\n';
+const WHERE_NOTE = 'useterminal: WHERE shifts as panes come and go — re-read it rather than reuse it\n';
 
 function ordered(v) {
   return [...v.panes].sort((a, b) => a.left - b.left || a.top - b.top);
@@ -393,7 +398,7 @@ function ordered(v) {
 function resolve(v, key) {
   if (!key) die('missing pane key');
   const hit = v.panes.find((p) => paneKey(p.id) === key);
-  if (!hit) die(`no such pane: ${key} (see \`showcase ls\`)`);
+  if (!hit) die(`no such pane: ${key} (see \`useterminal ls\`)`);
   if (hit.id === v.self) die('that is your own pane');
   return hit;
 }
@@ -458,7 +463,7 @@ function open(born) {
       // stdout stays the key alone so it can be piped; the place is a sentence
       // on stderr, since a bare "right" reads like an address
       process.stdout.write(`${paneKey(id)}\n`);
-      if (where) process.stderr.write(`showcase: the new pane sits at ${where}\n${WHERE_NOTE}`);
+      if (where) process.stderr.write(`useterminal: the new pane sits at ${where}\n${WHERE_NOTE}`);
       return;
     }
     rezoom(v);
@@ -470,7 +475,8 @@ function open(born) {
 // login shell's prompt carries a host, a path and a git branch that say nothing
 // about the demo. The rc files are what would paint that, so the shell starts
 // without them and reads the prompt out of the pane's environment instead.
-const PROMPT = 'PS1=\\[\\e[34m\\]$\\[\\e[0m\\] ';
+// 01;34 (bright blue), matching the user's own prompt colour
+const PROMPT = 'PS1=\\[\\e[01;34m\\]$\\[\\e[0m\\] ';
 
 function cmdNew(args) {
   if (args.length) die(`new: unexpected argument: ${args[0]}`);
@@ -563,6 +569,36 @@ function cmdRead(args) {
   process.stdout.write(out ? `${out}\n` : '');
 }
 
+const WAIT_POLL_MS = 200;
+
+/** Whether the pane is still in the caller's window: 'gone' when the window
+ *  itself no longer answers, else true/false. */
+function present(v, id) {
+  const r = spawnSync('tmux', ['-S', v.socket, 'list-panes', '-t', v.self, '-F', '#{pane_id}'], { encoding: 'utf8' });
+  if (r.status !== 0) return 'gone';
+  return r.stdout.trim().split('\n').includes(id);
+}
+
+/**
+ * Ends when the pane is gone, whatever removed it — the command finishing, a
+ * kill, the user closing it. An exec pane removes itself when its command
+ * ends, so absence is the termination signal; the exit code dies with the
+ * pane, deliberately. Capturing it would mean writing state to the user's
+ * tmux (remain-on-exit) that an interrupted wait then strands there — and
+ * outcome-grade execution is vt's job, not this tool's.
+ */
+async function cmdWait(args) {
+  const v = view();
+  const pane = resolve(v, args[0]);
+  if (args.length > 1) die(`wait: unexpected argument: ${args[1]}`);
+  for (;;) {
+    const p = present(v, pane.id);
+    if (p === 'gone') die('wait: the window is gone');
+    if (!p) return void process.stdout.write('closed\n');
+    await new Promise((tick) => { setTimeout(tick, WAIT_POLL_MS); });
+  }
+}
+
 function cmdKill(args) {
   const v = view();
   const pane = resolve(v, args[0]);
@@ -592,12 +628,12 @@ function cmdKill(args) {
 
 function main(argv) {
   const [verb, ...args] = argv;
-  const run = { new: cmdNew, exec: cmdExec, ls: cmdLs, send: cmdSend, key: cmdKey, read: cmdRead, kill: cmdKill }[verb];
+  const run = { new: cmdNew, exec: cmdExec, ls: cmdLs, send: cmdSend, key: cmdKey, read: cmdRead, wait: cmdWait, kill: cmdKill }[verb];
   if (!verb || verb === '-h' || verb === '--help') return void process.stdout.write(USAGE);
   if (!run) die(`unknown command: ${verb}`);
   // one line on stderr is the whole contract; a stack trace would break it
   try {
-    run(args);
+    run(args)?.catch?.((e) => die(e?.message ?? String(e)));
   } catch (e) {
     die(e?.message ?? String(e));
   }

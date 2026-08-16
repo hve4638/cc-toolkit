@@ -13,12 +13,12 @@ disable-model-invocation: true
 
 ## TUI 경로 (tmux 안 기본)
 
-사용자가 showcase pane 에서 직접 답한다; 결정적 작업은 거기서 일어나고, 산문 작업은 handoff 파일로 돌아온다.
+사용자가 useterminal pane 에서 직접 답한다; 결정적 작업은 거기서 일어나고, 산문 작업은 handoff 파일로 돌아온다.
 
 1. repo 디렉터리에서 pane 을 연다:
 
 ```bash
-showcase exec node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/tui.mjs"
+useterminal exec node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/tui.mjs"
 ```
 
 2. 사용자에게 pane 의 프롬프트를 끝내라고 알리고 턴을 끝내고 기다린다. pane 을 폴링하거나 조작하지 않는다 — 사용자의 것이다.

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# useterminal launcher — engine lives in the skill folder.
+# core exposes <plugin-root>/bin on PATH, so `useterminal …` works anywhere.
+exec node "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../skills/useterminal/scripts/useterminal.mjs" "$@"

@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# showcase launcher — engine lives in the skill folder.
-# core exposes <plugin-root>/bin on PATH, so `showcase …` works anywhere.
-exec node "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../skills/showcase/scripts/showcase.mjs" "$@"

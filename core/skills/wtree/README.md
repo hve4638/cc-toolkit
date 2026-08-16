@@ -6,7 +6,7 @@ repo 에 정책 기반 워크트리 관리를 셋업하는 스킬. `/wtree` 로 
 
 ## TUI 경로
 
-`tui.mjs` 를 showcase pane 으로 띄우면 사용자가 직접 답한다. npm init 류 인라인 프롬프트다 — 흐르는 출력에 질문이 끼고, 선택은 방향키+Enter, Esc 는 그 자리 취소, Ctrl-C 는 종료(130). 전체 화면을 잡지 않는다. 프리미티브는 `lib/prompt.mjs`(의존성 없음, raw mode + ANSI, 한글 2폭 절단, 키 큐로 연타 유실 방지).
+`tui.mjs` 를 useterminal pane 으로 띄우면 사용자가 직접 답한다. npm init 류 인라인 프롬프트다 — 흐르는 출력에 질문이 끼고, 선택은 방향키+Enter, Esc 는 그 자리 취소, Ctrl-C 는 종료(130). 전체 화면을 잡지 않는다. 프리미티브는 `lib/prompt.mjs`(의존성 없음, raw mode + ANSI, 한글 2폭 절단, 키 큐로 연타 유실 방지).
 
 두 국면으로 나뉜다:
 

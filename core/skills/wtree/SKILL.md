@@ -13,12 +13,12 @@ Two routes. Inside tmux (`$TMUX` set), use the TUI pane. Outside tmux, do not fa
 
 ## TUI route (default inside tmux)
 
-The user answers directly in a showcase pane; deterministic work happens there, and prose work comes back to you through a handoff file.
+The user answers directly in a useterminal pane; deterministic work happens there, and prose work comes back to you through a handoff file.
 
 1. From the repo directory, open the pane:
 
 ```bash
-showcase exec node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/tui.mjs"
+useterminal exec node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/tui.mjs"
 ```
 
 2. Tell the user to complete the prompts in the pane, then end your turn and wait. Do not poll or drive the pane — it is the user's.

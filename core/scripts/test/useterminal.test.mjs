@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 import {
   columnsOf, labels, layoutString, paneKey, parseLayout, planAppend, planLevel,
-} from '../../skills/showcase/scripts/showcase.mjs';
+} from '../../skills/useterminal/scripts/useterminal.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ENGINE = join(__dirname, '..', '..', 'skills', 'showcase', 'scripts', 'showcase.mjs');
+const ENGINE = join(__dirname, '..', '..', 'skills', 'useterminal', 'scripts', 'useterminal.mjs');
 
 // --------------------------------------------------------------- pane keys
 
@@ -163,7 +163,6 @@ function runCli(args, env) {
     env: { ...process.env, TMUX: '', TMUX_PANE: '', ...env },
   });
 }
-
 test('importing the engine works where argv[1] is not a path', () => {
   const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(ENGINE)}).then(m => console.log(m.paneKey('%0')))`, 'not-a-path'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
@@ -174,13 +173,13 @@ test('outside tmux it refuses in one line and does nothing else', () => {
   const r = runCli(['ls'], {});
   assert.equal(r.status, 1);
   assert.equal(r.stdout, '');
-  assert.match(r.stderr, /^showcase: not inside tmux — tell the user .+ and stop\n$/);
+  assert.match(r.stderr, /^useterminal: not inside tmux — tell the user .+ and stop\n$/);
 });
 
 const haveTmux = spawnSync('tmux', ['-V'], { encoding: 'utf8' }).status === 0;
 
 test('drives panes in its own window only', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -200,10 +199,10 @@ test('drives panes in its own window only', { skip: !haveTmux && 'tmux not insta
     assert.match(listed, new RegExp(`^KEY.*\n${key}\\s`));
     assert.doesNotMatch(listed, new RegExp(paneKey(self)), 'the caller must not list its own pane');
 
-    runCli(['send', key, 'echo showcase-probe'], env);
+    runCli(['send', key, 'echo useterminal-probe'], env);
     runCli(['key', key, 'enter'], env);
     const screen = runCli(['read', key], env).stdout;
-    assert.match(screen, /showcase-probe/);
+    assert.match(screen, /useterminal-probe/);
 
     const own = runCli(['kill', paneKey(self)], env);
     assert.equal(own.status, 1);
@@ -229,8 +228,35 @@ test('drives panes in its own window only', { skip: !haveTmux && 'tmux not insta
   }
 });
 
+test('wait blocks until the pane is gone', { skip: !haveTmux && 'tmux not installed' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
+  const socket = join(dir, 'sock');
+  const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
+
+  try {
+    tmux('new-session', '-d', '-s', 'lab', '-x', '80', '-y', '24');
+    const self = tmux('list-panes', '-t', 'lab', '-F', '#{pane_id}').stdout.trim();
+    const serverPid = tmux('display', '-p', '#{pid}').stdout.trim();
+    const env = { TMUX: `${socket},${serverPid},$0`, TMUX_PANE: self };
+
+    const key = runCli(['exec', 'sleep', '1'], env).stdout.trim();
+    const r = runCli(['wait', key], env);
+    assert.equal(r.stdout, 'closed\n');
+    assert.equal(r.status, 0);
+    assert.equal(runCli(['ls'], env).stdout, 'no panes\n', 'the pane really is gone');
+
+    // the pane no longer resolves, so a second wait refuses rather than hangs
+    const again = runCli(['wait', key], env);
+    assert.equal(again.status, 1);
+    assert.match(again.stderr, /no such pane/);
+  } finally {
+    tmux('kill-session', '-t', 'lab');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a new pane opens on a blue $ and nothing else', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -247,8 +273,9 @@ test('a new pane opens on a blue $ and nothing else', { skip: !haveTmux && 'tmux
       screen = runCli(['read', key], env).stdout;
     }
     assert.equal(screen.trim(), '$', `whatever the login shell paints stays out: ${JSON.stringify(screen)}`);
-    // the colour only shows through --ansi, which is where the blue is asserted
-    assert.match(runCli(['read', key, '--ansi'], env).stdout, /\x1b\[34m/);
+    // the colour only shows through --ansi, which is where the bright blue is
+    // asserted (tmux re-emits 01;34 as separate bold + blue sequences)
+    assert.match(runCli(['read', key, '--ansi'], env).stdout, /\x1b\[1m\x1b\[34m/);
   } finally {
     tmux('kill-session', '-t', 'lab');
     rmSync(dir, { recursive: true, force: true });
@@ -256,7 +283,7 @@ test('a new pane opens on a blue $ and nothing else', { skip: !haveTmux && 'tmux
 });
 
 test('places panes by the column rules', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
   const tree = () => parseLayout(tmux('display', '-p', '-t', 'lab', '#{window_layout}').stdout.trim());
@@ -313,7 +340,7 @@ test('places panes by the column rules', { skip: !haveTmux && 'tmux not installe
 });
 
 test('never lets a payload become a tmux command', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -348,7 +375,7 @@ test('never lets a payload become a tmux command', { skip: !haveTmux && 'tmux no
 });
 
 test('types into a pane the user scrolled back', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -379,7 +406,7 @@ test('types into a pane the user scrolled back', { skip: !haveTmux && 'tmux not 
 });
 
 test('a read stops at the last line with something on it', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -410,7 +437,7 @@ test('a read stops at the last line with something on it', { skip: !haveTmux && 
 });
 
 test('keeps a demo command intact, quoting and all', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const proof = join(dir, 'proof.txt');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
@@ -432,7 +459,7 @@ test('keeps a demo command intact, quoting and all', { skip: !haveTmux && 'tmux 
 });
 
 test('gives back a zoom it had to drop, and leaves my column alone', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
   const heightOf = (id) => Number(tmux('list-panes', '-t', 'lab', '-F', '#{pane_id} #{pane_height}').stdout
@@ -479,7 +506,7 @@ test('gives back a zoom it had to drop, and leaves my column alone', { skip: !ha
 });
 
 test('a demo that exits at once never lands in my column', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -498,7 +525,7 @@ test('a demo that exits at once never lands in my column', { skip: !haveTmux && 
     };
     const before = mine();
 
-    // `true` is gone before showcase can finish placing it, which is the race
+    // `true` is gone before useterminal can finish placing it, which is the race
     // the retry exists for; whatever the outcome, my column must be untouched
     for (let i = 0; i < 5; i++) {
       const r = runCli(['exec', 'true'], env);
@@ -513,7 +540,7 @@ test('a demo that exits at once never lands in my column', { skip: !haveTmux && 
 });
 
 test('works from a directory whose name ends in a semicolon', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const odd = join(dir, 'ends-with;');
   mkdirSync(odd);
@@ -540,7 +567,7 @@ test('works from a directory whose name ends in a semicolon', { skip: !haveTmux 
 });
 
 test('kill keeps a zoom that tmux drops', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -578,7 +605,7 @@ test('kill keeps a zoom that tmux drops', { skip: !haveTmux && 'tmux not install
 });
 
 test('read rejects arguments it does not know', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -601,7 +628,7 @@ test('read rejects arguments it does not know', { skip: !haveTmux && 'tmux not i
 });
 
 test('new takes no command and exec insists on one', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -624,7 +651,7 @@ test('new takes no command and exec insists on one', { skip: !haveTmux && 'tmux 
 });
 
 test('new hands out the WHERE hint next to the key, and says it does not keep', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 
@@ -647,7 +674,7 @@ test('new hands out the WHERE hint next to the key, and says it does not keep', 
 });
 
 test('stacks in the other column when I sit on the right', { skip: !haveTmux && 'tmux not installed' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'showcase-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'useterminal-test-'));
   const socket = join(dir, 'sock');
   const tmux = (...args) => spawnSync('tmux', ['-S', socket, ...args], { encoding: 'utf8' });
 

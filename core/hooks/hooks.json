@@ -1,5 +1,5 @@
 {
-  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md) + showcase inject when inside tmux, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher (no handlers left — new hooks are addons), and the event host (core/event) on all four events (addons: always-on like writing-context-hint, or agentaddon-enabled like rule:banaction)",
+  "description": "core hook chain — SessionStart instruction inject + cwd-only context inject (AGENTS.cwd.md/CLAUDE.cwd.md) + useterminal inject when inside tmux, Stop force-continue + context-file review hint, PostToolUse skill-hook dispatcher (no handlers left — new hooks are addons), and the event host (core/event) on all four events (addons: always-on like writing-context-hint, or agentaddon-enabled like rule:banaction)",
   "hooks": {
     "SessionStart": [
       {
@@ -17,7 +17,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/showcase-inject.mjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/scripts/run.cjs \"${CLAUDE_PLUGIN_ROOT}\"/scripts/useterminal-inject.mjs",
             "timeout": 3
           }
         ]
