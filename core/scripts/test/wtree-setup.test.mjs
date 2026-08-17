@@ -276,16 +276,25 @@ function shOk(text) {
 }
 
 test('renderHook: 답이 없으면 스펙 기본값으로 조립된다', () => {
-  const text = renderHook(TMUX_TPL);
-  assert.match(text, /detach=-d\n\[ "\$\{WT_INTERACTIVE:-0\}" = 1 \] && detach=/);
+  const text = renderHook(TMUX_TPL)['post-create'];
+  assert.match(text, /detach=-d\n\[ "\$\{WTREE_INTERACTIVE:-0\}" = 1 \] && detach=/);
   assert.match(text, /^prefix=''$/m);
   assert.match(text, /tmux send-keys -t "\$win" 'claude' Enter/);
   assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), 'no unfilled slot');
   assert.ok(shOk(text), 'passes sh -n');
 });
 
+test('renderHook: post-destroy 도 조립된다 — 가드와 ask 재호출 포함', () => {
+  const text = renderHook(TMUX_TPL)['post-destroy'];
+  assert.ok(text.includes('pane_current_path'), 'all-panes-on-dead-path gate');
+  assert.ok(text.includes('kill-window'));
+  assert.ok(text.includes('--ask'));
+  assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), 'no unfilled slot');
+  assert.ok(shOk(text), 'passes sh -n');
+});
+
 test('renderHook: focus=always · command=none 답이 반영된다', () => {
-  const text = renderHook(TMUX_TPL, { FOCUS: 'always', COMMAND: 'none' });
+  const text = renderHook(TMUX_TPL, { FOCUS: 'always', COMMAND: 'none' })['post-create'];
   assert.match(text, /# focus: always move\ndetach=\n/);
   assert.ok(!text.includes('&& detach='), 'no interactive branch line');
   assert.ok(!text.includes('send-keys'));
@@ -297,7 +306,7 @@ test('renderHook: input 값은 셸 인용을 거친다 (작은따옴표 포함)'
   const text = renderHook(TMUX_TPL, {
     PREFIX: 'wt:',
     COMMAND: { id: 'custom', value: "echo 'hi'" },
-  });
+  })['post-create'];
   assert.match(text, /^prefix='wt:'$/m);
   assert.ok(text.includes(`tmux send-keys -t "$win" ${shq("echo 'hi'")} Enter`));
   assert.ok(shOk(text));
@@ -310,7 +319,7 @@ test('renderHook: $ 대치 패턴과 {KEY} 를 품은 입력도 인용된 그대
   const text = renderHook(TMUX_TPL, {
     PREFIX: '{COMMAND}',
     COMMAND: { id: 'custom', value: evil },
-  });
+  })['post-create'];
   assert.ok(text.includes(`tmux send-keys -t "$win" ${shq(evil)} Enter`));
   assert.match(text, /^prefix='\{COMMAND\}'$/m);
   assert.ok(shOk(text));
@@ -332,7 +341,76 @@ test('planStep1: 조립 실패는 plan 시점에 터진다 — 실행 전, 파�
   );
 });
 
-test('mergeHooks: 렌더 결과를 서브셸로 격리해 병합한다', () => {
+test('mergeHooks: $0 재호출 훅이 같은 종류에서 겹치면 조립을 거부한다', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wtree-tpl-'));
+  const other = join(dir, 'other');
+  mkdirSync(other);
+  writeFileSync(join(other, 'post-destroy'), '#!/bin/sh\ntrue\n');
+  // tmux-window 의 post-destroy 는 $0 재호출 — 병합되면 재진입이 뒤 절까지 돈다.
+  assert.throws(() => mergeHooks([TMUX_TPL, { name: 'other', dir: other }]), /cannot be merged/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+// post-destroy 가드 동작 — stub tmux 를 PATH 에 놓고 헤르메틱하게 돌린다.
+// split-window 호출 여부가 관찰 대상이다 (ask pane 이 뜨는가/안 뜨는가).
+function runPostDestroy({ panes, panesExit = 0, env = {} }) {
+  const dir = mkdtempSync(join(tmpdir(), 'wtree-pd-'));
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  const log = join(dir, 'log');
+  writeFileSync(log, '');
+  writeFileSync(
+    join(bin, 'tmux'),
+    `#!/bin/sh
+echo "$@" >> "$LOGF"
+case "$1" in
+  display-message) echo @1; exit 0 ;;
+  list-panes) [ -n "\${PANES}" ] && printf '%s\\n' "\${PANES}"; exit "\${PANES_EXIT:-0}" ;;
+  *) exit 0 ;;
+esac
+`,
+  );
+  chmodSync(join(bin, 'tmux'), 0o755);
+  const hook = join(dir, 'post-destroy');
+  writeFileSync(hook, renderHook(TMUX_TPL)['post-destroy']);
+  const r = spawnSync('sh', [hook], {
+    encoding: 'utf8',
+    env: {
+      PATH: `${bin}:/usr/bin:/bin`,
+      TMUX: 'fake,1,0',
+      TMUX_PANE: '%9',
+      WTREE_PATH: '/x/wt',
+      WTREE_REPO: '/tmp',
+      WTREE_BRANCH: 'feat/x',
+      LOGF: log,
+      PANES: panes,
+      PANES_EXIT: String(panesExit),
+      ...env,
+    },
+  });
+  const calls = readFileSync(log, 'utf8');
+  rmSync(dir, { recursive: true, force: true });
+  return { status: r.status, calls };
+}
+
+test('post-destroy: 모든 pane 이 죽은 경로면 ask pane 을 띄운다 ((deleted) 접미사 포함)', () => {
+  const r = runPostDestroy({ panes: '/x/wt (deleted)\n/x/wt/sub' });
+  assert.match(r.calls, /split-window/);
+});
+
+test('post-destroy: 다른 경로 pane 이 하나라도 있으면 아무것도 하지 않는다', () => {
+  const r = runPostDestroy({ panes: '/x/wt (deleted)\n/home/elsewhere' });
+  assert.ok(!r.calls.includes('split-window'));
+  assert.equal(r.status, 0);
+});
+
+test('post-destroy: pane 목록 실패·빈 목록·계약 env 부재는 fail-closed', () => {
+  assert.ok(!runPostDestroy({ panes: '/x/wt', panesExit: 1 }).calls.includes('split-window'));
+  assert.ok(!runPostDestroy({ panes: '' }).calls.includes('split-window'));
+  assert.ok(!runPostDestroy({ panes: '/x/wt', env: { WTREE_PATH: '' } }).calls.includes('split-window'));
+});
+
+test('mergeHooks: 같은 종류만 서브셸 격리로 병합하고, 종류별 파일로 돌려준다', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wtree-tpl-'));
   const plain = join(dir, 'plain');
   mkdirSync(plain);
@@ -341,9 +419,12 @@ test('mergeHooks: 렌더 결과를 서브셸로 격리해 병합한다', () => {
     [TMUX_TPL, { name: 'plain', dir: plain }],
     { 'tmux-window': { FOCUS: 'never', COMMAND: 'none' } },
   );
-  assert.match(merged, /# === tmux-window ===\n\(/);
-  assert.match(merged, /# === plain ===\n\(\ntrue\n\)/);
-  assert.match(merged, /# focus: never move/);
-  assert.ok(shOk(merged));
+  assert.match(merged['post-create'], /# === tmux-window ===\n\(/);
+  assert.match(merged['post-create'], /# === plain ===\n\(\ntrue\n\)/);
+  assert.match(merged['post-create'], /# focus: never move/);
+  assert.ok(shOk(merged['post-create']));
+  // post-destroy 는 tmux-window 만 가지므로 병합 없이 단독 파일 그대로다.
+  assert.ok(merged['post-destroy'].includes('kill-window'));
+  assert.ok(!merged['post-destroy'].includes('# ==='));
   rmSync(dir, { recursive: true, force: true });
 });

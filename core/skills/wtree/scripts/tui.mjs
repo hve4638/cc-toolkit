@@ -39,67 +39,59 @@ const L = {
     rootUnknown: 'detection failed',
     sharedLabel: 'shared .wtree/',
     sharedNone: 'none',
-    foundExisting: (d, c) => `This repo already carries a policy: ${d} (${c})`,
-    qDisposal: 'existing policy — what to do with it?',
+    foundExisting: (d, c) => `existing policy found: ${d} (${c})`,
+    qDisposal: 'existing policy',
     dAdopt: 'adopt',
-    dAdoptNote: 'use it as-is',
+    dAdoptNote: 'use as-is',
     dRebuild: 'rebuild',
-    dRebuildNote: 'push it to .old and compose anew',
-    dKeep: 'keep',
-    dKeepNote: 'leave it untouched, build elsewhere',
+    dRebuildNote: 'back up to .old, compose anew',
     dRepath: 'different path',
-    qPath: 'workspace path — the policy is composed here first:',
-    pathNotWorkspace: (p) => `${p} already exists and is not a policy workspace — pick a fresh path.`,
-    qPathWorkspace: (p) => `${p} is already a policy workspace — what to do with it?`,
+    qPath: 'workspace path (where the policy is composed):',
+    pathNotWorkspace: (p) => `unusable path: ${p} — exists and is not a policy workspace`,
+    qPathWorkspace: (p) => `existing policy workspace: ${p}`,
     qShape: 'branch shape',
-    customNote: 'compose the rules from scratch (with the agent, after this pane)',
-    qHooks: 'post-create hooks',
-    multiHint: '(enter/space toggles an item)',
+    customNote: 'write the rules by hand (with the agent, after this pane)',
+    qHooks: 'wtree hooks',
+    multiHint: '(enter/space: toggle)',
     multiSubmit: 'submit selection',
-    inputRequired: 'a value is required — Esc cancels the setup',
-    qWhere: 'where do worktrees live?',
-    whereBeside: (n) => `beside the repo — ../${n}`,
-    whereInside: (n) => `inside the repo — ./${n}`,
-    qRoot: 'root branch name (detection failed):',
-    planTitle: 'about to do this:',
+    inputRequired: 'value required — Esc cancels the setup',
+    qWtdir: 'worktree folder (relative to the repo root, or absolute):',
+    qRoot: 'root branch (detection failed):',
+    planTitle: 'plan:',
     planDeleteOld: (p) => `delete ${p}/ (previous backup)`,
     planRotate: (a, b) => `move ${a}/ -> ${b}/`,
     planCreate: (p) => `create ${p}/`,
     planRules: (tpl, from, to) => `write rules from templates/shapes/${tpl}${from !== to ? ` (root ${from} -> ${to})` : ''}`,
-    planHooks: (names) => `write hooks/post-create (${names})`,
+    planHooks: (kinds, names) => `write hooks/ ${kinds} (${names})`,
     planSettings: (v) => `write settings (worktree-dir = ${v})`,
     planSettingsKeep: 'keep the existing settings',
     planLoad: (ws) => `apply the policy: wtree init --load ${ws}`,
     planCopyHooks: (n) => `copy ${n} hook file(s) into the repo policy`,
     planSkipHooks: 'hooks: not copied',
     planClaude: (p) => `place CLAUDE.md in ${p}/`,
-    qConfirm: 'proceed?',
+    qConfirm: 'proceed',
     cApply: 'apply',
     cCancel: 'cancel',
     doneCreate: 'workspace created:',
-    adoptNote: (ws) => `adopting ${ws} as-is — nothing will be created or modified in this pane.`,
-    hookWarnTitle: 'CAUTION — hooks are executable code',
+    adoptNote: (ws) => `adopt: ${ws} — applying in this pane`,
+    hookWarnTitle: 'CAUTION: hooks are executable code',
     hookWarnBody: (files) => [
-      'A post-create hook runs as shell code on every worktree creation.',
-      `File(s): ${files.join(', ')}`,
-      'Copy them into the repo policy only if you trust what they do.',
+      'a hook runs as shell code on wtree verbs (worktree create/merge/destroy)',
+      `file(s): ${files.join(', ')}`,
+      'copy only if you trust what they do',
     ],
-    hookVerdictLine: (v) => `agent review verdict: ${v}`,
-    hookVerdictYes: 'copy (--hooks yes)',
-    hookVerdictNo: 'do not copy (--hooks no)',
-    hookComposedNote: 'these hooks were assembled from your answers in the setup pane.',
-    qHookCopy: 'copy the hooks into the repo policy?',
-    hookNo: 'no — leave them out',
-    hookYes: 'yes — copy them',
-    applyDone: 'policy applied.',
-    applyFailed: 'apply failed — nothing was applied:',
-    blockedTitle: 'setup cannot proceed:',
-    cancelledNote: 'cancelled — nothing was changed in this run.',
-    doneCollectNote: 'Done here. Tell the agent this pane is finished — the review continues in the conversation.',
-    doneAdoptNote: 'Done here. Tell the agent this pane is finished — the review continues in the conversation.',
-    doneApplyNote: 'All applied. Tell the agent this pane is finished.',
-    pressKey: 'press any key to close this pane',
-    needTty: 'wtree TUI needs a terminal — fall back to the step scripts (step1.mjs)\n',
+    hookComposedNote: 'hooks assembled from the answers in this setup',
+    qHookCopy: 'copy hooks into the repo policy',
+    hookNo: 'do not copy',
+    hookYes: 'copy',
+    applyDone: 'policy applied',
+    applyFailed: 'apply failed — nothing changed:',
+    blockedTitle: 'setup blocked:',
+    cancelledNote: 'cancelled — nothing changed',
+    doneCollectNote: 'pane done — tell the agent; the review continues in the conversation',
+    doneApplyNote: 'applied — tell the agent to wrap up',
+    pressKey: 'any key: close pane',
+    needTty: 'wtree TUI needs a terminal — use the step scripts (step1.mjs)\n',
   },
   ko: {
     title: 'wtree 정책 셋업',
@@ -108,67 +100,59 @@ const L = {
     rootUnknown: '감지 실패',
     sharedLabel: '공유 .wtree/',
     sharedNone: '없음',
-    foundExisting: (d, c) => `이 repo 에는 이미 정책이 있다: ${d} (${c})`,
-    qDisposal: '기존 정책을 어떻게 할까?',
+    foundExisting: (d, c) => `기존 정책 발견: ${d} (${c})`,
+    qDisposal: '기존 정책 처리',
     dAdopt: '채택',
-    dAdoptNote: '그대로 쓴다',
+    dAdoptNote: '그대로 사용',
     dRebuild: '재구성',
-    dRebuildNote: '.old 로 밀어두고 새로 짠다',
-    dKeep: '보존',
-    dKeepNote: '건드리지 않고 다른 곳에 짠다',
+    dRebuildNote: '.old 로 백업 후 새로 구성',
     dRepath: '다른 경로',
-    qPath: '작업장 경로 — 정책은 먼저 여기서 조립된다:',
-    pathNotWorkspace: (p) => `${p} 는 이미 있고 정책 작업장이 아니다 — 새 경로를 골라달라.`,
-    qPathWorkspace: (p) => `${p} 는 이미 정책 작업장이다 — 어떻게 할까?`,
+    qPath: '작업장 경로 (정책 조립 위치):',
+    pathNotWorkspace: (p) => `사용 불가 경로: ${p} — 이미 존재하며 정책 작업장이 아님`,
+    qPathWorkspace: (p) => `기존 정책 작업장: ${p}`,
     qShape: '브랜치 셰이프',
-    customNote: 'rules 를 처음부터 짠다 (이 pane 이후 에이전트와 함께)',
-    qHooks: 'post-create 훅',
-    multiHint: '(enter/space 로 항목을 켜고 끈다)',
-    multiSubmit: '선택 확정',
-    inputRequired: '값이 필요하다 — 취소는 Esc',
-    qWhere: '워크트리를 어디에 둘까?',
-    whereBeside: (n) => `repo 옆 — ../${n}`,
-    whereInside: (n) => `repo 안 — ./${n}`,
-    qRoot: '루트 브랜치 이름 (감지 실패):',
-    planTitle: '이제 이렇게 한다:',
+    customNote: 'rules 직접 작성 (pane 종료 후 에이전트와 진행)',
+    qHooks: 'wtree 훅',
+    multiHint: '(enter/space: 토글)',
+    multiSubmit: '선택 완료',
+    inputRequired: '값 필요 — Esc 는 셋업 취소',
+    qWtdir: '워크트리 폴더 (repo 루트 기준 상대 또는 절대):',
+    qRoot: '루트 브랜치 (감지 실패):',
+    planTitle: '실행 계획:',
     planDeleteOld: (p) => `${p}/ 삭제 (이전 백업)`,
     planRotate: (a, b) => `${a}/ 를 ${b}/ 로 이동`,
     planCreate: (p) => `${p}/ 생성`,
     planRules: (tpl, from, to) => `templates/shapes/${tpl} 로 rules 작성${from !== to ? ` (루트 ${from} -> ${to})` : ''}`,
-    planHooks: (names) => `hooks/post-create 작성 (${names})`,
+    planHooks: (kinds, names) => `hooks/ ${kinds} 작성 (${names})`,
     planSettings: (v) => `settings 작성 (worktree-dir = ${v})`,
     planSettingsKeep: '기존 settings 유지',
     planLoad: (ws) => `정책 적용: wtree init --load ${ws}`,
     planCopyHooks: (n) => `훅 파일 ${n}개를 repo 정책으로 복사`,
     planSkipHooks: '훅: 복사하지 않음',
     planClaude: (p) => `${p}/ 에 CLAUDE.md 배치`,
-    qConfirm: '진행할까?',
+    qConfirm: '진행',
     cApply: '적용',
     cCancel: '취소',
-    doneCreate: '작업장을 만들었다:',
-    adoptNote: (ws) => `${ws} 를 그대로 채택한다 — 이 pane 에서는 아무것도 만들거나 고치지 않는다.`,
-    hookWarnTitle: '주의 — 훅은 실행 코드다',
+    doneCreate: '작업장 생성 완료:',
+    adoptNote: (ws) => `채택: ${ws} — 이 pane 에서 바로 적용`,
+    hookWarnTitle: '주의: 훅은 실행 코드',
     hookWarnBody: (files) => [
-      'post-create 훅은 워크트리를 만들 때마다 셸 코드로 실행된다.',
+      '훅은 wtree 동사(워크트리 생성/병합/삭제) 때 셸로 실행됨',
       `파일: ${files.join(', ')}`,
-      '무엇을 하는지 신뢰할 수 있을 때만 repo 정책으로 복사한다.',
+      '내용을 신뢰할 수 있을 때만 복사',
     ],
-    hookVerdictLine: (v) => `에이전트 검토 판정: ${v}`,
-    hookVerdictYes: '복사 (--hooks yes)',
-    hookVerdictNo: '복사 안 함 (--hooks no)',
-    hookComposedNote: '이 훅은 셋업 pane 에서 사용자의 답으로 조립됐다.',
-    qHookCopy: '훅을 repo 정책으로 복사할까?',
-    hookNo: '아니오 — 빼고 간다',
-    hookYes: '예 — 복사한다',
-    applyDone: '정책을 적용했다.',
-    applyFailed: '적용 실패 — 아무것도 반영되지 않았다:',
-    blockedTitle: '셋업을 진행할 수 없다:',
-    cancelledNote: '취소됨 — 이번 실행에서 바뀐 것은 없다.',
-    doneCollectNote: '여기서는 끝. 에이전트에게 이 pane 이 끝났다고 알려달라 — 검토는 대화에서 이어진다.',
-    doneAdoptNote: '여기서는 끝. 에이전트에게 이 pane 이 끝났다고 알려달라 — 검토는 대화에서 이어진다.',
-    doneApplyNote: '전부 적용됐다. 에이전트에게 이 pane 이 끝났다고 알려달라.',
-    pressKey: '아무 키나 누르면 이 pane 이 닫힌다',
-    needTty: 'wtree TUI 는 터미널이 필요하다 — step 스크립트(step1.mjs)로 폴백하라\n',
+    hookComposedNote: '이 셋업의 답변으로 조립된 훅',
+    qHookCopy: '훅을 repo 정책으로 복사',
+    hookNo: '복사 안 함',
+    hookYes: '복사',
+    applyDone: '정책 적용 완료',
+    applyFailed: '적용 실패 — 변경 없음:',
+    blockedTitle: '셋업 불가:',
+    cancelledNote: '취소됨 — 변경 없음',
+    doneCollectNote: 'pane 작업 완료 — 에이전트에게 알리면 검토가 대화에서 이어짐',
+    doneApplyNote: '적용 완료 — 에이전트에게 알리면 셋업이 마무리됨',
+    pressKey: '아무 키: pane 닫기',
+    needTty: 'wtree TUI: 터미널 필요 — step 스크립트(step1.mjs) 사용\n',
   },
 };
 
@@ -176,7 +160,7 @@ const L = {
 function usage() {
   process.stderr.write(
     'usage: tui.mjs [--ko]\n' +
-      '       tui.mjs apply --path <workspace> [--hooks yes|no|composed] [--where ../|./] [--ko]\n',
+      '       tui.mjs apply --path <workspace> [--hooks composed] [--ko]\n',
   );
   process.exit(2);
 }
@@ -196,15 +180,13 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === 'apply' && phase === 'collect') phase = 'apply';
   else if (a === '--path') opts.path = value();
   else if (a === '--hooks') opts.hooks = value();
-  else if (a === '--where') opts.where = value();
   else usage();
 }
 if (phase === 'apply' && !opts.path) usage();
-if (phase === 'collect' && ('path' in opts || 'hooks' in opts || 'where' in opts)) usage();
+if (phase === 'collect' && ('path' in opts || 'hooks' in opts)) usage();
 // composed 는 collect pane 이 넘긴다 — 훅이 사용자 답으로 조립됐다는 표식으로,
-// 에이전트 판정(yes|no)과 구분해 apply 의 더블 체크 초기값을 정한다.
-if ('hooks' in opts && !['yes', 'no', 'composed'].includes(opts.hooks)) usage();
-if ('where' in opts && opts.where !== '../' && opts.where !== './') usage();
+// apply 의 복사 더블 체크가 '복사'에서 시작한다.
+if ('hooks' in opts && opts.hooks !== 'composed') usage();
 setKo(ko);
 const lang = ko ? 'ko' : 'en';
 const t = L[lang];
@@ -241,16 +223,18 @@ function banner(gate, facts, title) {
   println('');
 }
 
-async function askWhere(facts) {
-  const wn = `${basename(facts.primary)}.worktrees`;
-  const wi = await select({
-    message: t.qWhere,
-    items: [
-      { label: '../', note: t.whereBeside(wn) },
-      { label: './', note: t.whereInside(wn) },
-    ],
-  });
-  return wi === null ? null : wi === 0 ? '../' : './';
+// worktree-dir 값을 받는다 — 제안값(../<repo>.worktrees)을 버퍼에 미리 채워
+// 그 자리에서 고쳐 쓴다. repo 폴더명이 곧 원하는 이름이 아닐 수 있어서다.
+async function askWtdir(facts) {
+  for (;;) {
+    const v = await input({
+      message: t.qWtdir,
+      def: `../${basename(facts.primary)}.worktrees`,
+      prefill: true,
+    });
+    if (v === null || v) return v;
+    println(paint.red(t.inputRequired));
+  }
 }
 
 // 새 작업장 경로를 받는다. 반환: 경로 문자열(없는 경로 또는 재구성할 기존
@@ -279,7 +263,6 @@ async function askFreshPath(def) {
   }
 }
 
-const verdictArg = ' --hooks <yes|no — your verdict from the hook review>';
 const koArg = () => (ko ? ' --ko' : '');
 
 async function collectPhase(gate, facts) {
@@ -294,23 +277,22 @@ async function collectPhase(gate, facts) {
       items: [
         { label: t.dAdopt, note: t.dAdoptNote },
         { label: t.dRebuild, note: t.dRebuildNote },
-        { label: t.dKeep, note: t.dKeepNote },
       ],
     });
     if (d === null) return cancelled();
     if (d === 0) return adoptFlow(facts, facts.dotwtree);
-    if (d === 1) ws = facts.dotwtree;
-    else {
-      const p = await askFreshPath('/tmp/wtree-setup');
+    ws = facts.dotwtree;
+  } else {
+    // 기존 정책이 없으면 경로를 묻지 않는다 — 기본 위치 .wtree 로 바로 간다.
+    // (그 자리에 정책 작업장이 아닌 무언가가 이미 있을 때만 새 경로를 묻는다.)
+    ws = join(facts.toplevel, '.wtree');
+    if (existsSync(ws) && !(isFile(join(ws, 'rules')) || isFile(join(ws, 'settings')))) {
+      println(paint.red(t.pathNotWorkspace(ws)));
+      const p = await askFreshPath('.wtree');
       if (p === null) return cancelled();
       if (typeof p === 'object') return adoptFlow(facts, p.adopt);
       ws = p;
     }
-  } else {
-    const p = await askFreshPath('.wtree');
-    if (p === null) return cancelled();
-    if (typeof p === 'object') return adoptFlow(facts, p.adopt);
-    ws = p;
   }
 
   const shapeItems = facts.shapes
@@ -365,8 +347,8 @@ async function collectPhase(gate, facts) {
     }
   }
 
-  const where = await askWhere(facts);
-  if (where === null) return cancelled();
+  const wtdir = await askWtdir(facts);
+  if (wtdir === null) return cancelled();
 
   let root;
   if (shapeTpl && !facts.detRoot)
@@ -377,7 +359,7 @@ async function collectPhase(gate, facts) {
 
   // ---- 확정 화면: 계획을 보여주고 나서야 파일시스템이 변한다 ----
   const steps = planStep1(
-    { ws, shapeTpl, root, hooks, hookAnswers, where },
+    { ws, shapeTpl, root, hooks, hookAnswers, wtdir },
     { detRoot: facts.detRoot, hookTpls: facts.hookTpls, primary: facts.primary },
   );
   println('');
@@ -388,8 +370,8 @@ async function collectPhase(gate, facts) {
       : s.kind === 'rotate' ? t.planRotate(s.ws, s.old)
       : s.kind === 'create' ? t.planCreate(s.ws)
       : s.kind === 'rules' ? t.planRules(s.tpl.name, s.tplRoot, s.effRoot)
-      : s.kind === 'hooks' ? t.planHooks(s.chosen.map((x) => x.name).join(' + '))
-      : t.planSettings(`${s.where}${basename(s.primary)}.worktrees`);
+      : s.kind === 'hooks' ? t.planHooks(Object.keys(s.files).join(', '), s.chosen.map((x) => x.name).join(' + '))
+      : t.planSettings(s.value);
     println(`  - ${line}`);
   }
   println('');
@@ -418,79 +400,43 @@ async function collectPhase(gate, facts) {
   await closePane(0);
 }
 
+// 기존 작업장 채택 — 이관 없이 이 pane 에서 곧바로 적용까지 간다. 훅 파일의
+// 위험성 검토는 pane 을 열기 전 에이전트 몫이다 (SKILL 지시).
 async function adoptFlow(facts, ws) {
-  const hooksDir = join(ws, 'hooks');
-  const hookFiles = isDir(hooksDir)
-    ? readdirSync(hooksDir).sort().filter((f) => isFile(join(hooksDir, f)))
-    : [];
-  const hasSettings = isFile(join(ws, 'settings'));
-
   println('');
   println(t.adoptNote(ws));
   println('');
-
-  let where = null;
-  if (!hasSettings) {
-    where = await askWhere(facts);
-    if (where === null) return cancelled();
-  }
-
-  const before = [render('frag-before-review', { RULES: join(ws, 'rules') }).trimEnd()];
-  if (hookFiles.length) before.push(render('frag-tui-hooks', {}).trimEnd());
-  const alertBlock = hookFiles.length
-    ? render('frag-tui-hook-alert', { HOOK_FILES: hookFiles.map((f) => join(hooksDir, f)).join(' ') })
-    : '';
-  const args = (hookFiles.length ? verdictArg : '') + (where ? ` --where ${where}` : '') + koArg();
-  const next = render('frag-tui-next', { TUI: SELF, WS: ws, ARGS: args, HANDOFF: handoffPath }).trimEnd();
-  writeHandoff(render('tui-adopted', { WS: ws, BEFORE: before.join('\n'), ALERT_BLOCK: alertBlock, NEXT: next }));
-
-  println(t.doneAdoptNote);
-  await closePane(0);
+  await applyWorkspace(facts, ws, {});
 }
 
-async function applyPhase(gate, facts) {
-  const ws = resolve(opts.path);
-  const bad = async (problem) => {
-    writeHandoff(render('step2-bad', { PROBLEM: problem }));
-    println(paint.red(`${t.applyFailed}`));
-    println(paint.red(`  ${problem}`));
-    await closePane(1);
-  };
-  if (!existsSync(ws)) return bad(`${ws} does not exist — with no workspace, start from step 1`);
-  if (!isDir(ws)) return bad(`${ws} is not a directory`);
-  if (!isFile(join(ws, 'rules'))) return bad(`${ws}/rules is missing — a custom shape needs its rules written`);
-
-  banner(gate, facts, t.applyTitle);
-  println(paint.dim(`  workspace: ${ws}`));
-  println('');
-
+// 작업장을 repo 정책으로 적용하는 공통 흐름 — 채택(수집 pane 안 즉시 적용)과
+// apply 국면(조립 경로의 두 번째 pane)이 공유한다. 여기서 pane 이 끝난다.
+async function applyWorkspace(facts, ws, { composed = false }) {
   const wsHooks = join(ws, 'hooks');
   const hookFiles = isDir(wsHooks)
     ? readdirSync(wsHooks).sort().filter((f) => isFile(join(wsHooks, f)))
     : [];
   const hasSettings = isFile(join(ws, 'settings'));
 
-  let where = opts.where ?? null;
-  if (!hasSettings && !where) {
-    where = await askWhere(facts);
-    if (where === null) return cancelled();
+  let wtdir = null;
+  if (!hasSettings) {
+    wtdir = await askWtdir(facts);
+    if (wtdir === null) return cancelled();
   }
 
   let copyHooks = false;
   if (hookFiles.length) {
     println(paint.redBold(t.hookWarnTitle));
     for (const line of t.hookWarnBody(hookFiles.map((f) => join(wsHooks, f)))) println(paint.red(`  ${line}`));
-    if (opts.hooks === 'composed') println(`  ${t.hookComposedNote}`);
-    else if (opts.hooks)
-      println(`  ${t.hookVerdictLine(opts.hooks === 'yes' ? t.hookVerdictYes : t.hookVerdictNo)}`);
+    if (composed) println(`  ${t.hookComposedNote}`);
     println('');
     // 경고를 읽기 전의 반사적 Enter 를 막는 0.5초 — 그 사이의 키는 버려진다.
     // 초기값이 "복사"로 시작하는 것은 사용자 본인이 pane 에서 조립한 훅뿐이다 —
-    // adopt 경로의 에이전트 판정(yes)은 이 더블 체크가 견제하는 대상이라 안 미리 고른다.
+    // 채택되는 기존 훅은 남의 코드일 수 있어 '복사 안 함'에서 시작한다.
     const hi = await select({
       message: t.qHookCopy,
       items: [{ label: t.hookNo }, { label: t.hookYes }],
-      initial: opts.hooks === 'composed' ? 1 : 0,
+      initial: composed ? 1 : 0,
       danger: true,
       delayMs: 500,
     });
@@ -501,9 +447,9 @@ async function applyPhase(gate, facts) {
 
   const wtDir = hasSettings
     ? worktreeDirOf(join(ws, 'settings'), facts.primary)
-    : resolve(facts.primary, `${where}${basename(facts.primary)}.worktrees`);
+    : resolve(facts.primary, wtdir);
   println(paint.bold(t.planTitle));
-  if (!hasSettings) println(`  - ${t.planSettings(`${where}${basename(facts.primary)}.worktrees`)}`);
+  if (!hasSettings) println(`  - ${t.planSettings(wtdir)}`);
   else println(`  - ${t.planSettingsKeep}`);
   println(`  - ${t.planLoad(ws)}`);
   if (hookFiles.length) println(`  - ${copyHooks ? t.planCopyHooks(hookFiles.length) : t.planSkipHooks}`);
@@ -514,7 +460,7 @@ async function applyPhase(gate, facts) {
   if (c === null || c === 1) return cancelled();
 
   const result = executeStep2(
-    { ws, copyHooks, where: where ?? undefined, whereProvided: Boolean(where) },
+    { ws, copyHooks, wtdir: wtdir ?? undefined, whereProvided: Boolean(wtdir) },
     { primary: facts.primary, toplevel: facts.toplevel },
   );
   if (!result.ok) {
@@ -533,6 +479,24 @@ async function applyPhase(gate, facts) {
   println('');
   println(t.doneApplyNote);
   await closePane(0);
+}
+
+async function applyPhase(gate, facts) {
+  const ws = resolve(opts.path);
+  const bad = async (problem) => {
+    writeHandoff(render('step2-bad', { PROBLEM: problem }));
+    println(paint.red(`${t.applyFailed}`));
+    println(paint.red(`  ${problem}`));
+    await closePane(1);
+  };
+  if (!existsSync(ws)) return bad(`${ws} does not exist — with no workspace, start from step 1`);
+  if (!isDir(ws)) return bad(`${ws} is not a directory`);
+  if (!isFile(join(ws, 'rules'))) return bad(`${ws}/rules is missing — a custom shape needs its rules written`);
+
+  banner(gate, facts, t.applyTitle);
+  println(paint.dim(`  workspace: ${ws}`));
+  println('');
+  await applyWorkspace(facts, ws, { composed: opts.hooks === 'composed' });
 }
 
 // ---- 진입 -------------------------------------------------------------------

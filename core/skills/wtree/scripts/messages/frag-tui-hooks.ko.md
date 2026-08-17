@@ -1,1 +1,0 @@
-- 아래 apply 명령의 훅 판정을 정한다: `--hooks yes`(repo 정책으로 복사 제안) 또는 `--hooks no`. 어느 쪽이든 사용자가 apply pane 에서 더블 체크한다.

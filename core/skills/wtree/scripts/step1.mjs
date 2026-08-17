@@ -212,7 +212,7 @@ run(() => {
   if (a.branch_shape === 'custom')
     before.push(render('frag-before-custom', { WS: ws, VOCAB: join(SKILL_DIR, 'vocabulary.md') }).trimEnd());
   if (chosenCount)
-    before.push(render('frag-before-hooks', { HOOK_PATH: join(ws, 'hooks', 'post-create') }).trimEnd());
+    before.push(render('frag-before-hooks', { HOOK_PATH: join(ws, 'hooks') }).trimEnd());
   before.push(render('frag-before-review', { RULES: join(ws, 'rules') }).trimEnd());
 
   const step2Answer = { path: ws, ...(chosenCount ? { copy_hooks: true } : {}) };

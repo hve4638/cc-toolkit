@@ -103,9 +103,12 @@ export function dropSection(text, name) {
 }
 
 // ---- 훅 조립 ----------------------------------------------------------------
-// 훅 템플릿은 {KEY} 슬롯을 둔 골격(post-create)과 슬롯별 경우의 수를 선언한
-// options.json 으로 온다. 조립은 여기서만 일어난다 — TUI 는 답만 모으고,
-// 답이 없는 슬롯은 스펙의 기본(첫 case / default)으로 채워진다.
+// 훅 템플릿은 {KEY} 슬롯을 둔 골격(wtree 훅 6종 중 가진 파일들)과 슬롯별
+// 경우의 수를 선언한 options.json 으로 온다. 조립은 여기서만 일어난다 —
+// TUI 는 답만 모으고, 답이 없는 슬롯은 스펙의 기본(첫 case / default)으로
+// 채워진다. options 는 템플릿 전역이라 슬롯이 어느 파일에 있어도 된다.
+export const HOOK_KINDS = ['pre-create', 'post-create', 'pre-merge', 'post-merge', 'pre-destroy', 'post-destroy'];
+
 export function hookOptionsOf(tpl) {
   const p = join(tpl.dir, 'options.json');
   return isFile(p) ? JSON.parse(readFileSync(p, 'utf8')).options : [];
@@ -115,6 +118,7 @@ export function hookOptionsOf(tpl) {
 export const shq = (v) => `'${String(v).replaceAll("'", `'\\''`)}'`;
 
 // answers[key]: select 는 case id (input 딸린 case 는 { id, value }), input 은 문자열.
+// 반환은 { 훅이름: 조립된 텍스트 } — 템플릿이 가진 훅 파일 전부를 조립한다.
 //
 // 치환은 블록을 전부 만든 뒤 골격 위 단일 패스로만 한다. 문자열 replaceAll 의
 // 대치 패턴($' $& $$)이 인용된 입력을 변형하지 않게 함수 대치를 쓰고, 삽입된
@@ -138,38 +142,63 @@ export function renderHook(tpl, answers = {}) {
       blocks[o.key] = o.template.replaceAll('{VALUE}', () => shq(v));
     }
   }
-  const skeleton = readFileSync(join(tpl.dir, 'post-create'), 'utf8');
+  const files = {};
   const used = new Set();
-  // ${WT_BRANCH} 같은 셸 확장은 슬롯이 아니다 — $ 없는 {KEY} 만 잡는다.
-  const text = skeleton.replace(/(?<!\$)\{([A-Z][A-Z0-9_]*)\}/g, (m, key) => {
-    if (!(key in blocks)) throw new Error(`hook ${tpl.name}: unfilled slot ${m}`);
-    used.add(key);
-    return blocks[key];
-  });
+  for (const kind of HOOK_KINDS) {
+    if (!isFile(join(tpl.dir, kind))) continue;
+    const skeleton = readFileSync(join(tpl.dir, kind), 'utf8');
+    // ${WTREE_BRANCH} 같은 셸 확장은 슬롯이 아니다 — $ 없는 {KEY} 만 잡는다.
+    const text = skeleton.replace(/(?<!\$)\{([A-Z][A-Z0-9_]*)\}/g, (m, key) => {
+      if (!(key in blocks)) throw new Error(`hook ${tpl.name}: unfilled slot ${m} in ${kind}`);
+      used.add(key);
+      return blocks[key];
+    });
+    files[kind] = text.replace(/\n{3,}/g, '\n\n').replace(/\n+$/, '\n');
+  }
+  if (!Object.keys(files).length) throw new Error(`hook ${tpl.name}: no hook file in template`);
   for (const key of Object.keys(blocks))
-    if (!used.has(key)) throw new Error(`hook ${tpl.name}: no slot {${key}} in post-create`);
-  return text.replace(/\n{3,}/g, '\n\n').replace(/\n+$/, '\n');
+    if (!used.has(key)) throw new Error(`hook ${tpl.name}: no slot {${key}} in any hook file`);
+  return files;
 }
 
-// 훅 기능 여러 개를 post-create 하나로 병합한다. 기능마다 서브셸로 격리해
-// 한 기능의 exit 0 가드가 다음 기능을 삼키지 않게 한다.
+// 훅 기능 여러 개를 훅 종류별 파일 하나씩으로 병합한다. 같은 종류에 여러
+// 기능이 오면 기능마다 서브셸로 격리해 한 기능의 exit 0 가드가 다음 기능을
+// 삼키지 않게 한다. 반환은 { 훅이름: 텍스트 }.
 export function mergeHooks(tpls, answersByName = {}) {
-  const rendered = tpls.map((t) => ({ name: t.name, text: renderHook(t, answersByName[t.name] || {}) }));
-  if (rendered.length === 1) return rendered[0].text;
-  const bodies = rendered.map((r) => {
-    const b = r.text.replace(/^#!.*\n/, '');
-    return `# === ${r.name} ===\n(\n${b.trimEnd()}\n)`;
-  });
-  return `#!/bin/sh\n# wtree post-create — merged by the /wtree setup (per-feature subshell isolation)\n\n${bodies.join('\n\n')}\n`;
+  const rendered = tpls.map((t) => ({ name: t.name, files: renderHook(t, answersByName[t.name] || {}) }));
+  const out = {};
+  for (const kind of HOOK_KINDS) {
+    const have = rendered.filter((r) => kind in r.files);
+    if (!have.length) continue;
+    if (have.length === 1) {
+      out[kind] = have[0].files[kind];
+      continue;
+    }
+    const bodies = have.map((r) => {
+      // $0 재호출(자기 파일을 다시 부르는 훅)은 병합하면 깨진다 — 재진입이
+      // 자기 절만이 아니라 뒤 절 전부를 다시 돌리기 때문. 조용한 오동작
+      // 대신 조립 시점에 거부한다.
+      if (r.files[kind].includes('$0'))
+        throw new Error(
+          `hook ${r.name}: ${kind} re-invokes $0 and cannot be merged with another feature's ${kind}`,
+        );
+      const b = r.files[kind].replace(/^#!.*\n/, '');
+      return `# === ${r.name} ===\n(\n${b.trimEnd()}\n)`;
+    });
+    out[kind] = `#!/bin/sh\n# wtree ${kind} — merged by the /wtree setup (per-feature subshell isolation)\n\n${bodies.join('\n\n')}\n`;
+  }
+  return out;
 }
 
-export const settingsBody = (where, primary) =>
-  `# wtree machine-local settings — written by the /wtree setup\nworktree-dir = ${where}${basename(primary)}.worktrees\n`;
+export const settingsBody = (wtdir) =>
+  `# wtree machine-local settings — written by the /wtree setup\nworktree-dir = ${wtdir}\n`;
 
 // ---- step1 계획/실행 --------------------------------------------------------
 // 계획은 구조화된 단계 목록이다: TUI 가 확정 화면에 자기 말로 렌더할 수 있게
 // 하고, 실행은 이 목록만 따라가므로 보여준 것과 하는 것이 어긋날 수 없다.
-export function planStep1({ ws, shapeTpl, root, drop, hooks, hookAnswers, where }, { detRoot, hookTpls, primary }) {
+// worktree-dir 값은 두 형태로 온다: 폼(동결)은 where 접두어('../'|'./')를 주고
+// 이름은 <repo>.worktrees 로 고정, TUI 는 wtdir 로 완성된 값을 준다.
+export function planStep1({ ws, shapeTpl, root, drop, hooks, hookAnswers, where, wtdir }, { detRoot, hookTpls, primary }) {
   const steps = [];
   if (existsSync(ws)) {
     const old = ws + '.old';
@@ -185,8 +214,8 @@ export function planStep1({ ws, shapeTpl, root, drop, hooks, hookAnswers, where 
   // 훅도 plan 시점에 끝까지 렌더한다 — rules 의 선례처럼, 조립 실패가
   // rotate/create 뒤가 아니라 어떤 파일시스템 변경보다 먼저 터지게.
   const chosen = (hooks || []).map((h) => hookTpls.find((t) => t.name === h));
-  if (chosen.length) steps.push({ kind: 'hooks', ws, chosen, text: mergeHooks(chosen, hookAnswers || {}) });
-  steps.push({ kind: 'settings', ws, where, primary });
+  if (chosen.length) steps.push({ kind: 'hooks', ws, chosen, files: mergeHooks(chosen, hookAnswers || {}) });
+  steps.push({ kind: 'settings', ws, value: wtdir || `${where}${basename(primary)}.worktrees` });
   return steps;
 }
 
@@ -222,16 +251,14 @@ export function executeStep1(steps) {
       }
       case 'hooks':
         mkdirSync(join(s.ws, 'hooks'));
-        writeFileSync(join(s.ws, 'hooks', 'post-create'), s.text);
+        for (const [kind, text] of Object.entries(s.files)) writeFileSync(join(s.ws, 'hooks', kind), text);
         actions.push(
-          `- created: ${join(s.ws, 'hooks', 'post-create')} (${s.chosen.map((t) => t.name).join(' + ')}${s.chosen.length > 1 ? ' merged' : ''})`,
+          `- created: ${join(s.ws, 'hooks')}/ ${Object.keys(s.files).join(', ')} (${s.chosen.map((t) => t.name).join(' + ')}${s.chosen.length > 1 ? ' merged' : ''})`,
         );
         break;
       case 'settings':
-        writeFileSync(join(s.ws, 'settings'), settingsBody(s.where, s.primary));
-        actions.push(
-          `- created: ${join(s.ws, 'settings')} (worktree-dir = ${s.where}${basename(s.primary)}.worktrees)`,
-        );
+        writeFileSync(join(s.ws, 'settings'), settingsBody(s.value));
+        actions.push(`- created: ${join(s.ws, 'settings')} (worktree-dir = ${s.value})`);
         break;
     }
   }
@@ -242,7 +269,7 @@ export function executeStep1(steps) {
 // 훅 `sh -n` 선검사 → settings 보완 → wtree init --load → 훅 복사 → 워크트리
 // 폴더 CLAUDE.md. 실패는 페이지 이름+값으로 알린다 — 렌더는 호출자의 몫이다
 // (폼은 stdout 으로, TUI 는 화면과 handoff 파일로).
-export function executeStep2({ ws, copyHooks, where, whereProvided }, { primary, toplevel }) {
+export function executeStep2({ ws, copyHooks, where, wtdir, whereProvided }, { primary, toplevel }) {
   const wsHooks = join(ws, 'hooks');
   const hookFiles = isDir(wsHooks)
     ? readdirSync(wsHooks).sort().filter((f) => isFile(join(wsHooks, f)))
@@ -261,8 +288,9 @@ export function executeStep2({ ws, copyHooks, where, whereProvided }, { primary,
   const wsSettings = join(ws, 'settings');
   const hasSettings = isFile(wsSettings);
   if (!hasSettings) {
-    writeFileSync(wsSettings, settingsBody(where, primary));
-    actions.push(`- created: ${wsSettings} (worktree-dir = ${where}${basename(primary)}.worktrees)`);
+    const value = wtdir || `${where}${basename(primary)}.worktrees`;
+    writeFileSync(wsSettings, settingsBody(value));
+    actions.push(`- created: ${wsSettings} (worktree-dir = ${value})`);
   } else if (whereProvided) {
     actions.push(`- kept: ${wsSettings} already exists, so the where value was ignored`);
   }

@@ -10,10 +10,10 @@ repo 에 정책 기반 워크트리 관리를 셋업하는 스킬. `/wtree` 로 
 
 두 국면으로 나뉜다:
 
-- **무동사(collect)** — 게이트·사실 수집 후 질문(기존 정책 처분 / 작업장 경로 / 셰이프 / 훅 / where / 감지 실패 시 root)을 받고, 변경 직전 계획을 한 화면으로 확정받은 뒤 step1 의 결정적 동작(회전·생성·셰이프 반영·훅 병합·settings)을 수행한다. 개입 구간(rules 검토, custom rules 작성, 훅 [조정]·판정)이 오면 handoff 를 쓰고 종료한다.
-- **apply** — 에이전트가 검토를 마친 뒤 두 번째 pane 으로 띄운다 (`apply --path <ws> [--hooks yes|no] [--where ../|./]`). `--hooks` 는 에이전트의 검토 판정이고, 훅이 있으면 붉은 경고 + 0.5초 지연(그 사이 키는 버려져 반사적 Enter 가 안 통한다) 뒤 기본 커서 '아니오'인 더블 체크를 사용자가 한다. 확정 후 step2 의 결정적 동작(sh -n 선검사 → settings 보완 → `wtree init --load` → 훅 복사 → CLAUDE.md)을 수행한다.
+- **무동사(collect)** — 게이트·사실 수집 후 질문(기존 정책 처분 / 셰이프 / 훅 선택 + 훅 조정 지점 / 워크트리 폴더 / 감지 실패 시 root)을 받고, 변경 직전 계획을 한 화면으로 확정받은 뒤 step1 의 결정적 동작(회전·생성·셰이프 반영·훅 조립·settings)을 수행한다. 작업장 경로는 묻지 않고 `<repo>/.wtree` 로 간다(그 자리에 작업장 아닌 것이 있을 때만 질문). 개입 구간(rules 검토, custom rules 작성)이 오면 handoff 를 쓰고 종료한다. 기존 작업장 **채택**은 handoff 없이 이 pane 에서 즉시 적용까지 간다.
+- **apply** — 에이전트가 검토를 마친 뒤 두 번째 pane 으로 띄운다 (`apply --path <ws> [--hooks composed]`). `--hooks composed` 는 collect pane 에서 사용자 답으로 조립된 훅이라는 표식으로 복사 더블 체크의 초기 커서만 '복사'로 바꾼다. 훅이 있으면 붉은 경고 + 0.5초 지연(그 사이 키는 버려져 반사적 Enter 가 안 통한다) 뒤 더블 체크를 사용자가 하고 — 조립 훅이 아니면 기본 커서는 '복사 안 함' — 확정 후 step2 의 결정적 동작(sh -n 선검사 → settings 보완 → `wtree init --load` → 훅 복사 → CLAUDE.md)을 수행한다.
 
-**handoff 계약**: exec pane 은 종료 즉시 사라져 stdout 이 에이전트에게 돌아가지 않으므로, TUI 는 매 종료 지점에서 `<git-common-dir>/wtree-setup-handoff.md` 를 쓴다. 내용은 폼 스크립트의 출력 페이지와 같은 태그 블록(`tui-done`/`tui-adopted`/`tui-cancelled`/`tui-failed`, apply 는 `step2-done` 등 기존 페이지 재사용)이라 에이전트 대면 프로토콜이 두 경로에서 갈라지지 않는다. 끝났다는 신호는 지금은 사용자가 대화로 직접 준다.
+**handoff 계약**: exec pane 은 종료 즉시 사라져 stdout 이 에이전트에게 돌아가지 않으므로, TUI 는 매 종료 지점에서 `<git-common-dir>/wtree-setup-handoff.md` 를 쓴다. 내용은 폼 스크립트의 출력 페이지와 같은 태그 블록(`tui-done`/`tui-cancelled`/`tui-failed`, 채택·apply 는 `step2-done` 등 기존 페이지 재사용)이라 에이전트 대면 프로토콜이 두 경로에서 갈라지지 않는다. 끝났다는 신호는 지금은 사용자가 대화로 직접 준다.
 
 TUI 화면 문구는 `tui.mjs` 안의 en/ko 상수 표다 — messages/ 페이지는 에이전트가 파싱하는 산문이고, 화면 문구는 커서·색과 함께 그려지는 조각이라 페이지가 되지 못한다. handoff 용 페이지는 messages/ 에 있다.
 
@@ -29,12 +29,12 @@ SKILL 본문은 "step1 을 실행하고 출력을 따르라"와 태그 시맨틱
 
 | 스크립트 | 동작 (완전한 answer 시) | answer 키 |
 |---|---|---|
-| `step1.mjs` | 작업장 생성 — path 회전(`.old` 백업, 이전 old 삭제) 또는 생성, 셰이프 rules 반영(루트 개명·`drop` 섹션 제거), 훅 병합(`post-create` 하나로, 복수 기능은 서브셸 격리), settings 기록. path 가 이미 유효한 작업장이면(채택) 무변화로 인정하고 step2 완성 명령을 handoff | `path`, `allow_overwrite`, `branch_shape`, `hooks`, `root`, `drop`, `where`, `copy_hooks`(채택 시) |
+| `step1.mjs` | 작업장 생성 — path 회전(`.old` 백업, 이전 old 삭제) 또는 생성, 셰이프 rules 반영(루트 개명·`drop` 섹션 제거), 훅 조립·병합(훅 종류별 파일 하나로, 같은 종류의 복수 기능은 서브셸 격리), settings 기록. path 가 이미 유효한 작업장이면(채택) 무변화로 인정하고 step2 완성 명령을 handoff | `path`, `allow_overwrite`, `branch_shape`, `hooks`, `root`, `drop`, `where`, `copy_hooks`(채택 시) |
 | `step2.mjs` | 적용 — 훅 `sh -n` 선검사 → settings 보완 → `wtree init --load` → 훅 복사(+실행 권한) → 워크트리 폴더 CLAUDE.md | `path`, `copy_hooks`, `where` |
 
 역할 경계: 파일시스템 조작은 전부 스크립트가 한다. 에이전트는 읽기·질문·그리고 생성과 적용 사이의 작업장 내용 편집(훅 [조정] 주석 확인, custom rules 작성, 기타 이탈 반영)만 한다. `.git/wtree/` 반영은 항상 적용 국면(step2 또는 TUI apply) 몫이다.
 
-기존 `.wtree` 발견 시 처분 3선택지(채택 / 폐기 재구성 / 보존 재구성)를 묻는다 — 폼에서는 step1 answer 인자로, TUI 에서는 select 로 표현된다. 훅 위험성 검토는 두 경로 모두 에이전트 몫이다: 폼은 `copy_hooks` 답으로, TUI 는 handoff 의 `--hooks` 판정 + 사용자 더블 체크로 이어진다. 작업장 기본이 repo 의 `.wtree/` 라 구성 결과가 곧 커밋 가능한 공유물이고, `wtree save` 단계는 따로 없다.
+기존 `.wtree` 발견 시 TUI 는 처분 2선택지(채택 / 재구성)를 묻고, 채택은 pane 안에서 즉시 적용까지 간다 — 훅 위험성 검토는 pane 을 열기 **전** 에이전트 몫이다(SKILL 지시: `.wtree/hooks` 가 있으면 먼저 읽고 경고). 폼(동결)은 종전대로 3선택지 answer 인자와 `copy_hooks` 검토를 유지한다. 작업장 기본이 repo 의 `.wtree/` 라 구성 결과가 곧 커밋 가능한 공유물이고, `wtree save` 단계는 따로 없다.
 
 TUI 의 drop(셰이프 섹션 제거)과 root 재지정 같은 이탈은 질문에 없다 — 개입 구간에서 에이전트가 작업장 파일 편집으로 반영한다(폼 경로는 answer 키 그대로).
 
@@ -44,7 +44,7 @@ TUI 의 drop(셰이프 섹션 제거)과 root 재지정 같은 이탈은 질문�
 
 `templates/shapes/<이름>/` — 브랜치명이 박힌 그대로 동작하는 rules + INFO.md. 디렉터리 하나가 선택지 하나이고, 목록 요약은 INFO.md 첫 줄이다(TUI select 의 note 로도 쓰인다). 템플릿 특정 이탈(prototype 제거 등)은 INFO.md 가 안내한다.
 
-`templates/hooks/<기능>/` — post-create 훅을 기능 단위로 담는다(현재 tmux-window 하나). 가장 흔한 선택이 박힌 동작하는 훅 + [조정] 주석 + INFO.md. 복수 선택 시 서브셸 격리로 병합한다.
+`templates/hooks/<기능>/` — wtree 훅을 기능 단위로 담는다(현재 tmux-window 하나). 기능 하나가 훅 종류별 파일 여럿(예: post-create + post-destroy)을 가질 수 있고, {KEY} 슬롯 골격 + options.json(조정 지점 선언) + INFO.md 로 구성된다. 같은 종류를 여러 기능이 가지면 서브셸 격리로 병합한다 — 단, `$0` 재호출 훅은 병합 거부.
 
 두 종류 모두 폴더 추가만으로 선택지가 늘어난다 — 스크립트는 고치지 않는다.
 
@@ -61,7 +61,7 @@ wtree/
 │   │   ├── main-work/          # rules + INFO.md
 │   │   └── main-dev-work/      # rules + INFO.md (실사용 rules 원본)
 │   └── hooks/
-│       └── tmux-window/        # post-create + INFO.md
+│       └── tmux-window/        # post-create + post-destroy + options.json + INFO.md
 └── scripts/
     ├── tui.mjs            # TUI (collect + apply 두 국면, 화면 문구 en/ko 상수)
     ├── step1.mjs          # 작업장 생성 폼 (폴백)

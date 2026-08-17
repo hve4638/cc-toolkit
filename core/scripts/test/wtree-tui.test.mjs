@@ -111,15 +111,11 @@ test('tui: handoff 페이지 전부가 엄격 치환을 통과한다 (en/ko)', (
   const script = `
 import { render, setKo } from ${JSON.stringify(join(SCRIPTS, 'lib', 'setuplib.mjs'))};
 const pages = () => {
-  const next = render('frag-tui-next', { TUI: '/t/tui.mjs', WS: '/w', ARGS: ' --hooks yes', HANDOFF: '/h.md' });
+  const next = render('frag-tui-next', { TUI: '/t/tui.mjs', WS: '/w', ARGS: ' --hooks composed', HANDOFF: '/h.md' });
   render('tui-done', { ACTIONS: '- a', BEFORE: '- b', NEXT: next });
-  const alert = render('frag-tui-hook-alert', { HOOK_FILES: '/w/hooks/post-create' });
-  render('tui-adopted', { WS: '/w', BEFORE: '- b', ALERT_BLOCK: alert, NEXT: next });
-  render('tui-adopted', { WS: '/w', BEFORE: '- b', ALERT_BLOCK: '', NEXT: next });
   render('tui-cancelled', { STEP1: '/t/step1.mjs' });
   render('tui-failed', { DETAIL: 'boom', STEP1: '/t/step1.mjs' });
   render('tui-started', { STEP1: '/t/step1.mjs' });
-  render('frag-tui-hooks', {});
 };
 pages();
 setKo(true);

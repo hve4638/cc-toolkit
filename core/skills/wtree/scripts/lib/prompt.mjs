@@ -252,47 +252,63 @@ export async function multiselect({ message, items, hint = '', submitLabel = 'su
 }
 
 /**
- * 한 줄 입력 — 빈 입력은 기본값, Esc 는 null (select 류와 같은 취소 계약).
- * npm init 의 `name: (dir)` 모양이되, readline 이 아니라 raw 키로 받는다 —
- * readline 은 Esc 를 구분해 주지 않는다.
+ * 한 줄 입력 — 커서 이동(←→, Home/End, Ctrl-A/E)과 중간 수정을 지원한다.
+ * Esc 는 null (select 류와 같은 취소 계약). def 는 힌트로 보였다가 빈 입력이면
+ * 값이 되고, prefill 이면 처음부터 버퍼에 채워져 그 자리에서 고쳐 쓴다
+ * (지우고 빈 채로 Enter 는 '' 반환 — 재질문은 호출자 몫).
+ * 값이 폭을 넘으면 커서 주변만 창으로 보인다 — 줄바꿈 좌표 산수를 피한다.
  */
-export function input({ message, def = '' }) {
-  const suffix = def ? ` ${paint.dim(`(${def})`)}` : '';
-  const plainHead = `? ${message}${def ? ` (${def})` : ''} `;
-  out.write(`${paint.green('?')} ${paint.bold(message)}${suffix} `);
+export function input({ message, def = '', prefill = false }) {
+  const hint = !prefill && def ? ` (${def})` : '';
+  const headW = displayWidth(`? ${message}${hint} `);
+  const headStr = `${paint.green('?')} ${paint.bold(message)}${hint ? ` ${paint.dim(`(${def})`)}` : ''} `;
 
   return withRaw(async () => {
-    let buf = '';
-    const collapse = (tail) => {
-      const rows = rowsOf(plainHead + buf);
-      if (rows > 1) out.write(`\x1b[${rows - 1}A`);
-      out.write(`\x1b[G\x1b[0J${tail}\n`);
+    const buf = prefill ? [...def] : [];
+    let pos = buf.length;
+    const width = (chars) => chars.reduce((w, c) => w + chWidth(c), 0);
+    const draw = () => {
+      const budget = Math.max(8, cols() - headW - 2);
+      let s = 0;
+      let w = width(buf.slice(0, pos));
+      while (w > budget) w -= chWidth(buf[s++]);
+      let e = pos;
+      let rest = budget - w;
+      while (e < buf.length && rest >= chWidth(buf[e])) rest -= chWidth(buf[e++]);
+      out.write(`\x1b[G\x1b[2K${headStr}${buf.slice(s, e).join('')}`);
+      out.write(`\x1b[${headW + width(buf.slice(s, pos)) + 1}G`);
     };
+    draw();
     for (;;) {
       const k = await nextKey();
       if (isCtrlC(k)) die130();
       if (k.name === 'return' || k.name === 'enter') {
-        const v = buf.trim() || def;
-        collapse(`${paint.green('✔')} ${paint.bold(message)} ${paint.cyan(v)}`);
+        const v = buf.join('').trim() || (prefill ? '' : def);
+        out.write(`\x1b[G\x1b[0J${paint.green('✔')} ${paint.bold(message)} ${paint.cyan(v)}\n`);
         return v;
-      }
-      if (k.name === 'escape') {
-        collapse(`${paint.red('✘')} ${paint.bold(message)}`);
+      } else if (k.name === 'escape') {
+        out.write(`\x1b[G\x1b[0J${paint.red('✘')} ${paint.bold(message)}\n`);
         return null;
-      }
-      if (k.name === 'backspace') {
-        if (buf) {
-          const w = chWidth(buf.at(-1));
-          buf = buf.slice(0, -1);
-          out.write('\b \b'.repeat(w === 2 ? 2 : 1));
+      } else if (k.name === 'left') {
+        if (pos > 0) pos--;
+      } else if (k.name === 'right') {
+        if (pos < buf.length) pos++;
+      } else if (k.name === 'home' || (k.ctrl && k.name === 'a')) {
+        pos = 0;
+      } else if (k.name === 'end' || (k.ctrl && k.name === 'e')) {
+        pos = buf.length;
+      } else if (k.name === 'backspace') {
+        if (pos > 0) buf.splice(--pos, 1);
+      } else if (k.name === 'delete') {
+        if (pos < buf.length) buf.splice(pos, 1);
+      } else {
+        const ch = k.sequence ?? '';
+        if (!k.ctrl && !k.meta && ch && ![...ch].some((c) => c < ' ' || c === '\x7f')) {
+          buf.splice(pos, 0, ...ch);
+          pos += [...ch].length;
         }
-        continue;
       }
-      const ch = k.sequence ?? '';
-      if (!k.ctrl && !k.meta && ch && ![...ch].some((c) => c < ' ' || c === '\x7f')) {
-        buf += ch;
-        out.write(ch);
-      }
+      draw();
     }
   });
 }

@@ -1,7 +1,7 @@
 #!/bin/sh
 # wtree post-create hook — opens a tmux window per new worktree.
-# Env: WT_PATH(worktree path) WT_BRANCH(branch) WT_PARENT(parent branch)
-#      WT_REPO(repo root) WT_INTERACTIVE(1 on a terminal run)
+# Env: WTREE_PATH(worktree path) WTREE_BRANCH(branch) WTREE_REPO(repo root)
+#      WTREE_INTERACTIVE(1 on a terminal run) WTREE_VERB(new|open)
 
 [ -n "${TMUX:-}" ] || exit 0   # outside tmux, do nothing
 
@@ -9,6 +9,6 @@
 
 {PREFIX}
 
-win=$(tmux new-window $detach -P -F '#{window_id}' -c "$WT_PATH" -n "${prefix}${WT_BRANCH}") || exit 0
+win=$(tmux new-window $detach -P -F '#{window_id}' -c "$WTREE_PATH" -n "${prefix}${WTREE_BRANCH}") || exit 0
 
 {COMMAND}

@@ -3,22 +3,22 @@
     {
       "key": "FOCUS",
       "type": "select",
-      "label": { "en": "focus — move to the new window?", "ko": "포커스 — 새 윈도우로 이동할까?" },
+      "label": { "en": "focus — move to the new window", "ko": "포커스 — 새 윈도우로 이동" },
       "cases": [
         {
           "id": "interactive",
           "label": { "en": "only on interactive runs", "ko": "interactive 실행일 때만" },
           "note": { "en": "wtree new typed in a terminal", "ko": "터미널에서 직접 친 wtree new" },
-          "code": "# focus: move only on interactive runs\ndetach=-d\n[ \"${WT_INTERACTIVE:-0}\" = 1 ] && detach="
+          "code": "# focus: move only on interactive runs\ndetach=-d\n[ \"${WTREE_INTERACTIVE:-0}\" = 1 ] && detach="
         },
         {
           "id": "always",
-          "label": { "en": "always", "ko": "항상 이동" },
+          "label": { "en": "always", "ko": "항상" },
           "code": "# focus: always move\ndetach="
         },
         {
           "id": "never",
-          "label": { "en": "never", "ko": "이동하지 않음" },
+          "label": { "en": "never", "ko": "안 함" },
           "code": "# focus: never move\ndetach=-d"
         }
       ]

@@ -1,0 +1,105 @@
+#!/bin/sh
+# wtree post-destroy hook — offers to close the tmux window stranded on the
+# destroyed worktree. Env: WTREE_PATH(deleted worktree path) WTREE_BRANCH
+# WTREE_REPO(repo root) WTREE_VERB(destroy|land)
+#
+# Re-invoked as `sh $0 --ask <window> <branch> <path>` inside the pane it
+# opens — a repo-local hook is a single file, so both halves live here. The
+# ask pane is spawned by the tmux server and sees no WTREE_* env, hence argv.
+#
+# On a cascade destroy this fires once per target; the first ask pane sits on
+# $WTREE_REPO, which fails the all-panes gate for every later target, so only
+# one prompt appears. Accidental but desirable — kept as the intended shape.
+
+# every pane of the window must sit on the vanished worktree path; a deleted
+# cwd is reported with a " (deleted)" suffix (proc cwd readlink).
+on_dead_path() {
+  case "$1" in
+    "$2" | "$2"/* | "$2 (deleted)" | "$2"/*" (deleted)") return 0 ;;
+  esac
+  return 1
+}
+
+if [ "${1:-}" = --ask ]; then
+  win=$2
+  branch=$3
+  path=$4
+  old=$(stty -g) || exit 0
+  cleanup() { trap - EXIT INT TERM; stty "$old" 2>/dev/null; printf '\033[?25h'; }
+  trap cleanup EXIT INT TERM
+  stty raw -echo
+  # drain type-ahead: a stray Enter aimed elsewhere must not answer this prompt
+  stty min 0 time 1
+  while [ -n "$(dd bs=1 count=1 2>/dev/null)" ]; do :; done
+  stty min 1 time 0
+  printf '\033[?25l'
+  esc=$(printf '\033')
+  cr=$(printf '\r')
+  sel=1
+  drawn=
+  draw() {
+    [ -n "$drawn" ] && printf '\033[3A'
+    printf '\r\033[2K\033[1;31mworktree destroyed: %s — close this window?\033[0m\r\n' "$branch"
+    if [ "$sel" = 0 ]; then
+      printf '\r\033[2K  \033[36m> close\033[0m\r\n'
+      printf '\r\033[2K    keep\r\n'
+    else
+      printf '\r\033[2K    close\r\n'
+      printf '\r\033[2K  \033[36m> keep\033[0m\r\n'
+    fi
+    drawn=1
+  }
+  # the gate re-run before the kill — the user may have moved a pane elsewhere
+  # while the prompt sat open. Excludes this ask pane itself.
+  still_stranded() {
+    panes=$(tmux list-panes -t "$win" -F '#{pane_id} #{pane_current_path}') || return 1
+    [ -n "$panes" ] || return 1
+    printf '%s\n' "$panes" | while IFS=' ' read -r id p; do
+      [ "$id" = "${TMUX_PANE:-}" ] && continue
+      on_dead_path "$p" "$path" || exit 1
+    done
+  }
+  while :; do
+    draw
+    k=$(dd bs=1 count=1 2>/dev/null)
+    if [ "$k" = "$esc" ]; then
+      k=$(dd bs=2 count=1 2>/dev/null)
+      case "$k" in
+        '[A') sel=0 ;;
+        '[B') sel=1 ;;
+      esac
+    elif [ "$k" = k ]; then sel=0
+    elif [ "$k" = j ]; then sel=1
+    elif [ "$k" = q ] || [ "$k" = n ]; then exit 0
+    elif [ "$k" = "$cr" ]; then
+      if [ "$sel" = 0 ] && still_stranded; then
+        cleanup
+        tmux kill-window -t "$win"
+      fi
+      exit 0
+    elif [ -z "$k" ]; then exit 0   # EOF or a bare LF — keep, never close blind
+    fi
+  done
+fi
+
+[ -n "${TMUX:-}" ] || exit 0   # outside tmux, do nothing
+# without the contract env the gate below would degenerate ("$WTREE_PATH"/* -> /*)
+[ -n "${WTREE_PATH:-}" ] && [ -n "${WTREE_REPO:-}" ] || exit 0
+
+# the window destroy ran in — from the invoking pane when known
+if [ -n "${TMUX_PANE:-}" ]; then
+  win=$(tmux display-message -p -t "$TMUX_PANE" '#{window_id}') || exit 0
+else
+  win=$(tmux display-message -p '#{window_id}') || exit 0
+fi
+
+# defensive gate, fail-closed: every pane of that window must sit on the
+# vanished worktree path — one pane elsewhere means the window still hosts
+# other work, and a failed or empty pane listing counts as "elsewhere".
+panes=$(tmux list-panes -t "$win" -F '#{pane_current_path}') || exit 0
+[ -n "$panes" ] || exit 0
+printf '%s\n' "$panes" | while IFS= read -r p; do
+  on_dead_path "$p" "$WTREE_PATH" || exit 1
+done || exit 0
+
+tmux split-window -t "$win" -l 5 -c "$WTREE_REPO" sh "$0" --ask "$win" "$WTREE_BRANCH" "$WTREE_PATH"
