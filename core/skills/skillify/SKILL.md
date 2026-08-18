@@ -22,31 +22,34 @@ The principles themselves (description, information hierarchy, pruning, local co
 
 ## Step 1. Interview (if needed)
 
-Ask all 6 questions in a single bundle (no split):
+Ask all 5 questions in a single bundle (no split):
 
 1. What does this skill do (one sentence)?
 2. When should it be invoked — trigger context?
-3. Invocation mode — explicit-only / auto-trigger / both?
-4. Which failure, inefficiency, or confusion does it prevent (WHY)?
-5. Storage location — project-local / global / plugin / common (`common/skills/`)?
-6. Is there an existing skill in a similar trigger category?
+3. Which failure, inefficiency, or confusion does it prevent (WHY)?
+4. Storage location — project-local / global / plugin?
+5. Is there an existing skill in a similar trigger category?
 
 ---
 
 ## Step 2. Name / slug decision
 
-Agree with the user.
+Agree with the user. The name is lowercase English and is the skill's **leading word** — the token the user types, the token the description front-loads, and the token the body repeats to anchor behaviour are all this one word.
 
-- kebab-case, ≤30 characters, English
-- If a family exists, use a prefix (`reflect-*`, `rule-*`)
-- Good: `git-rebase-no-edit-flag`, `man-banaction`
-- Bad: `general-tips`, `mistakes`, `learning-20260430`
+- Reach for a word the model already holds, so the name recruits that prior — `stage`, `interview`, `handoff`, `prototype`
+- Where no single word fits, coin a compound that still reads as one concept — `bughunt`, `memhome`, `pairtdd`
+
+What makes a leading word strong, and how to hunt for one: the Leading words section of [writing-great-skill](../writing-great-skill/SKILL.md).
 
 ---
 
 ## Step 3. Write SKILL.ko.md
 
 Apply every section of [writing-great-skill](../writing-great-skill/SKILL.md) and save the Korean draft to `<location>/<slug>/SKILL.ko.md`.
+
+Invocation mode is decided here: default to user-invoked, and take model-invocation only where the Invocation section of [writing-great-skill](../writing-great-skill/SKILL.md) calls for it.
+
+Where the procedure is deterministic — file operations, settings, checkable state transitions — build it as step scripts by [skillify-stepform](../skillify-stepform/SKILL.md) instead of body prose.
 
 ---
 
@@ -73,24 +76,13 @@ Report the slug, location, and a one-line description summary to the user.
 
 ## Empty case
 
-If a skill in the same trigger category already exists, recommend adding rules to the existing skill rather than creating a new one (confirmed in Step 1 question 6).
-
----
-
-## Heavy case
-
-Recommend invoking the plugin `skill-creator` if the skill matches:
-
-- Multiple outputs + variability (output form changes substantially with input)
-- Evaluation automation needed (eval/benchmark)
-- Deeply coupled with external tools or environments
+If a skill in the same trigger category already exists, recommend adding rules to the existing skill rather than creating a new one (confirmed in Step 1 question 5).
 
 ---
 
 ## Invocation routing
 
 - If the user wants *retrospection / crystallization of past mistakes*, route to reflect (not this skill).
-- If the user wants *a heavy workflow with eval/benchmark*, route to the plugin `skill-creator`.
 - Otherwise, handle new skill creation in this skill.
 
 </skillify_instruction>
