@@ -40,8 +40,9 @@ function withTree(fn) {
     /**
      * addon.mjs 를 core/addon/<이름>/ 에 심고 manifest 항목을 등록한다.
      * ruleEvents 값은 이벤트 배열, 또는 manifest 항목 그대로의 객체.
+     * alwaysEvents 를 주면 항목의 events (설정 무관 통과 목록) 로 실린다.
      */
-    install: (name, ruleEvents, source) => {
+    install: (name, ruleEvents, source, alwaysEvents) => {
       mkdirSync(join(dir, 'core', 'addon', name), { recursive: true });
       writeFileSync(join(dir, 'core', 'addon', name, 'addon.mjs'), source);
       const rules = Object.fromEntries(
@@ -50,7 +51,9 @@ function withTree(fn) {
           Array.isArray(spec) ? { events: spec } : spec,
         ]),
       );
-      manifestEntries.push({ path: `addon/${name}/addon.mjs`, rules });
+      const entry = { path: `addon/${name}/addon.mjs`, rules };
+      if (alwaysEvents !== undefined) entry.events = alwaysEvents;
+      manifestEntries.push(entry);
     },
     run: (event, options = {}) => {
       writeFileSync(join(eventDir, 'manifest.json'), JSON.stringify({ addons: manifestEntries }));
@@ -204,25 +207,30 @@ test('Stop 의 keepGoing 은 최상위 decision 으로 나간다', () => {
   });
 });
 
-test('기본 켜짐 규칙은 설정 없이 발화하고 부정 한 줄이 끈다', () => {
+test('alwaysEvents 애드온은 설정 없이 발화하고, 규칙을 켜면 핸들러 분기가 바뀐다', () => {
   withTree((tree) => {
-    tree.install('ctx', { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } }, `
+    tree.install('ctx', { 'cwd-context': ['SessionStart'] }, `
       export default {
-        rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
-        handlers: { SessionStart(api) { api.injectContext('작업 위치 안내'); } },
+        rules: { 'cwd-context': { events: ['SessionStart'] } },
+        alwaysEvents: ['SessionStart'],
+        handlers: {
+          SessionStart(api, payload, rules) {
+            api.injectContext(rules['cwd-context'].trigger ? '켜진 안내' : '기본 안내');
+          },
+        },
       };
-    `);
+    `, ['SessionStart']);
 
-    // 설정 파일이 아예 없다.
+    // 설정 파일이 아예 없다 — 규칙은 꺼진 채 기본 분기가 돈다.
     assert.deepEqual(tree.run('SessionStart'), {
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
-        additionalContext: '작업 위치 안내',
+        additionalContext: '기본 안내',
       },
     });
 
-    tree.entries('!cwd-context\n');
-    assert.deepEqual(tree.run('SessionStart'), {});
+    tree.entries('cwd-context\n');
+    assert.equal(tree.run('SessionStart').hookSpecificOutput.additionalContext, '켜진 안내');
   });
 });
 

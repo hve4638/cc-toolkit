@@ -17,8 +17,9 @@
  *
  * 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
  * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
- * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
- * `trigger: false` 로) 셋째 인자로 받는다.
+ * 하나라도 켜져 있거나 E 가 `alwaysEvents` 에 있을 때 불리고, E 를 선언한 규칙
+ * 전부를 (꺼진 것은 `trigger: false` 로) 셋째 인자로 받는다 — 규칙이 다 꺼진 채
+ * alwaysEvents 로 불렸다면 기본 동작을 핸들러 코드가 정한다.
  *
  * 합침 규칙, 이벤트별 주의사항, 열지 않은 필드는 core/event/README.md.
  */
@@ -35,8 +36,9 @@ export function isEventName(name) {
 }
 /**
  * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
- * priority 와 enabledByDefault 는 검사하지 않는다 — 값이 이상해도 각각
- * medium·꺼짐으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다.
+ * priority 와 alwaysEvents 는 여기서 검사하지 않는다 — 값이 이상해도 각각
+ * medium·없음으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다 (alwaysEvents 의
+ * 형식 검증은 build-manifest 가 개발 시점에 한다).
  */
 export function isAddonDecl(value) {
     if (typeof value !== 'object' || value === null)
@@ -301,32 +303,36 @@ export function apiFor(event, draft, payload) {
  * 이번 이벤트에 핸들러가 받을 규칙 상태를 고른다. 호스트가 쓴다.
  *
  * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
- * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
- *
- * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
- * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
- * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
+ * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다. 단 이벤트가
+ * `alwaysEvents` 에 있으면 규칙이 다 꺼져 있어도 (전부 trigger:false 인 채,
+ * 이벤트를 선언한 규칙이 없으면 빈 상태로) 발화한다.
  *
  * 규칙이 하나도 없는 선언 (상시 애드온) 은 설정과 무관하다 — 이 이벤트의
  * 핸들러가 있으면 빈 규칙 상태로 발화한다.
  */
-export function selectRules(decl, event, enabled, negated = () => false) {
+export function selectRules(decl, event, enabled) {
     const declared = Object.entries(decl.rules ?? {});
-    if (declared.length === 0)
+    // 규칙도 alwaysEvents 도 없는 선언만 상시다 — alwaysEvents 가 있으면 규칙
+    // 0개여도 (instruction 의 데이터 조립 형태) 아래의 always 판정을 타야
+    // 목록 밖 이벤트가 새지 않는다. manifestSelects 와 같은 판정이다.
+    if (declared.length === 0 && decl.alwaysEvents === undefined) {
         return decl.handlers[event] ? {} : null;
+    }
     const rules = {};
     let triggered = false;
     for (const [name, rule] of declared) {
         if (!rule.events.includes(event))
             continue;
         const args = enabled.get(name);
-        const trigger = args !== undefined || (rule.enabledByDefault === true && !negated(name));
+        const trigger = args !== undefined;
         triggered ||= trigger;
         // WHY: trigger 는 예약 키 — 인자에 같은 이름이 와도 여기서 덮여 조용히
         //      무시된다. 훅에는 사람에게 경고를 띄울 마땅한 경로가 없다.
         rules[name] = { ...args, trigger };
     }
-    return triggered ? rules : null;
+    // isAddonDecl 이 alwaysEvents 를 검증하지 않으므로 배열이 아니면 없음으로 본다.
+    const always = Array.isArray(decl.alwaysEvents) && decl.alwaysEvents.includes(event);
+    return triggered || always ? rules : null;
 }
 const BANDS = ['high', 'medium', 'low'];
 // 모르는 밴드 값은 medium 으로. indexOf 의 -1 을 그대로 쓰면 high 보다 앞선다.

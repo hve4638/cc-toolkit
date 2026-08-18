@@ -11,6 +11,26 @@
       }
     },
     {
+      "path": "addon/instruction/addon.mjs",
+      "rules": {},
+      "events": [
+        "SessionStart"
+      ]
+    },
+    {
+      "path": "addon/useterminal/addon.mjs",
+      "rules": {
+        "useterminal-proactive": {
+          "events": [
+            "SessionStart"
+          ]
+        }
+      },
+      "events": [
+        "SessionStart"
+      ]
+    },
+    {
       "path": "addon/writing-context-hint/addon.mjs",
       "events": [
         "PostToolUse"

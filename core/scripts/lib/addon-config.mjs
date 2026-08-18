@@ -19,9 +19,7 @@
  *
  * Fail-open throughout: a missing file, an unknown namespace and a malformed
  * line all resolve to "nothing here" rather than an error, so a typo in a
- * config file can never take a hook down with it. For default-on names
- * (loadState's `negated`) "nothing here" means the default *runs*: a negation
- * line lost to an unreadable layer silently re-enables the rule.
+ * config file can never take a hook down with it.
  */
 
 import { join } from 'node:path';
@@ -52,23 +50,15 @@ function toRegExp(pattern) {
 }
 
 /**
- * Entries plus negation history: `{ entries, negated }` where `negated(name)`
- * says whether any `!pattern` line in any layer matched the name.
- *
- * A consumer that treats some names as on by default (the event host's
- * enabledByDefault rules) needs the history: such a name never appears in
- * `entries`, so a negation is the only way to turn it off. A name re-enabled
- * after a negation is back in `entries`, which wins over `negated`.
+ * Entries the namespace leaves on, as a Map of entry name → args object
+ * (empty when the entry carries none). Entries that end up off are absent.
  *
  * A null `projectRoot` skips the ancestor layers, leaving the global state
  * alone — what a tool editing the global file needs to see.
  */
-export function loadState(projectRoot, namespace) {
+export function load(projectRoot, namespace) {
   const entries = new Map();
-  /** @type {RegExp[]} */
-  const negations = [];
-  const negated = (name) => negations.some((re) => re.test(name));
-  if (!NAMESPACES.includes(namespace)) return { entries, negated };
+  if (!NAMESPACES.includes(namespace)) return entries;
 
   const text = cascadePaths(projectRoot, join('.config', 'agentaddon', namespace))
     .map((path) => readTextOr(path, ''))
@@ -81,7 +71,6 @@ export function loadState(projectRoot, namespace) {
     const negation = NEGATION_RE.exec(line);
     if (negation) {
       const re = toRegExp(negation[1]);
-      negations.push(re);
       for (const name of entries.keys()) if (re.test(name)) entries.delete(name);
       continue;
     }
@@ -92,13 +81,5 @@ export function loadState(projectRoot, namespace) {
     if (args) entries.set(entry[1], args);
   }
 
-  return { entries, negated };
-}
-
-/**
- * Entries the namespace leaves on, as a Map of entry name → args object
- * (empty when the entry carries none). Entries that end up off are absent.
- */
-export function load(projectRoot, namespace) {
-  return loadState(projectRoot, namespace).entries;
+  return entries;
 }

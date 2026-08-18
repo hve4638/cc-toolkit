@@ -15,7 +15,8 @@ const MAIN = join(__dirname, '..', '..', 'event', 'main.mjs');
 test('declaration: ponytail 은 SessionStart 를 명시 켜기로 구독한다', () => {
   assert.deepEqual(Object.keys(decl.rules), ['ponytail']);
   assert.deepEqual([...decl.rules.ponytail.events], ['SessionStart']);
-  assert.equal(decl.rules.ponytail.enabledByDefault, undefined);
+  // alwaysEvents 가 없어야 규칙 게이트가 산다 — 켜기 전에는 침묵.
+  assert.equal(decl.alwaysEvents, undefined);
 });
 
 test('dispatch: 스킬 본문이 frontmatter 없이 주입된다', async () => {

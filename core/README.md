@@ -111,11 +111,25 @@ mcp__github__.*: .*
 
 SKILL.md·SKILL.ko.md·CLAUDE.md·AGENTS.md 를 편집한 세션이 턴을 끝낼 때, 해당 리뷰 스킬 (`/writing-great-skill`·`/writing-great-agents-md`) 실행을 권하는 한 줄을 사용자에게만 띄운다. 모델 컨텍스트에는 들어가지 않는다.
 
-### 7. ponytail 모드
+### 7. 세션 지침 주입 (instruction)
+
+**메커니즘**: 애드온 (`addon/instruction/`), 상시 (alwaysEvents) — 설정 없이 돌고 끄는 스위치가 없다
+
+세션 시작 (startup·compact·clear) 때 `addon/instruction/instructions/` 의 각 `<이름>.md` 를 `<이름>` 태그로 감싸 파일명 정렬 순으로 이어붙여 컨텍스트로 주입한다. 블록을 추가하려면 그 폴더에 md 파일 하나를 더 두면 된다 (`.ko.md` 는 번역 페어로, 주입되지 않는다). frontmatter 의 `name: <태그>` 로 파일명 대신 쓸 태그명을 지정할 수 있다.
+
+조각 frontmatter 에 `rule: <이름>` 을 적으면 그 조각은 해당 규칙이 agentaddon `event` 파일에 켜진 프로젝트에서만 주입된다 — 조각이 곧 규칙 하나가 되어 `/available-addon-rule` 목록에도 자동으로 실린다. 이름은 소문자·숫자·`-`·`:` 만 쓸 수 있고, 다른 애드온의 규칙 이름과 겹칠 수 없다 (어기면 manifest 재생성이 거부한다). frontmatter 없는 조각은 항상 주입된다. 조각을 더하거나 rule 을 바꿨으면 `node core/event/build-manifest.mjs` 로 manifest 를 재생성한다.
+
+### 8. ponytail 모드
 
 **메커니즘**: 애드온 (`skills/ponytail/addon.mjs`), agentaddon `event` 파일에 `ponytail` 줄로 켬
 
 켜진 프로젝트에서는 세션 시작 시 `/ponytail` 스킬 본문 (최소·게으른 해법 규율) 을 컨텍스트로 주입해 세션 내내 lazy 모드를 유지한다. 스킬 자체 (`/ponytail`, `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt`) 는 애드온과 무관하게 단독 호출할 수 있다.
+
+### 9. useterminal 안내 주입
+
+**메커니즘**: 애드온 (`addon/useterminal/`), 상시 (alwaysEvents) + opt-in 규칙 `useterminal-proactive` — tmux 안에서만 돈다
+
+tmux 안에서 시작한 세션 (startup·compact·clear) 에 `useterminal` (에이전트가 사용자 창에 pane 을 열어 보여주는 도구) 의 존재를 알리는 블록 (`hint.md`) 을 주입한다. agentaddon `event` 파일에 `useterminal-proactive` 를 켜면 시키지 않아도 보여줄 만한 것 (데모·테스트 실행·긴 출력·프로그램 구동) 은 먼저 pane 을 열라는 적극 지시 (`proactive.md`) 로 대체된다. tmux 밖에서는 어느 규칙이 켜져 있어도 침묵한다.
 
 ---
 
@@ -123,11 +137,15 @@ SKILL.md·SKILL.ko.md·CLAUDE.md·AGENTS.md 를 편집한 세션이 턴을 끝�
 
 ### 애드온 시스템 (`event/` + `addon/` + `skills/*/addon.mjs`)
 
-훅 이벤트를 잡는 애드온의 호스트. 애드온은 `addon/<이름>/addon.mjs` 나 `skills/<이름>/addon.mjs` 에 두고, 구독할 규칙 이름과 트리거 이벤트를 스스로 선언한다 — 규칙 이름과 파일 위치는 무관하며, 연결은 생성물 `event/manifest.json` 이 담당한다 (`node core/event/build-manifest.mjs` 로 재생성). 규칙에 `enabledByDefault: true` 를 달면 agentaddon 에 줄이 없어도 돌고 `!이름` 부정으로만 꺼진다. 선언 형식·합침 규칙은 `event/README.md`.
+훅 이벤트를 잡는 애드온의 호스트. 애드온은 `addon/<이름>/addon.mjs` 나 `skills/<이름>/addon.mjs` 에 두고, 구독할 규칙 이름과 트리거 이벤트를 스스로 선언한다 — 규칙 이름과 파일 위치는 무관하며, 연결은 생성물 `event/manifest.json` 이 담당한다 (`node core/event/build-manifest.mjs` 로 재생성). `alwaysEvents` 에 적은 이벤트는 규칙이 다 꺼져 있어도 핸들러가 불린다 — 규칙은 순수 플래그, 기본 동작은 핸들러 코드. 선언 형식·합침 규칙은 `event/README.md`.
 
 ### corelib (`scripts/lib/corelib.mjs`)
 
 훅 스크립트 공용 패턴의 뿌리 lib. cascade 경로 (`cascadePaths`), fail-open 읽기 (`readTextOr`/`readJsonOr`), 워크스페이스 가드 쓰기 (`writeFileAtomic`/`appendLine`/`ensureDir` 의 `guardDir` 옵션), 훅 stdin (`readStdin`/`readHookPayload`), `resolveProjectRoot`. node 내장만 의존하는 한 파일이라 타 플러그인은 파일째 복사해 쓴다 — 수정은 원본에서 하고, 사본은 diff 로 동기화한다. core 안의 lib (`agent-memory.mjs`, `addon-config.mjs`)·스크립트·애드온·event 호스트는 전부 이 위에 선다.
+
+### addonlib (`scripts/lib/addonlib.mjs`)
+
+애드온이 공유하는 조립 시점 패턴 lib. corelib 과 반대 계약 — 형식 오류에 던진다: 애드온 import 시점에 터지면 build-manifest·테스트가 죽어 개발 시점에 드러나고, 런타임에는 collect 의 fail-open 이 그 애드온만 조용히 뺀다. 현재 함수는 md frontmatter 분리 (`parseFrontmatter`) 하나. core 애드온 전용이라 corelib 의 vendor copy 정책은 적용되지 않는다.
 
 ### 러너 (`scripts/run.cjs`)
 

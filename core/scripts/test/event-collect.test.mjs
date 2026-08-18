@@ -41,10 +41,10 @@ async function withTree(fn) {
     entries: (text) => writeFileSync(join(project, '.config', 'agentaddon', 'event'), text),
     /**
      * addon.mjs 를 심고 manifest 항목을 등록한다. base 는 'addon' 또는 'skills'.
-     * ruleEvents 값은 이벤트 배열, 또는 manifest 항목 그대로의 객체
-     * ({ events, enabledByDefault }).
+     * ruleEvents 값은 이벤트 배열, 또는 manifest 항목 그대로의 객체 ({ events }).
+     * alwaysEvents 를 주면 항목의 events (설정 무관 통과 목록) 로 실린다.
      */
-    install: (base, name, ruleEvents, source) => {
+    install: (base, name, ruleEvents, source, alwaysEvents) => {
       mkdirSync(join(dir, 'core', base, name), { recursive: true });
       writeFileSync(join(dir, 'core', base, name, 'addon.mjs'), source);
       const rules = Object.fromEntries(
@@ -53,7 +53,9 @@ async function withTree(fn) {
           Array.isArray(spec) ? { events: spec } : spec,
         ]),
       );
-      autoEntries.push({ path: `${base}/${name}/addon.mjs`, rules });
+      const entry = { path: `${base}/${name}/addon.mjs`, rules };
+      if (alwaysEvents !== undefined) entry.events = alwaysEvents;
+      autoEntries.push(entry);
     },
     manifest: (obj) => { manualManifest = obj; },
     collect: (event) => {
@@ -241,82 +243,65 @@ test('이번 이벤트에 안 걸린 애드온은 import 조차 안 된다', asy
   });
 });
 
-/** 기본 켜짐 규칙 하나를 구독하는 애드온 소스. */
-function defaultCatcher(rule, event) {
+/** alwaysEvents 로 게이트를 뺀 애드온 소스 — 규칙은 순수 플래그. */
+function alwaysCatcher(rule, event) {
   return `
     export default {
-      rules: { '${rule}': { events: ['${event}'], enabledByDefault: true } },
+      rules: { '${rule}': { events: ['${event}'] } },
+      alwaysEvents: ['${event}'],
       handlers: { ${event}() {} },
     };
   `;
 }
 
-const DEFAULT_ON = (event) => ({ events: [event], enabledByDefault: true });
-
-test('기본 켜짐 규칙은 설정이 아예 없어도 불려 온다', async () => {
+test('alwaysEvents 애드온은 설정이 아예 없어도 불려 온다 — 규칙은 꺼진 채 실린다', async () => {
   await withTree(async (tree) => {
-    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
-      defaultCatcher('cwd-context', 'SessionStart'));
+    tree.install('addon', 'ctx', { 'cwd-context': ['SessionStart'] },
+      alwaysCatcher('cwd-context', 'SessionStart'), ['SessionStart']);
 
     const loaded = await tree.collect('SessionStart');
     assert.equal(loaded.length, 1);
-    assert.deepEqual(loaded[0].rules, { 'cwd-context': { trigger: true } });
+    assert.deepEqual(loaded[0].rules, { 'cwd-context': { trigger: false } });
   });
 });
 
-test('부정이 기본 켜짐 규칙을 끈다', async () => {
+test('alwaysEvents 애드온의 규칙을 켜면 trigger 와 인자가 실린다', async () => {
   await withTree(async (tree) => {
-    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
-      defaultCatcher('cwd-context', 'SessionStart'));
-    tree.entries('!cwd-context\n');
-
-    assert.deepEqual(await tree.collect('SessionStart'), []);
-  });
-});
-
-test('부정 뒤에 다시 켠 줄이 이긴다 — 인자도 실린다', async () => {
-  await withTree(async (tree) => {
-    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
-      defaultCatcher('cwd-context', 'SessionStart'));
-    tree.entries('!cwd-*\ncwd-context@lang=ko\n');
+    tree.install('addon', 'ctx', { 'cwd-context': ['SessionStart'] },
+      alwaysCatcher('cwd-context', 'SessionStart'), ['SessionStart']);
+    tree.entries('cwd-context@lang=ko\n');
 
     const [loaded] = await tree.collect('SessionStart');
     assert.deepEqual(loaded.rules, { 'cwd-context': { lang: 'ko', trigger: true } });
   });
 });
 
-test('부정된 기본 켜짐 애드온은 import 조차 안 된다 — manifest 사전 필터가 판정을 공유', async () => {
+test('낡은 manifest: 항목에 events 가 빠졌으면 alwaysEvents 선언이어도 못 찾는다', async () => {
   await withTree(async (tree) => {
+    // 선언은 alwaysEvents 로 바꿨는데 manifest 는 아직 규칙형 — 사전 필터가
+    // import 없이 거르는 구조의 대가다. 낡은 manifest 는 event-manifest.test.mjs
+    // 의 실스캔 diff 가 잡는다.
     const marker = join(tree.project, 'probe-marker');
-    tree.install('addon', 'probe', { 'cwd-context': DEFAULT_ON('SessionStart') }, `
+    tree.install('addon', 'probe', { 'cwd-context': ['SessionStart'] }, `
       import { writeFileSync } from 'node:fs';
       writeFileSync(${JSON.stringify(marker)}, 'imported');
       export default {
-        rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
+        rules: { 'cwd-context': { events: ['SessionStart'] } },
+        alwaysEvents: ['SessionStart'],
         handlers: { SessionStart() {} },
       };
     `);
-    tree.entries('!cwd-context\n');
 
     assert.deepEqual(await tree.collect('SessionStart'), []);
+    // 사전 필터 단계에서 빠져 import 조차 안 된다.
     assert.equal(existsSync(marker), false);
   });
 });
 
-test('manifest 만 기본 켜짐이라 해도 선언이 아니면 안 불린다 — 선언이 기준', async () => {
-  await withTree(async (tree) => {
-    // manifest 는 낡아서 기본 켜짐이라 하지만 실제 선언은 아니다.
-    tree.install('addon', 'ctx', { 'cwd-context': DEFAULT_ON('SessionStart') },
-      catcher('cwd-context', 'SessionStart'));
-
-    assert.deepEqual(await tree.collect('SessionStart'), []);
-  });
-});
-
-test('선언만 기본 켜짐이고 manifest 에 플래그가 빠졌으면 못 찾는다 — 낡은 manifest 의 한계', async () => {
+test('manifest 만 events 를 가져도 선언에 alwaysEvents 가 없으면 안 불린다 — 선언이 기준', async () => {
   await withTree(async (tree) => {
     tree.install('addon', 'ctx', { 'cwd-context': ['SessionStart'] },
-      defaultCatcher('cwd-context', 'SessionStart'));
+      catcher('cwd-context', 'SessionStart'), ['SessionStart']);
 
     assert.deepEqual(await tree.collect('SessionStart'), []);
   });
@@ -376,25 +361,21 @@ test('낡은 manifest: 상시 항목인데 선언이 규칙형이면 선언이 �
   });
 });
 
-test('낡은 manifest: 기본 켜짐 규칙형 항목인데 선언이 상시면 — 재생성 전에는 부정 줄이 사전 필터를 막는다', async () => {
+test('rules 와 events 를 같이 가진 항목: 이벤트가 events 에 없으면 rules 로 판정한다', async () => {
   await withTree(async (tree) => {
-    // 이번 전환이 개발 중 실제로 만드는 방향: 선언은 상시로 바꿨는데 manifest
-    // 는 아직 기본 켜짐 규칙형. 낡음의 한계를 문서화한다 — 낡은 manifest 는
-    // event-manifest.test.mjs 의 실스캔 diff 가 잡는다.
-    tree.install('addon', 'always', {}, `
-      export default { handlers: { PostToolUse() {} } };
-    `);
-    tree.manifest({
-      addons: [{
-        path: 'addon/always/addon.mjs',
-        rules: { 'old-name': { events: ['PostToolUse'], enabledByDefault: true } },
-      }],
-    });
+    // SessionStart 는 alwaysEvents, PreToolUse 는 규칙 게이트인 애드온.
+    tree.install('addon', 'mixed', { 'mixed-rule': ['PreToolUse'] }, `
+      export default {
+        rules: { 'mixed-rule': { events: ['PreToolUse'] } },
+        alwaysEvents: ['SessionStart'],
+        handlers: { SessionStart() {}, PreToolUse() {} },
+      };
+    `, ['SessionStart']);
 
-    // 설정이 없으면 기본 켜짐으로 사전 필터를 통과하고, 선언(상시)이 로드를 정한다.
-    assert.equal((await tree.collect('PostToolUse')).length, 1);
-    // 부정 줄은 사전 필터에서 옛 이름을 죽여 상시인데도 안 불린다 — 낡음의 대가.
-    tree.entries('!old-name\n');
-    assert.deepEqual(await tree.collect('PostToolUse'), []);
+    // SessionStart 는 설정 없이 통과, PreToolUse 는 규칙이 꺼져 있어 빠진다.
+    assert.equal((await tree.collect('SessionStart')).length, 1);
+    assert.deepEqual(await tree.collect('PreToolUse'), []);
+    tree.entries('mixed-rule\n');
+    assert.equal((await tree.collect('PreToolUse')).length, 1);
   });
 });

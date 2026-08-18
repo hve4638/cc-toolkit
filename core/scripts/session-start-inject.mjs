@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 /**
- * SessionStart Hook: inject frame/instruction.md as additionalContext.
+ * SessionStart Hook: inject <plugin root>/instruction.md as additionalContext.
+ *
+ * core ships no instruction.md — its blocks moved to addon/instruction/, so
+ * this hook stays wired but silent (fail-open). Kept deliberately: the
+ * mechanism itself is retained, at the cost of one no-op node spawn per
+ * startup/compact/clear. Reviving core/instruction.md would double-inject
+ * the same blocks (a test pins its absence).
  *
  * Fires on startup / compact / clear (resume excluded — transcript restore
  * already brings the prior injection back, so re-inject would duplicate).

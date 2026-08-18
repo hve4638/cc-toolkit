@@ -1,2 +1,3 @@
 ponytail
 rule:banaction
+useterminal-proactive

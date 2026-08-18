@@ -35,6 +35,14 @@ Option detail beyond this table: `useterminal --help`.
 - The `ls` list holds panes this session did not open — another agent's, or the user's. Target only the KEYs this session opened.
 - `kill` the panes this session opened once they have served their purpose.
 - Terminal work the user has no reason to watch belongs in `vt`.
+
+## Tips
+
+- For plain explanations, lean on color codes to keep the output readable.
+- When showing several tasks in sequence, don't spam clear — the user misses what got wiped. Clear at most once, when asked to demo something unrelated to what's on screen.
+- Piping through `... | less` and the like strips colors and hurts readability.
+- To compare two outputs or walk through several cases, showing them in 2–3 panes is recommended.
+- Three panes is the most the user can watch at once; four is acceptable only when each shows under 10 lines. More than that is discouraged.
 </useterminal_instruction>
 
 $ARGUMENTS

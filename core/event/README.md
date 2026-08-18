@@ -41,32 +41,33 @@ export default {
 ```
 
 - `rules` 는 구독 선언이다: 규칙 이름 → 그 규칙이 트리거되는 이벤트 목록. 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다. 이름은 평평하게 짓는다 — `rule:banaction` 의 `종류:` 접두어는 초기 관례의 잔재다.
-- 핸들러는 **이벤트당 하나**다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 셋째 인자로 받는다 — 꺼진 것은 `trigger: false` 로. 규칙별 분기는 핸들러가 이 객체를 보고 한다.
+- 핸들러는 **이벤트당 하나**다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중 하나라도 켜져 있거나 E 가 `alwaysEvents` 에 있을 때 불리고, E 를 선언한 규칙 전부를 셋째 인자로 받는다 — 꺼진 것은 `trigger: false` 로. 규칙별 분기는 핸들러가 이 객체를 보고 한다.
 - 규칙 상태에는 그 항목의 인자도 실린다: `showcase-heavy@mode=strict` → `rules['showcase-heavy']` 는 `{ mode: 'strict', trigger: true }`. `trigger` 는 호스트가 채우는 예약 키라 인자로 같은 이름을 적어도 조용히 무시된다.
 - `priority` 는 이벤트별 실행 밴드다. 생략·모르는 값은 medium.
 - 핸들러는 아무것도 반환하지 않는다. 훅이 낼 것은 전부 api 호출로 적는다. 첫 줄의 `// @ts-check` 와 `@type` 주석이 있어야 타입 오류가 에디터에 뜬다.
 
-### 기본 켜짐
+### alwaysEvents — 규칙 게이트 빼기
 
-`enabledByDefault: true` 를 단 규칙은 agentaddon 에 줄이 없어도 켜진 것으로 친다 (인자 없음). 구식 `hooks/hooks.mjs` 처럼 설정 없이 항상 도는 훅을 애드온으로 옮기는 데 쓴다.
+`alwaysEvents` 에 적은 이벤트는 자기 규칙이 다 꺼져 있어도 핸들러가 불린다 — 규칙은 순수 플래그가 되고, 기본 동작은 핸들러 코드가 정한다 (설정 없이 항상 돌면서 규칙으로 수위만 바꾸는 훅용).
 
 ```js
-rules: { 'cwd-context': { events: ['SessionStart'], enabledByDefault: true } },
+rules: { 'useterminal-proactive': { events: ['SessionStart'] } },
+alwaysEvents: ['SessionStart'],
 ```
 
-끄는 길은 부정이다 — 어느 층에서든 `!cwd-context` (glob 포함) 가 매치하면 기본값이 죽는다. 부정 뒤에 다시 적은 켜는 줄은 여느 항목처럼 살아나고, 그때 붙인 인자도 실린다.
+목록에 없는 이벤트는 규칙 게이트 그대로다. 형식 검증 (배열·이벤트 이름·핸들러 존재) 은 build-manifest 가 개발 시점에 한다 — 런타임은 틀린 값을 없음으로 취급해 무증상이다.
 
 ### 규칙 없는 상시 애드온
 
-`rules` 를 아예 생략 (또는 빈 객체) 하면 상시 애드온이다 — `handlers` 가 잡는 이벤트에 설정과 무관하게 항상 발화하고, 핸들러의 셋째 인자는 빈 객체다. 이름이 없으니 agentaddon 으로 끌 수 없고 `!*` 도 닿지 않으며, available-rules.txt 에도 실리지 않는다. 켜고 끄는 개념 자체가 없는 배관성 훅 (예: writing-context-hint) 용이고, 사용자에게 끄는 손잡이를 줄 기능이면 기본 켜짐 규칙을 쓴다.
+`rules` 를 아예 생략 (또는 빈 객체) 하면 상시 애드온이다 — `handlers` 가 잡는 이벤트에 설정과 무관하게 항상 발화하고, 핸들러의 셋째 인자는 빈 객체다. 이름이 없으니 agentaddon 으로 끌 수 없고 `!*` 도 닿지 않으며, available-rules.txt 에도 실리지 않는다. 켜고 끄는 개념 자체가 없는 배관성 훅 (예: writing-context-hint) 용이고, 켜고 끌 플래그가 필요한 기능이면 규칙 (+ 필요 시 alwaysEvents) 을 쓴다.
 
 manifest 항목은 규칙 대신 이벤트 목록으로 실리는데, 이벤트 출처가 핸들러 키뿐이라 오타 난 키는 영영 발화하지 않는 무증상 실패가 된다 — 생성기가 키를 검사해 개발 시점에 죽인다.
 
 ## manifest
 
-`manifest.json` 은 생성물이다 — 규칙 이름 → 애드온 경로·이벤트 목록 (기본 켜짐 플래그 포함) 의 표. `collect.mjs` 는 이 표와 켜진 규칙만 보고 이번 이벤트에 불릴 애드온을 고르므로, 존재하는 애드온을 전부 import 하지 않는다.
+`manifest.json` 은 생성물이다 — 규칙 이름 → 애드온 경로·이벤트 목록의 표. 항목의 `events` 는 설정과 무관하게 통과하는 이벤트 목록으로, 상시 애드온 (핸들러 키 유래) 과 alwaysEvents 가 같은 자리에 실린다. `collect.mjs` 는 이 표와 켜진 규칙만 보고 이번 이벤트에 불릴 애드온을 고르므로, 존재하는 애드온을 전부 import 하지 않는다.
 
-addon.mjs 를 만들거나 `rules` 선언을 바꿨으면 재생성해 같이 커밋한다 (사용자용 규칙 이름 목록 `skills/available-addon-rule/available-rules.txt` 도 같은 실행이 함께 갱신한다):
+addon.mjs 를 만들거나 `rules` 선언을 바꿨으면 재생성해 같이 커밋한다 — 선언을 데이터에서 조립하는 애드온 (instruction 의 조각 frontmatter) 은 그 데이터를 바꿔도 해당된다 (사용자용 규칙 이름 목록 `skills/available-addon-rule/available-rules.txt` 도 같은 실행이 함께 갱신한다):
 
 ```bash
 node core/event/build-manifest.mjs

@@ -1,0 +1,1 @@
+`useterminal` can open and drive panes in the user's own window. When something should happen where the user can watch it — a demo, live output, a program being driven — invoke the `core:useterminal` skill for how to use it.

@@ -45,6 +45,19 @@ test('availableRulesText 는 규칙 이름을 정렬·중복 제거해 한 줄�
   assert.equal(availableRulesText(manifest), 'alpha\nzebra\n');
 });
 
+test('availableRulesText 는 alwaysEvents 애드온의 규칙도 싣는다 — 규칙은 전부 켤 수 있는 플래그다', () => {
+  const manifest = {
+    addons: [
+      {
+        path: 'addon/a/addon.mjs',
+        rules: { alpha: { events: ['SessionStart'] } },
+        events: ['SessionStart'],
+      },
+    ],
+  };
+  assert.equal(availableRulesText(manifest), 'alpha\n');
+});
+
 async function withRoot(fn) {
   const dir = mkdtempSync(join(tmpdir(), 'event-manifest-test-'));
   try {
@@ -85,33 +98,107 @@ test('addon 과 skills 두 트리를 훑고 경로·규칙을 적는다', async 
   });
 });
 
-test('enabledByDefault 는 true 일 때만 manifest 에 실린다', async () => {
+test('alwaysEvents 선언은 항목의 events 로 실린다 — 규칙과 나란히', async () => {
   await withRoot(async (root) => {
-    install(root, 'addon', 'mixed', `
+    install(root, 'addon', 'always-rule', `
       export default {
-        rules: {
-          'on-by-default': { events: ['SessionStart'], enabledByDefault: true },
-          'off-by-default': { events: ['SessionStart'] },
-          'odd-value': { events: ['SessionStart'], enabledByDefault: 'yes' },
-        },
+        rules: { 'my-flag': { events: ['SessionStart'] } },
+        alwaysEvents: ['SessionStart'],
         handlers: { SessionStart() {} },
       };
     `);
-
-    assert.deepEqual((await buildManifest(root)).addons[0].rules, {
-      'on-by-default': { events: ['SessionStart'], enabledByDefault: true },
-      'off-by-default': { events: ['SessionStart'] },
-      'odd-value': { events: ['SessionStart'] },
+    assert.deepEqual(await buildManifest(root), {
+      addons: [{
+        path: 'addon/always-rule/addon.mjs',
+        rules: { 'my-flag': { events: ['SessionStart'] } },
+        events: ['SessionStart'],
+      }],
     });
+  });
+});
+
+test('규칙 0개 + alwaysEvents 도 규칙 애드온 형태로 실린다 — 데이터 조립 선언은 규칙 개수가 오간다', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'data-driven', `
+      export default {
+        rules: {},
+        alwaysEvents: ['SessionStart'],
+        handlers: { SessionStart() {} },
+      };
+    `);
+    assert.deepEqual(await buildManifest(root), {
+      addons: [{ path: 'addon/data-driven/addon.mjs', rules: {}, events: ['SessionStart'] }],
+    });
+  });
+});
+
+test('규칙 선언의 모르는 최상위 키는 생성기를 죽인다 — alwaysEvents 오타가 게이트를 조용히 남기는 것 방지', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'typo-always', `
+      export default {
+        rules: { 'my-flag': { events: ['SessionStart'] } },
+        alwaysEvent: ['SessionStart'],
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /alwaysEvent/);
+  });
+});
+
+test('rules 없이 alwaysEvents 만 쓴 선언은 생성기를 죽인다 — 상시 애드온의 다른 철자다', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'redundant', `
+      export default {
+        alwaysEvents: ['SessionStart'],
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /alwaysEvents 는 무의미/);
+  });
+});
+
+test('형식이 틀린 alwaysEvents 는 생성기를 죽인다 — 런타임은 없음으로 취급해 무증상이다', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'bad-shape', `
+      export default {
+        rules: { r: { events: ['SessionStart'] } },
+        alwaysEvents: 'SessionStart',
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /alwaysEvents/);
+  });
+  await withRoot(async (root) => {
+    install(root, 'addon', 'bad-name', `
+      export default {
+        rules: { r: { events: ['SessionStart'] } },
+        alwaysEvents: ['Sessionstart'],
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /Sessionstart/);
+  });
+});
+
+test('핸들러 없는 이벤트를 alwaysEvents 에 적으면 생성기를 죽인다 — 영영 안 발화하는 무증상 실패', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'dead-always', `
+      export default {
+        rules: { r: { events: ['SessionStart'] } },
+        alwaysEvents: ['SessionStart', 'Stop'],
+        handlers: { SessionStart() {} },
+      };
+    `);
+    await assert.rejects(buildManifest(root), /Stop/);
   });
 });
 
 test('agentaddon 이름 문법을 벗어난 규칙 이름은 생성기를 죽인다', async () => {
   await withRoot(async (root) => {
-    // 설정 줄로 켤 수도 끌 수도 없는 이름 — 기본 켜짐이면 끌 수 없는 훅이 된다.
+    // 설정 줄로 켤 수도 끌 수도 없는 이름 — 영영 안 켜지는 오타다.
     install(root, 'addon', 'typo', `
       export default {
-        rules: { cwd_context: { events: ['SessionStart'], enabledByDefault: true } },
+        rules: { cwd_context: { events: ['SessionStart'] } },
         handlers: { SessionStart() {} },
       };
     `);
@@ -158,7 +245,12 @@ test('.alias 스킬은 건너뛴다 — 같은 핸들러가 두 번 돌지 않�
 test('폴더 이름순으로 훑어 결과가 결정적이다', async () => {
   await withRoot(async (root) => {
     install(root, 'addon', 'zebra', DECL);
-    install(root, 'addon', 'alpha', DECL);
+    install(root, 'addon', 'alpha', `
+      export default {
+        rules: { 'other-rule': { events: ['Stop'] } },
+        handlers: { Stop() {} },
+      };
+    `);
     const manifest = await buildManifest(root);
     assert.deepEqual(manifest.addons.map((a) => a.path), ['addon/alpha/addon.mjs', 'addon/zebra/addon.mjs']);
   });
@@ -182,6 +274,14 @@ test('상시 애드온의 오타 난 핸들러 키는 생성기를 죽인다 —
       export default { handlers: { Sessionstart() {} } };
     `);
     await assert.rejects(buildManifest(root), /Sessionstart/);
+  });
+});
+
+test('두 애드온이 같은 규칙 이름을 선언하면 생성기를 죽인다 — 한 줄이 둘 다 켜는 조용한 겹침 방지', async () => {
+  await withRoot(async (root) => {
+    install(root, 'addon', 'one', DECL);
+    install(root, 'skills', 'two', DECL);
+    await assert.rejects(buildManifest(root), /some-rule.*addon\/one\/addon\.mjs/);
   });
 });
 

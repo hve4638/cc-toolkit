@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { load, loadState } from '../lib/addon-config.mjs';
+import { load } from '../lib/addon-config.mjs';
 
 // HOME 을 임시 디렉터리로 격리 — 실제 사용자의 ~/.config/agentaddon 이 결과에 새어
 // 들어오지 않게 한다. os.homedir() 는 호출 시점의 $HOME 을 본다.
@@ -137,21 +137,10 @@ test('flat names without a colon are entries — the colon is just a character',
   assert.deepEqual({ ...entries.get('showcase-light') }, { lang: 'ko' });
 });
 
-test('loadState reports negation history across layers, globs included', () => {
-  withLayers({ global: '!cwd-*\n', local: '!feat:inlay\n' }, (project) => {
-    const { negated } = loadState(project, 'event');
-    assert.equal(negated('cwd-context'), true);
-    assert.equal(negated('feat:inlay'), true);
-    assert.equal(negated('feat:other'), false);
-  });
-});
-
-test('a name re-enabled after negation is in entries and still counts as negated', () => {
+test('a name re-enabled after an outer-layer negation is back in entries', () => {
   withLayers({ global: '!cwd-context\n', local: 'cwd-context@lang=ko\n' }, (project) => {
-    const { entries, negated } = loadState(project, 'event');
-    // entries 가 이기는 쪽이다 — negated 는 이력일 뿐 소비자가 entries 부터 본다.
+    const entries = load(project, 'event');
     assert.deepEqual({ ...entries.get('cwd-context') }, { lang: 'ko' });
-    assert.equal(negated('cwd-context'), true);
   });
 });
 

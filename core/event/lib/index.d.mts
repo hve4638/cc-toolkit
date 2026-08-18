@@ -17,8 +17,9 @@
  *
  * 규칙 이름은 agentaddon `event` 파일의 항목 이름과 문자열로만 이어진다 — 애드온의
  * 위치·폴더 이름과는 무관하다. 이벤트 E 의 핸들러는 E 를 선언한 자기 규칙 중
- * 하나라도 켜져 있을 때만 불리고, E 를 선언한 규칙 전부를 (꺼진 것은
- * `trigger: false` 로) 셋째 인자로 받는다.
+ * 하나라도 켜져 있거나 E 가 `alwaysEvents` 에 있을 때 불리고, E 를 선언한 규칙
+ * 전부를 (꺼진 것은 `trigger: false` 로) 셋째 인자로 받는다 — 규칙이 다 꺼진 채
+ * alwaysEvents 로 불렸다면 기본 동작을 핸들러 코드가 정한다.
  *
  * 합침 규칙, 이벤트별 주의사항, 열지 않은 필드는 core/event/README.md.
  */
@@ -167,13 +168,6 @@ export type Handler<E extends EventName> = (api: EventMap[E]['api'], payload: Ev
 /** 규칙 하나의 선언 — 어느 이벤트에서 트리거되는가. */
 export interface RuleDecl {
     events: readonly EventName[];
-    /**
-     * true 면 agentaddon 에 줄이 없어도 켜진 것으로 본다 (인자 없음). 끄는 길은
-     * 부정뿐이다 — `!<이름>` 이 매치한 적 있으면 기본값이 죽고, 그 뒤에 다시
-     * 적은 켜는 줄이 살린다. 구식 hooks.mjs 처럼 설정 없이 항상 도는 훅을
-     * 애드온으로 옮기기 위한 것.
-     */
-    enabledByDefault?: boolean;
 }
 /**
  * addon.mjs 가 default 로 내보내는 선언.
@@ -190,6 +184,13 @@ export interface AddonDecl {
      * 없다 (`!*` 도 닿지 않는다). 켜고 끌 일이 없는 배관성 훅용.
      */
     rules?: Readonly<Record<string, RuleDecl>>;
+    /**
+     * 여기 적힌 이벤트는 자기 규칙이 다 꺼져 있어도 핸들러가 불린다 — 규칙은
+     * 순수 플래그가 되고, 기본 동작은 핸들러 코드가 정한다. 규칙 게이트를
+     * 이벤트 단위로 빼는 스위치라 규칙을 선언한 애드온에만 의미가 있다 (규칙
+     * 없는 선언은 어차피 상시).
+     */
+    alwaysEvents?: readonly EventName[];
     /** 이벤트별 실행 밴드. 생략·모르는 값은 medium. */
     priority?: Readonly<Partial<Record<EventName, Band>>>;
     handlers: {
@@ -198,8 +199,9 @@ export interface AddonDecl {
 }
 /**
  * default export 가 애드온 선언인지 거른다. 호스트와 manifest 생성기가 쓴다.
- * priority 와 enabledByDefault 는 검사하지 않는다 — 값이 이상해도 각각
- * medium·꺼짐으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다.
+ * priority 와 alwaysEvents 는 여기서 검사하지 않는다 — 값이 이상해도 각각
+ * medium·없음으로 떨어질 뿐, 선언 전체를 버릴 이유가 아니다 (alwaysEvents 의
+ * 형식 검증은 build-manifest 가 개발 시점에 한다).
  */
 export declare function isAddonDecl(value: unknown): value is AddonDecl;
 type PermissionKind = 'allow' | 'deny' | 'ask';
@@ -252,16 +254,14 @@ export interface LoadedAddon {
  * 이번 이벤트에 핸들러가 받을 규칙 상태를 고른다. 호스트가 쓴다.
  *
  * 이벤트를 선언한 규칙 전부가 실리고 (꺼진 것은 trigger:false), 하나도 켜져
- * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다.
- *
- * enabledByDefault 규칙은 설정에 줄이 없어도 켜진 것으로 친다. `negated` 는
- * "부정 줄이 이 이름에 매치한 적 있는가" — 매치했으면 기본값이 죽는다. 부정
- * 뒤에 다시 켠 항목은 enabled 에 있으므로 negated 를 볼 일이 없다.
+ * 있지 않으면 null — 그 애드온은 이번 이벤트에서 불리지 않는다. 단 이벤트가
+ * `alwaysEvents` 에 있으면 규칙이 다 꺼져 있어도 (전부 trigger:false 인 채,
+ * 이벤트를 선언한 규칙이 없으면 빈 상태로) 발화한다.
  *
  * 규칙이 하나도 없는 선언 (상시 애드온) 은 설정과 무관하다 — 이 이벤트의
  * 핸들러가 있으면 빈 규칙 상태로 발화한다.
  */
-export declare function selectRules(decl: AddonDecl, event: EventName, enabled: ReadonlyMap<string, Args>, negated?: (name: string) => boolean): Rules | null;
+export declare function selectRules(decl: AddonDecl, event: EventName, enabled: ReadonlyMap<string, Args>): Rules | null;
 /**
  * 불러온 애드온을 밴드 순 (high → medium → low) 으로 세워 차례로 돌린다.
  * 같은 밴드 안의 순서는 정의하지 않는다. 테스트 때문에 내보낸다.
