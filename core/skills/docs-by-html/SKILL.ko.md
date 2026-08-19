@@ -22,6 +22,11 @@ description: 사용자에게 보여줄 문서를 Markdown 대신 classless HTML 
 ```
 
 작성 전에 [example.html](./example.html) 을 읽고 그 문서 골격을 따른다.
+
+## 산출물 위치
+
+원본 마크다운 파일이 있다면 원본과 동일한 위치, 새로 생성된 파일이라면 해당 디렉토리에서 관례적인 위치(프로젝트 루트, docs/, report/ 등)에 둔다.
+
 </docs_by_html_instruction>
 
 $ARGUMENTS

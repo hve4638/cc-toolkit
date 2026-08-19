@@ -22,6 +22,10 @@ Link the stylesheet and write classless: semantic HTML elements only — no clas
 ```
 
 Before writing, read [example.html](./example.html) and follow its document shape.
+
+## Output location
+
+If the document has a source Markdown file, place the HTML next to it; for a newly created document, use the conventional location in that directory tree (project root, docs/, report/, etc.).
 </docs_by_html_instruction>
 
 $ARGUMENTS
