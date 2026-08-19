@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploy Pipeline Review</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/hve4638/classless.css@main/classless.css">
+</head>
+<body>
+<header>
+<h1>Deploy Pipeline Review</h1>
+<p>Findings from the staging deploy investigation, 2026-08-19.</p>
+</header>
+
+<main>
+<section>
+<h2>Summary</h2>
+<p>The staging deploy fails intermittently at the image-push step. The root cause is a registry token that expires mid-pipeline; the fix is to refresh the token per step instead of per run.</p>
+</section>
+
+<section>
+<h2>Failure rate by step</h2>
+<table>
+<thead>
+<tr><th>Step</th><th>Runs</th><th>Failures</th><th>Rate</th></tr>
+</thead>
+<tbody>
+<tr><td>build</td><td>120</td><td>1</td><td>0.8%</td></tr>
+<tr><td>test</td><td>119</td><td>3</td><td>2.5%</td></tr>
+<tr><td>image push</td><td>116</td><td>14</td><td>12.1%</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>Token lifetime vs. pipeline duration</h2>
+<figure>
+<svg viewBox="0 0 400 120" role="img" aria-label="Token expires before the image-push step ends">
+<line x1="20" y1="40" x2="380" y2="40" stroke="currentColor" stroke-width="2"/>
+<rect x="20" y="30" width="200" height="20" fill="none" stroke="currentColor"/>
+<text x="120" y="24" text-anchor="middle" font-size="12">token valid (15 min)</text>
+<line x1="20" y1="90" x2="300" y2="90" stroke="currentColor" stroke-width="2"/>
+<rect x="240" y="80" width="120" height="20" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+<text x="300" y="74" text-anchor="middle" font-size="12">image push (runs past expiry)</text>
+</svg>
+<figcaption>The push step regularly outlives the 15-minute token.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2>Next step</h2>
+<blockquote>
+<p>Refresh the registry token at the start of each pipeline step; re-run the 14 failed deploys to confirm.</p>
+</blockquote>
+</section>
+</main>
+</body>
+</html>
