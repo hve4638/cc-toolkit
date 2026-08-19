@@ -66,7 +66,7 @@ const unquote = s => s.trim().replace(/^['"]|['"]$/g, '');
 // ---- 수집 ----
 // TODO.md·frontmatter 가 깨진 폴더도 '파싱 불가' 노드로 그래프에 남긴다 —
 // 실재하는 폴더에 대한 의존이 "완료로 간주" 로 새지 않고, 고치는 일 자체가 선행 작업으로 보인다.
-const todos = new Map(); // 폴더명 -> {desc, priority, status, depends}
+const todos = new Map(); // 폴더명 -> {desc, priority, status, repos, depends}
 const parseWarns = [];   // '이름: 사유'
 const missingDeps = [];  // '이름: 없는 의존'
 for (const ent of readdirSync(todoDir, { withFileTypes: true })) {
@@ -79,6 +79,8 @@ for (const ent of readdirSync(todoDir, { withFileTypes: true })) {
     desc: typeof fm?.description === 'string' ? fm.description : '',
     priority: typeof fm?.priority === 'string' && fm.priority ? fm.priority : 'normal',
     status: fm ? (typeof fm.status === 'string' && fm.status ? fm.status : 'pending') : 'invalid',
+    repos: Array.isArray(fm?.repos) ? fm.repos
+      : typeof fm?.repos === 'string' && fm.repos ? [fm.repos] : [],
     depends: Array.isArray(fm?.depends) ? [...new Set(fm.depends)]
       : typeof fm?.depends === 'string' && fm.depends ? [fm.depends] : [],
   });
@@ -162,11 +164,13 @@ process.stdout.write(`${todos.size}개 (${countStr})\n`);
 const nameW = Math.max(...[...todos.keys()].map(width)) + 2;
 const prioW = Math.max(...[...todos.values()].map(t => width(t.priority))) + 2;
 const statW = Math.max(...[...todos.values()].map(t => width(t.status))) + 2;
+const repoStr = t => t.repos.join(',') || '-';
+const repoW = Math.max(...[...todos.values()].map(t => width(repoStr(t)))) + 2;
 function line(n) {
   const t = todos.get(n);
   const deps = t.deps.length ? dim(`  ← ${t.deps.join(', ')}`) : '';
   const unblocks = !t.deps.length && blocks.get(n)?.length ? dim(`  → ${blocks.get(n).join(', ')}`) : '';
-  let row = `  ${pad(n, nameW)}${pad(t.priority, prioW)}${pad(t.status, statW)}${t.desc}${deps}${unblocks}`;
+  let row = `  ${pad(n, nameW)}${pad(t.priority, prioW)}${pad(t.status, statW)}${pad(repoStr(t), repoW)}${t.desc}${deps}${unblocks}`;
   if (t.status === 'on-hold') row = dim(row.replace(/\x1b\[\d+m/g, ''));
   return row + '\n';
 }
