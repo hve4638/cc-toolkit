@@ -1,9 +1,9 @@
 ---
-name: docs-by-html
+name: html
 description: 사용자에게 보여줄 문서를 Markdown 대신 classless HTML 로 작성. 사용자가 읽을 문서 (보고서·리뷰·정리 글) 를 만들 때, 또는 HTML 문서를 요청받을 때 사용.
 ---
 
-<docs_by_html_instruction>
+<html_instruction>
 사용자에게 보여줄 목적의 문서는 Markdown 이 아닌 HTML 로 작성한다.
 
 적합:
@@ -27,6 +27,6 @@ description: 사용자에게 보여줄 문서를 Markdown 대신 classless HTML 
 
 원본 마크다운 파일이 있다면 원본과 동일한 위치, 새로 생성된 파일이라면 해당 디렉토리에서 관례적인 위치(프로젝트 루트, docs/, report/ 등)에 둔다.
 
-</docs_by_html_instruction>
+</html_instruction>
 
 $ARGUMENTS

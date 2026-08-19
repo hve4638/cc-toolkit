@@ -1,9 +1,9 @@
 ---
-name: docs-by-html
+name: html
 description: Write user-facing documents as classless HTML instead of Markdown. Use when producing a document for the user to read — a report, review, or writeup — or when the user asks for a document in HTML.
 ---
 
-<docs_by_html_instruction>
+<html_instruction>
 Write documents meant to be shown to the user as HTML, not Markdown.
 
 Good fit:
@@ -26,6 +26,6 @@ Before writing, read [example.html](./example.html) and follow its document shap
 ## Output location
 
 If the document has a source Markdown file, place the HTML next to it; for a newly created document, use the conventional location in that directory tree (project root, docs/, report/, etc.).
-</docs_by_html_instruction>
+</html_instruction>
 
 $ARGUMENTS
