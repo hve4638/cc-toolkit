@@ -33,7 +33,8 @@
 | | `/docs-skills` | Claude Code skills 작성·배포 docs 링크 |
 | 스킬 설명서 | `/man` | 스킬의 `MAN.md` 를 읽고 설명·질의응답. 인자 없으면 문서화된 스킬 색인 |
 | | `/mkman` | 스킬을 분석해 그 폴더에 `MAN.md` (사용자용 설명서) 생성 |
-| 도메인 지식 | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
+| 도메인 지식 | `/man-addon` | addon 시스템 사용자 매뉴얼 — agentaddon `event` 파일 위치·줄 문법·규칙 켜고 끄기 |
+| | `/man-banaction` | banaction 가드 매뉴얼 — `.banaction` 규칙 형식·위치·거부 동작 안내 |
 | | `/available-addon-rule` | agentaddon `event` 파일에 적어 켤 수 있는 규칙 이름 목록 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
 | 스펙 | `/interview` | 계획·결정·아이디어를 질문 하나씩 + 추천 답으로 집요하게 인터뷰. 종료는 사용자가 선언, 요약 파일은 opt-in |
