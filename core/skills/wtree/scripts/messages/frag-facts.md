@@ -1,5 +1,0 @@
-- wtree CLI: OK — {WTREE_VERSION}
-- repo: {PRIMARY} (common dir: {COMMON})
-- existing policy: none — good to set up
-- shared .wtree/: {DOTWTREE_LINE}
-- root branch: {ROOT}

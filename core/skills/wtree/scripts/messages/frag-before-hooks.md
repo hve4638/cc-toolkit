@@ -1,1 +1,0 @@
-- Open every file under {HOOK_PATH}/ and walk them through with the user — each was assembled with its option defaults, and the alternatives per adjustment point are listed in the chosen hook templates' INFO.md. Edit a file when their taste differs

@@ -1,355 +1,103 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { mergeHooks, planStep1, renderHook, shq } from '../../skills/wtree/scripts/lib/actions.mjs';
+import { HOOK_KINDS, mergeFeatures, readHookFiles } from '../../skills/wtree/scripts/lib/actions.mjs';
+import { listHookVariants } from '../../skills/wtree/scripts/lib/setuplib.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SCRIPTS = join(__dirname, '..', '..', 'skills', 'wtree', 'scripts');
-const STEP1 = join(SCRIPTS, 'step1.mjs');
-const STEP2 = join(SCRIPTS, 'step2.mjs');
-const TMUX_TPL = {
-  name: 'tmux-window',
-  dir: join(SCRIPTS, '..', 'templates', 'hooks', 'tmux-window'),
-};
+const TPL_ROOT = join(__dirname, '..', '..', 'skills', 'wtree', 'templates', 'hooks');
+const ALWAYS = join(TPL_ROOT, 'tmux-window', 'always');
+const INTERACTIVE_ONLY = join(TPL_ROOT, 'tmux-window', 'interactive-only');
 
-// 실제 wtree CLI 는 머신마다 있을 수도 없을 수도 있다. 게이트의 `(gitwtree)`
-// 문자열 검사와 step2 의 `init --load` 만 흉내내는 shim 을 PATH 맨 앞에 둬서
-// 테스트를 어느 머신에서든 같게 만든다.
-function makeShimBin() {
-  const bin = mkdtempSync(join(tmpdir(), 'wtree-shim-'));
-  const shim = join(bin, 'wtree');
-  writeFileSync(
-    shim,
-    `#!/bin/sh
-case "$1" in
-  --version) echo "wtree 0.0.0 (gitwtree)" ;;
-  init)
-    d="$(git rev-parse --path-format=absolute --git-common-dir)/wtree"
-    mkdir -p "$d"
-    [ -f "$3/rules" ] && cp "$3/rules" "$d/rules"
-    [ -f "$3/settings" ] && cp "$3/settings" "$d/settings"
-    echo "loaded rules from $3"
-    ;;
-  *) echo "shim: unknown verb $1" >&2; exit 1 ;;
-esac
-`,
-  );
-  chmodSync(shim, 0o755);
-  return bin;
-}
+// ---------------------------------------------------------------- 템플릿 변형
 
-function makeRepo(branch = 'main') {
-  const dir = mkdtempSync(join(tmpdir(), 'wtree-setup-'));
-  const repo = join(dir, 'repo');
-  mkdirSync(repo);
-  const g = (args) =>
-    spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
-  g(['init', '-q', '-b', branch]);
-  g(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init']);
-  return { dir, repo };
-}
-
-const SHIM_BIN = makeShimBin();
-
-function run(script, { cwd, answer, argv = [], wtree = true } = {}) {
-  const path = wtree
-    ? `${SHIM_BIN}:/usr/bin:/bin`
-    : '/usr/bin:/bin';
-  const args = [script, ...argv];
-  if (answer !== undefined) args.push('--answer', JSON.stringify(answer));
-  const r = spawnSync(process.execPath, args, {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env, PATH: path },
-  });
-  return { status: r.status, out: r.stdout, err: r.stderr };
-}
-
-// ---------------------------------------------------------------- step1 게이트
-
-test('step1: wtree CLI 부재는 Blocked', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, { cwd: repo, wtree: false });
-  assert.match(r.out, /<status>Blocked<\/status>/);
-  assert.match(r.out, /standalone wtree CLI not found/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: git repo 밖은 Blocked', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wtree-nogit-'));
-  const r = run(STEP1, { cwd: dir });
-  assert.match(r.out, /<status>Blocked<\/status>/);
-  assert.match(r.out, /not inside a git work tree/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 이미 설정된 repo 는 Blocked', () => {
-  const { dir, repo } = makeRepo();
-  mkdirSync(join(repo, '.git', 'wtree'), { recursive: true });
-  writeFileSync(join(repo, '.git', 'wtree', 'rules'), '[main]\n');
-  const r = run(STEP1, { cwd: repo });
-  assert.match(r.out, /<status>Blocked<\/status>/);
-  assert.match(r.out, /already configured/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------- step1 라운드
-
-test('step1: 무인자 fresh 라운드는 path 만 요구한다', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, { cwd: repo });
-  assert.match(r.out, /<status>Required Answer<\/status>/);
-  assert.match(r.out, /- path: "\.wtree"/);
-  assert.match(r.out, /root branch: main/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: path 만 답하면 나머지 키와 질문을 모아 알린다', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, { cwd: repo, answer: { path: '.wtree' } });
-  assert.equal(r.status, 1);
-  assert.match(r.out, /<status>Required Answer<\/status>/);
-  assert.match(r.out, /- branch_shape: /);
-  assert.match(r.out, /- hooks: /);
-  assert.match(r.out, /- where: /);
-  assert.match(r.out, /<question>/);
-  assert.ok(!existsSync(join(repo, '.wtree')), 'incomplete answer must not create anything');
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 모르는 키는 Error, 무변화', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, { cwd: repo, answer: { path: '.wtree', nope: 1 } });
-  assert.match(r.out, /<status>Error<\/status>/);
-  assert.match(r.out, /unknown key in --answer: nope/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------- step1 실행
-
-test('step1: 완전한 answer 는 작업장을 만든다 (셰이프·settings)', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, {
-    cwd: repo,
-    answer: { path: '.wtree', branch_shape: 'main-work', hooks: [], where: '../' },
-  });
-  assert.match(r.out, /<status>Success<\/status>/);
-  const rules = readFileSync(join(repo, '.wtree', 'rules'), 'utf8');
-  assert.match(rules, /^\[main\]/m);
-  const settings = readFileSync(join(repo, '.wtree', 'settings'), 'utf8');
-  assert.match(settings, new RegExp(`worktree-dir = \\.\\./${basename(repo)}\\.worktrees`));
-  assert.match(r.out, /step2\.mjs --answer/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 템플릿 루트가 repo 루트 브랜치로 개명된다', () => {
-  const { dir, repo } = makeRepo('trunk');
-  const r = run(STEP1, {
-    cwd: repo,
-    answer: { path: '.wtree', branch_shape: 'main-work', hooks: [], where: '../' },
-  });
-  assert.match(r.out, /applied: root branch main -> trunk/);
-  const rules = readFileSync(join(repo, '.wtree', 'rules'), 'utf8');
-  assert.match(rules, /^\[trunk\]/m);
-  assert.ok(!/^\[main\]/m.test(rules));
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 훅 선택은 post-create 로 반영되고 step2 에 copy_hooks 가 실린다', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP1, {
-    cwd: repo,
-    answer: { path: '.wtree', branch_shape: 'main-work', hooks: ['tmux-window'], where: '../' },
-  });
-  assert.match(r.out, /<status>Success<\/status>/);
-  assert.ok(existsSync(join(repo, '.wtree', 'hooks', 'post-create')));
-  assert.match(r.out, /"copy_hooks":true/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 기존 작업장은 .old 로 회전한다', () => {
-  const { dir, repo } = makeRepo();
-  mkdirSync(join(repo, '.wtree'));
-  writeFileSync(join(repo, '.wtree', 'rules'), '[old-stuff]\n');
-  const r = run(STEP1, {
-    cwd: repo,
-    answer: {
-      path: '.wtree', allow_overwrite: true, branch_shape: 'main-work', hooks: [], where: '../',
-    },
-  });
-  assert.match(r.out, /<status>Success<\/status>/);
-  assert.match(readFileSync(join(repo, '.wtree.old', 'rules'), 'utf8'), /old-stuff/);
-  assert.match(readFileSync(join(repo, '.wtree', 'rules'), 'utf8'), /^\[main\]/m);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step1: 기존 .wtree 발견 라운드와 채택(adopt) handoff', () => {
-  const { dir, repo } = makeRepo();
-  mkdirSync(join(repo, '.wtree'));
-  writeFileSync(join(repo, '.wtree', 'rules'), '[main]\nchildren = *\n');
-  const round = run(STEP1, { cwd: repo });
-  assert.match(round.out, /<status>Required Answer<\/status>/);
-  assert.match(round.out, /disposal of the existing policy/);
-
-  const adopt = run(STEP1, { cwd: repo, answer: { path: '.wtree', where: '../' } });
-  assert.match(adopt.out, /<status>Success<\/status>/);
-  assert.match(adopt.out, /adopted: .*\.wtree as-is/);
-  assert.match(adopt.out, /"where":"\.\.\/"/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------- step2
-
-test('step2: 적용 — init --load, settings 보완, CLAUDE.md', () => {
-  const { dir, repo } = makeRepo();
-  const step1 = run(STEP1, {
-    cwd: repo,
-    answer: { path: '.wtree', branch_shape: 'main-work', hooks: [], where: '../' },
-  });
-  assert.match(step1.out, /<status>Success<\/status>/);
-  const r = run(STEP2, { cwd: repo, answer: { path: join(repo, '.wtree') } });
-  assert.match(r.out, /<status>Success<\/status>/);
-  assert.ok(existsSync(join(repo, '.git', 'wtree', 'rules')));
-  const claude = join(dir, `${basename(repo)}.worktrees`, 'CLAUDE.md');
-  assert.ok(existsSync(claude), 'worktree folder CLAUDE.md');
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step2: 훅 문법 오류는 아무것도 반영하지 않는다', () => {
-  const { dir, repo } = makeRepo();
-  const ws = join(repo, '.wtree');
-  mkdirSync(join(ws, 'hooks'), { recursive: true });
-  writeFileSync(join(ws, 'rules'), '[main]\nchildren = *\n');
-  writeFileSync(join(ws, 'settings'), 'worktree-dir = ../x.worktrees\n');
-  writeFileSync(join(ws, 'hooks', 'post-create'), '#!/bin/sh\nif then fi (\n');
-  const r = run(STEP2, { cwd: repo, answer: { path: ws, copy_hooks: true } });
-  assert.match(r.out, /<status>Error<\/status>/);
-  assert.match(r.out, /failed `sh -n`/);
-  assert.ok(!existsSync(join(repo, '.git', 'wtree')), 'nothing must be applied');
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step2: copy_hooks true 는 훅을 복사하고 실행 권한을 준다', () => {
-  const { dir, repo } = makeRepo();
-  const ws = join(repo, '.wtree');
-  mkdirSync(join(ws, 'hooks'), { recursive: true });
-  writeFileSync(join(ws, 'rules'), '[main]\nchildren = *\n');
-  writeFileSync(join(ws, 'settings'), 'worktree-dir = ../x.worktrees\n');
-  writeFileSync(join(ws, 'hooks', 'post-create'), '#!/bin/sh\ntrue\n');
-  const r = run(STEP2, { cwd: repo, answer: { path: ws, copy_hooks: true } });
-  assert.match(r.out, /<status>Success<\/status>/);
-  const hook = join(repo, '.git', 'wtree', 'hooks', 'post-create');
-  assert.ok(existsSync(hook));
-  rmSync(dir, { recursive: true, force: true });
-});
-
-test('step2: answer 없는 호출은 정상 루트 이탈 오류다', () => {
-  const { dir, repo } = makeRepo();
-  const r = run(STEP2, { cwd: repo });
-  assert.match(r.out, /<status>Error<\/status>/);
-  rmSync(dir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------- 훅 조립
-
-// sh -n 으로 조립 결과가 유효한 셸인지 확인한다 — executeStep2 의 선검사와 같은 검사다.
+// sh -n 으로 유효한 셸인지 확인한다 — tui 의 기록 선검사와 같은 검사다.
 function shOk(text) {
   const dir = mkdtempSync(join(tmpdir(), 'wtree-hook-'));
-  const f = join(dir, 'post-create');
+  const f = join(dir, 'hook');
   writeFileSync(f, text);
   const r = spawnSync('sh', ['-n', f], { encoding: 'utf8' });
   rmSync(dir, { recursive: true, force: true });
   return r.status === 0;
 }
 
-test('renderHook: 답이 없으면 스펙 기본값으로 조립된다', () => {
-  const text = renderHook(TMUX_TPL)['post-create'];
+test('listHookVariants: tmux-window 두 변형이 같은 배타 그룹(feature)으로 열거된다', () => {
+  const variants = listHookVariants().filter((v) => v.feature === 'tmux-window');
+  assert.deepEqual(variants.map((v) => v.variant), ['always', 'interactive-only']);
+  for (const v of variants) {
+    assert.equal(v.name, `tmux-window · ${v.variant}`);
+    assert.ok(v.summary.length > 0, 'INFO first line as summary');
+  }
+});
+
+test('템플릿 변형은 완성품이다 — 슬롯 없음, sh -n 통과', () => {
+  for (const dir of [ALWAYS, INTERACTIVE_ONLY]) {
+    const files = readHookFiles(dir);
+    assert.deepEqual(Object.keys(files).sort(), ['post-create', 'post-destroy']);
+    for (const [kind, text] of Object.entries(files)) {
+      assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), `${dir}/${kind}: no {KEY} slot`);
+      assert.ok(shOk(text), `${dir}/${kind}: passes sh -n`);
+    }
+  }
+});
+
+test('always 변형: 항상 윈도우를 열고, 포커스는 interactive 실행일 때만 이동한다', () => {
+  const text = readHookFiles(ALWAYS)['post-create'];
   assert.match(text, /detach=-d\n\[ "\$\{WTREE_INTERACTIVE:-0\}" = 1 \] && detach=/);
-  assert.match(text, /^prefix=''$/m);
-  assert.match(text, /tmux send-keys -t "\$win" 'claude' Enter/);
-  assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), 'no unfilled slot');
-  assert.ok(shOk(text), 'passes sh -n');
+  assert.ok(!text.includes('|| exit 0   # non-interactive'), 'no creation gate');
+  assert.ok(text.includes(`tmux send-keys -t "$win" 'claude' Enter`));
 });
 
-test('renderHook: post-destroy 도 조립된다 — 가드와 ask 재호출 포함', () => {
-  const text = renderHook(TMUX_TPL)['post-destroy'];
-  assert.ok(text.includes('pane_current_path'), 'all-panes-on-dead-path gate');
-  assert.ok(text.includes('kill-window'));
-  assert.ok(text.includes('--ask'));
-  assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), 'no unfilled slot');
-  assert.ok(shOk(text), 'passes sh -n');
+test('interactive-only 변형: 비대화 실행은 윈도우를 아예 만들지 않는다', () => {
+  const text = readHookFiles(INTERACTIVE_ONLY)['post-create'];
+  assert.match(text, /\[ "\$\{WTREE_INTERACTIVE:-0\}" = 1 \] \|\| exit 0/);
+  assert.ok(!text.includes('detach'), 'no detach branch — focus always moves when it runs');
+  assert.ok(text.includes(`tmux send-keys -t "$win" 'claude' Enter`));
 });
 
-test('renderHook: focus=always · command=none 답이 반영된다', () => {
-  const text = renderHook(TMUX_TPL, { FOCUS: 'always', COMMAND: 'none' })['post-create'];
-  assert.match(text, /# focus: always move\ndetach=\n/);
-  assert.ok(!text.includes('&& detach='), 'no interactive branch line');
-  assert.ok(!text.includes('send-keys'));
-  assert.ok(!/\n{3,}/.test(text), 'no triple blank lines after an empty slot');
-  assert.ok(shOk(text));
-});
-
-test('renderHook: input 값은 셸 인용을 거친다 (작은따옴표 포함)', () => {
-  const text = renderHook(TMUX_TPL, {
-    PREFIX: 'wt:',
-    COMMAND: { id: 'custom', value: "echo 'hi'" },
-  })['post-create'];
-  assert.match(text, /^prefix='wt:'$/m);
-  assert.ok(text.includes(`tmux send-keys -t "$win" ${shq("echo 'hi'")} Enter`));
-  assert.ok(shOk(text));
-});
-
-// replaceAll 문자열 대치의 $ 패턴 해석과, 삽입된 내용이 다른 슬롯 치환에
-// 재스캔되는 두 유출 경로의 회귀 테스트 — 인용된 입력은 바이트 그대로 남는다.
-test('renderHook: $ 대치 패턴과 {KEY} 를 품은 입력도 인용된 그대로 남는다', () => {
-  const evil = `echo $'hi' $& $$ \${X} {PRINT} {COMMAND}`;
-  const text = renderHook(TMUX_TPL, {
-    PREFIX: '{COMMAND}',
-    COMMAND: { id: 'custom', value: evil },
-  })['post-create'];
-  assert.ok(text.includes(`tmux send-keys -t "$win" ${shq(evil)} Enter`));
-  assert.match(text, /^prefix='\{COMMAND\}'$/m);
-  assert.ok(shOk(text));
-});
-
-test('renderHook: 모르는 case id · 값 없는 input case 는 던진다', () => {
-  assert.throws(() => renderHook(TMUX_TPL, { FOCUS: 'sometimes' }), /unknown case/);
-  assert.throws(() => renderHook(TMUX_TPL, { COMMAND: 'custom' }), /needs a value/);
-});
-
-test('planStep1: 조립 실패는 plan 시점에 터진다 — 실행 전, 파일시스템 무변화', () => {
-  assert.throws(
-    () =>
-      planStep1(
-        { ws: '/tmp/none', hooks: ['tmux-window'], hookAnswers: { 'tmux-window': { FOCUS: 'nope' } }, where: '../' },
-        { detRoot: 'main', hookTpls: [TMUX_TPL], primary: '/tmp/repo' },
-      ),
-    /unknown case/,
+test('두 변형의 post-destroy 는 동일 사본이다 (드리프트 가드)', () => {
+  assert.equal(
+    readFileSync(join(ALWAYS, 'post-destroy'), 'utf8'),
+    readFileSync(join(INTERACTIVE_ONLY, 'post-destroy'), 'utf8'),
   );
 });
 
-test('mergeHooks: $0 재호출 훅이 같은 종류에서 겹치면 조립을 거부한다', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wtree-tpl-'));
-  const other = join(dir, 'other');
-  mkdirSync(other);
-  writeFileSync(join(other, 'post-destroy'), '#!/bin/sh\ntrue\n');
+// ---------------------------------------------------------------- 병합
+
+test('mergeFeatures: $0 재호출 훅이 같은 종류에서 겹치면 조립을 거부한다', () => {
   // tmux-window 의 post-destroy 는 $0 재호출 — 병합되면 재진입이 뒤 절까지 돈다.
-  assert.throws(() => mergeHooks([TMUX_TPL, { name: 'other', dir: other }]), /cannot be merged/);
-  rmSync(dir, { recursive: true, force: true });
+  const a = { name: 'tmux-window · always', files: readHookFiles(ALWAYS) };
+  const b = { name: 'other', files: { 'post-destroy': '#!/bin/sh\ntrue\n' } };
+  assert.throws(() => mergeFeatures([a, b]), /cannot be merged/);
 });
+
+test('mergeFeatures: 같은 종류만 서브셸 격리로 병합하고, 종류별 파일로 돌려준다', () => {
+  const a = { name: 'tmux-window · always', files: readHookFiles(ALWAYS) };
+  const b = { name: 'plain', files: { 'post-create': '#!/bin/sh\ntrue\n' } };
+  const merged = mergeFeatures([a, b]);
+  assert.match(merged['post-create'], /# === tmux-window · always ===\n\(/);
+  assert.match(merged['post-create'], /# === plain ===\n\(\ntrue\n\)/);
+  assert.ok(shOk(merged['post-create']));
+  // post-destroy 는 한쪽만 가지므로 병합 없이 단독 파일 그대로다.
+  assert.ok(merged['post-destroy'].includes('kill-window'));
+  assert.ok(!merged['post-destroy'].includes('# ==='));
+});
+
+test('mergeFeatures: 가져온 기존 훅(원시 파일)도 같은 모양으로 섞인다', () => {
+  const imported = { name: '/repo/.wtree/hooks', files: { 'pre-merge': '#!/bin/sh\necho SHARED\n' } };
+  const composed = { name: 'tmux-window · always', files: readHookFiles(ALWAYS) };
+  const merged = mergeFeatures([imported, composed]);
+  assert.equal(merged['pre-merge'], '#!/bin/sh\necho SHARED\n');
+  assert.ok(merged['post-create'].includes('send-keys'));
+  assert.deepEqual(Object.keys(merged).sort(), HOOK_KINDS.filter((k) => k in merged).sort());
+});
+
+// ---------------------------------------------------------------- post-destroy 가드
 
 // post-destroy 가드 동작 — stub tmux 를 PATH 에 놓고 헤르메틱하게 돌린다.
 // split-window 호출 여부가 관찰 대상이다 (ask pane 이 뜨는가/안 뜨는가).
@@ -372,7 +120,7 @@ esac
   );
   chmodSync(join(bin, 'tmux'), 0o755);
   const hook = join(dir, 'post-destroy');
-  writeFileSync(hook, renderHook(TMUX_TPL)['post-destroy']);
+  writeFileSync(hook, readFileSync(join(ALWAYS, 'post-destroy'), 'utf8'));
   const r = spawnSync('sh', [hook], {
     encoding: 'utf8',
     env: {
@@ -408,23 +156,4 @@ test('post-destroy: pane 목록 실패·빈 목록·계약 env 부재는 fail-cl
   assert.ok(!runPostDestroy({ panes: '/x/wt', panesExit: 1 }).calls.includes('split-window'));
   assert.ok(!runPostDestroy({ panes: '' }).calls.includes('split-window'));
   assert.ok(!runPostDestroy({ panes: '/x/wt', env: { WTREE_PATH: '' } }).calls.includes('split-window'));
-});
-
-test('mergeHooks: 같은 종류만 서브셸 격리로 병합하고, 종류별 파일로 돌려준다', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wtree-tpl-'));
-  const plain = join(dir, 'plain');
-  mkdirSync(plain);
-  writeFileSync(join(plain, 'post-create'), '#!/bin/sh\ntrue\n');
-  const merged = mergeHooks(
-    [TMUX_TPL, { name: 'plain', dir: plain }],
-    { 'tmux-window': { FOCUS: 'never', COMMAND: 'none' } },
-  );
-  assert.match(merged['post-create'], /# === tmux-window ===\n\(/);
-  assert.match(merged['post-create'], /# === plain ===\n\(\ntrue\n\)/);
-  assert.match(merged['post-create'], /# focus: never move/);
-  assert.ok(shOk(merged['post-create']));
-  // post-destroy 는 tmux-window 만 가지므로 병합 없이 단독 파일 그대로다.
-  assert.ok(merged['post-destroy'].includes('kill-window'));
-  assert.ok(!merged['post-destroy'].includes('# ==='));
-  rmSync(dir, { recursive: true, force: true });
 });

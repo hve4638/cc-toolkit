@@ -1,7 +1,0 @@
-[main]
-children = group:work
-destroyable = false
-merge-mode = squash
-
-[group:work]
-name-allow = feat/*, fix/*, refactor/*, perf/*, docs/*, test/*, chore/*

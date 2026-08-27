@@ -1,0 +1,14 @@
+#!/bin/sh
+# wtree post-create hook — opens a tmux window per new worktree, but only on
+# interactive runs (wtree new typed in a terminal), and moves focus to it.
+# A non-interactive run (an agent calling wtree) creates no window at all.
+# Env: WTREE_PATH(worktree path) WTREE_BRANCH(branch) WTREE_REPO(repo root)
+#      WTREE_INTERACTIVE(1 on a terminal run) WTREE_VERB(new|open)
+
+[ -n "${TMUX:-}" ] || exit 0   # outside tmux, do nothing
+[ "${WTREE_INTERACTIVE:-0}" = 1 ] || exit 0   # non-interactive: no window
+
+win=$(tmux new-window -P -F '#{window_id}' -c "$WTREE_PATH" -n "$WTREE_BRANCH") || exit 0
+
+# send-keys, because tmux new-window <cmd> runs a non-interactive shell that skips the user's aliases and functions
+tmux send-keys -t "$win" 'claude' Enter

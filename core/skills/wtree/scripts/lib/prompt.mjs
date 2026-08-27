@@ -99,6 +99,19 @@ async function dropKeysFor(ms) {
 // 순환 이동 — 테스트를 위해 순수 함수로 분리
 export const moveIndex = (index, delta, len) => (index + delta + len) % len;
 
+// multiselect 토글 — 항목에 group 이 있으면 같은 group 은 배타다: 하나를 켜면
+// 같은 group 의 켜진 항목이 꺼진다(한 기능의 변형 중 하나만). 테스트를 위해
+// 순수 함수로 분리.
+export function toggleIndex(on, idx, items) {
+  if (on.has(idx)) {
+    on.delete(idx);
+    return;
+  }
+  const g = items[idx].group;
+  if (g) for (const i of [...on]) if (items[i].group === g) on.delete(i);
+  on.add(idx);
+}
+
 // 항목 줄이 터미널 폭을 넘어 줄바꿈되면 "N 줄 위로" 커서 산수가 전부 깨지므로,
 // 그리기 전에 표시 폭으로 자른다. 한글·CJK 는 터미널에서 2칸이다.
 const wideChar =
@@ -139,7 +152,10 @@ function itemLine(it, active, marker) {
     ],
     cols(),
   );
-  return segs.map((s) => (s.tint ? s.tint(s.text) : s.text)).join('');
+  return {
+    text: segs.map((s) => (s.tint ? s.tint(s.text) : s.text)).join(''),
+    width: segs.reduce((w, s) => w + displayWidth(s.text), 0),
+  };
 }
 
 const labelOf = (it) => (typeof it === 'string' ? it : it.label);
@@ -148,10 +164,17 @@ const labelOf = (it) => (typeof it === 'string' ? it : it.label);
 // 감기는지를 세서 접기(collapse)의 "N 줄 위로" 산수에 넣는다.
 const rowsOf = (plain) => Math.max(1, Math.ceil(displayWidth(plain) / cols()));
 
+// 지난번에 그린 각 줄의 표시 폭으로, 그 블록이 폭 c 인 화면에서 차지하는
+// 행수를 계산한다. 창이 좁아지면 tmux 가 그려 둔 줄을 재줄바꿈해 블록이
+// 늘어나므로, "N 줄 위로" 산수는 줄 수가 아니라 이 값을 써야 한다 —
+// 테스트를 위해 순수 함수로 분리.
+export const occupiedRows = (widths, c) =>
+  widths.reduce((r, w) => r + Math.max(1, Math.ceil(w / c)), 0);
+
 function writeHeader(message, hint, danger) {
   const q = danger ? paint.redBold(message) : paint.bold(message);
   out.write(`${paint.green('?')} ${q}${hint ? ` ${paint.dim(hint)}` : ''}\n`);
-  return { q, rows: rowsOf(`? ${message}${hint ? ` ${hint}` : ''}`) };
+  return { q, plain: `? ${message}${hint ? ` ${hint}` : ''}` };
 }
 
 /**
@@ -161,36 +184,52 @@ function writeHeader(message, hint, danger) {
  */
 export async function select({ message, items, initial = 0, hint = '', danger = false, delayMs = 0 }) {
   if (!items.length) throw new Error('select: empty items');
-  const { q, rows } = writeHeader(message, hint, danger);
+  const { q, plain } = writeHeader(message, hint, danger);
 
   return withRaw(async () => {
     if (delayMs) await dropKeysFor(delayMs);
     hideCursor();
     let idx = initial;
     let drawn = false;
+    let widths = [];
+    // 절단은 그리기 시점 폭 기준이므로, 창 크기가 바뀌면 그 자리에서 다시
+    // 그린다 — 키 입력 전까지 …로 잘린 채 남지 않게. 올라갈 행수는 지난
+    // 블록의 실점유(재줄바꿈 반영)로 센다.
     const draw = () => {
-      if (drawn) out.write(`\x1b[${items.length}A`);
-      for (let i = 0; i < items.length; i++) out.write(`\x1b[2K${itemLine(items[i], i === idx, '')}\n`);
+      if (drawn) out.write(`\x1b[${occupiedRows(widths, cols())}A\x1b[G\x1b[0J`);
+      widths = [];
+      for (let i = 0; i < items.length; i++) {
+        const l = itemLine(items[i], i === idx, '');
+        widths.push(l.width);
+        out.write(`${l.text}\n`);
+      }
       drawn = true;
     };
-    draw();
-    for (;;) {
-      const k = await nextKey();
-      if (isCtrlC(k)) die130();
-      if (k.name === 'up' || k.name === 'k') idx = moveIndex(idx, -1, items.length);
-      else if (k.name === 'down' || k.name === 'j') idx = moveIndex(idx, 1, items.length);
-      else if (k.name === 'return' || k.name === 'enter') {
-        out.write(`\x1b[${items.length + rows}A\x1b[0J`);
-        out.write(`${paint.green('✔')} ${q} ${paint.cyan(labelOf(items[idx]))}\n`);
-        showCursor();
-        return idx;
-      } else if (k.name === 'escape') {
-        out.write(`\x1b[${items.length + rows}A\x1b[0J`);
-        out.write(`${paint.red('✘')} ${q}\n`);
-        showCursor();
-        return null;
-      }
+    const collapse = () => out.write(`\x1b[${occupiedRows(widths, cols()) + rowsOf(plain)}A\x1b[G\x1b[0J`);
+    const onResize = () => drawn && draw();
+    out.on('resize', onResize);
+    try {
       draw();
+      for (;;) {
+        const k = await nextKey();
+        if (isCtrlC(k)) die130();
+        if (k.name === 'up' || k.name === 'k') idx = moveIndex(idx, -1, items.length);
+        else if (k.name === 'down' || k.name === 'j') idx = moveIndex(idx, 1, items.length);
+        else if (k.name === 'return' || k.name === 'enter') {
+          collapse();
+          out.write(`${paint.green('✔')} ${q} ${paint.cyan(labelOf(items[idx]))}\n`);
+          showCursor();
+          return idx;
+        } else if (k.name === 'escape') {
+          collapse();
+          out.write(`${paint.red('✘')} ${q}\n`);
+          showCursor();
+          return null;
+        }
+        draw();
+      }
+    } finally {
+      out.off('resize', onResize);
     }
   });
 }
@@ -199,54 +238,65 @@ export async function select({ message, items, initial = 0, hint = '', danger = 
  * 다중 선택 — Enter/space 가 항목을 켜고 끄고, 맨 아래 submit 행에서 Enter 로
  * 확정한다. 항목 위의 Enter 가 확정이 아니라 토글인 것은 의도다: 다른 질문들과
  * 달리 Enter 연타가 "아무것도 안 고름"으로 확정되는 함정을 없앤다.
+ * 항목의 group 은 배타 그룹이다 — 같은 group 에서는 하나만 켜진다.
  * 반환은 켠 인덱스 배열(없으면 빈 배열), Esc 는 null.
  */
 export async function multiselect({ message, items, hint = '', submitLabel = 'submit' }) {
   if (!items.length) throw new Error('multiselect: empty items');
-  const { q, rows } = writeHeader(message, hint, false);
-  const total = items.length + 1; // 마지막 행이 submit
-  const isSubmit = (i) => i === items.length;
+  const { q, plain } = writeHeader(message, hint, false);
+  const isSubmit = (i) => i === items.length; // 마지막 행이 submit
 
   return withRaw(async () => {
     hideCursor();
     let idx = 0;
     const on = new Set();
     let drawn = false;
+    let widths = [];
     const draw = () => {
-      if (drawn) out.write(`\x1b[${total}A`);
-      for (let i = 0; i < items.length; i++) {
-        const mark = on.has(i) ? '[x] ' : '[ ] ';
-        out.write(`\x1b[2K${itemLine(items[i], i === idx, mark)}\n`);
-      }
-      out.write(`\x1b[2K${itemLine({ label: submitLabel }, isSubmit(idx), '')}\n`);
+      if (drawn) out.write(`\x1b[${occupiedRows(widths, cols())}A\x1b[G\x1b[0J`);
+      widths = [];
+      const put = (l) => {
+        widths.push(l.width);
+        out.write(`${l.text}\n`);
+      };
+      for (let i = 0; i < items.length; i++) put(itemLine(items[i], i === idx, on.has(i) ? '[x] ' : '[ ] '));
+      put(itemLine({ label: submitLabel }, isSubmit(idx), ''));
       drawn = true;
     };
-    draw();
-    for (;;) {
-      const k = await nextKey();
-      if (isCtrlC(k)) die130();
-      const toggle = () => (on.has(idx) ? on.delete(idx) : on.add(idx));
-      if (k.name === 'up' || k.name === 'k') idx = moveIndex(idx, -1, total);
-      else if (k.name === 'down' || k.name === 'j') idx = moveIndex(idx, 1, total);
-      else if (k.name === 'space') {
-        if (!isSubmit(idx)) toggle();
-      } else if (k.name === 'return' || k.name === 'enter') {
-        if (!isSubmit(idx)) toggle();
-        else {
-          const picked = [...on].sort((a, b) => a - b);
-          out.write(`\x1b[${total + rows}A\x1b[0J`);
-          const shown = picked.length ? picked.map((i) => labelOf(items[i])).join(', ') : '-';
-          out.write(`${paint.green('✔')} ${q} ${paint.cyan(shown)}\n`);
-          showCursor();
-          return picked;
-        }
-      } else if (k.name === 'escape') {
-        out.write(`\x1b[${total + rows}A\x1b[0J`);
-        out.write(`${paint.red('✘')} ${q}\n`);
-        showCursor();
-        return null;
-      }
+    const collapse = () => out.write(`\x1b[${occupiedRows(widths, cols()) + rowsOf(plain)}A\x1b[G\x1b[0J`);
+    const onResize = () => drawn && draw();
+    out.on('resize', onResize);
+    try {
       draw();
+      for (;;) {
+        const k = await nextKey();
+        if (isCtrlC(k)) die130();
+        const toggle = () => toggleIndex(on, idx, items);
+        const total = items.length + 1;
+        if (k.name === 'up' || k.name === 'k') idx = moveIndex(idx, -1, total);
+        else if (k.name === 'down' || k.name === 'j') idx = moveIndex(idx, 1, total);
+        else if (k.name === 'space') {
+          if (!isSubmit(idx)) toggle();
+        } else if (k.name === 'return' || k.name === 'enter') {
+          if (!isSubmit(idx)) toggle();
+          else {
+            const picked = [...on].sort((a, b) => a - b);
+            collapse();
+            const shown = picked.length ? picked.map((i) => labelOf(items[i])).join(', ') : '-';
+            out.write(`${paint.green('✔')} ${q} ${paint.cyan(shown)}\n`);
+            showCursor();
+            return picked;
+          }
+        } else if (k.name === 'escape') {
+          collapse();
+          out.write(`${paint.red('✘')} ${q}\n`);
+          showCursor();
+          return null;
+        }
+        draw();
+      }
+    } finally {
+      out.off('resize', onResize);
     }
   });
 }
@@ -266,7 +316,16 @@ export function input({ message, def = '', prefill = false }) {
   return withRaw(async () => {
     const buf = prefill ? [...def] : [];
     let pos = buf.length;
+    let lastCursorCol = 1;
     const width = (chars) => chars.reduce((w, c) => w + chWidth(c), 0);
+    // 블록 시작(입력 줄의 1행 1열)으로 돌아가 지운다 — 창이 좁아져 지난
+    // 출력이 재줄바꿈됐으면 커서가 이어진 행에 있으므로, 지난 커서 열로
+    // 몇 행짜리가 됐는지 계산해 그만큼 올라간다.
+    const home = () => {
+      const up = Math.ceil(lastCursorCol / cols()) - 1;
+      if (up > 0) out.write(`\x1b[${up}A`);
+      out.write('\x1b[G\x1b[0J');
+    };
     const draw = () => {
       const budget = Math.max(8, cols() - headW - 2);
       let s = 0;
@@ -275,40 +334,50 @@ export function input({ message, def = '', prefill = false }) {
       let e = pos;
       let rest = budget - w;
       while (e < buf.length && rest >= chWidth(buf[e])) rest -= chWidth(buf[e++]);
-      out.write(`\x1b[G\x1b[2K${headStr}${buf.slice(s, e).join('')}`);
-      out.write(`\x1b[${headW + width(buf.slice(s, pos)) + 1}G`);
+      home();
+      out.write(`${headStr}${buf.slice(s, e).join('')}`);
+      lastCursorCol = headW + width(buf.slice(s, pos)) + 1;
+      out.write(`\x1b[${lastCursorCol}G`);
     };
-    draw();
-    for (;;) {
-      const k = await nextKey();
-      if (isCtrlC(k)) die130();
-      if (k.name === 'return' || k.name === 'enter') {
-        const v = buf.join('').trim() || (prefill ? '' : def);
-        out.write(`\x1b[G\x1b[0J${paint.green('✔')} ${paint.bold(message)} ${paint.cyan(v)}\n`);
-        return v;
-      } else if (k.name === 'escape') {
-        out.write(`\x1b[G\x1b[0J${paint.red('✘')} ${paint.bold(message)}\n`);
-        return null;
-      } else if (k.name === 'left') {
-        if (pos > 0) pos--;
-      } else if (k.name === 'right') {
-        if (pos < buf.length) pos++;
-      } else if (k.name === 'home' || (k.ctrl && k.name === 'a')) {
-        pos = 0;
-      } else if (k.name === 'end' || (k.ctrl && k.name === 'e')) {
-        pos = buf.length;
-      } else if (k.name === 'backspace') {
-        if (pos > 0) buf.splice(--pos, 1);
-      } else if (k.name === 'delete') {
-        if (pos < buf.length) buf.splice(pos, 1);
-      } else {
-        const ch = k.sequence ?? '';
-        if (!k.ctrl && !k.meta && ch && ![...ch].some((c) => c < ' ' || c === '\x7f')) {
-          buf.splice(pos, 0, ...ch);
-          pos += [...ch].length;
-        }
-      }
+    const onResize = () => draw();
+    out.on('resize', onResize);
+    try {
       draw();
+      for (;;) {
+        const k = await nextKey();
+        if (isCtrlC(k)) die130();
+        if (k.name === 'return' || k.name === 'enter') {
+          const v = buf.join('').trim() || (prefill ? '' : def);
+          home();
+          out.write(`${paint.green('✔')} ${paint.bold(message)} ${paint.cyan(v)}\n`);
+          return v;
+        } else if (k.name === 'escape') {
+          home();
+          out.write(`${paint.red('✘')} ${paint.bold(message)}\n`);
+          return null;
+        } else if (k.name === 'left') {
+          if (pos > 0) pos--;
+        } else if (k.name === 'right') {
+          if (pos < buf.length) pos++;
+        } else if (k.name === 'home' || (k.ctrl && k.name === 'a')) {
+          pos = 0;
+        } else if (k.name === 'end' || (k.ctrl && k.name === 'e')) {
+          pos = buf.length;
+        } else if (k.name === 'backspace') {
+          if (pos > 0) buf.splice(--pos, 1);
+        } else if (k.name === 'delete') {
+          if (pos < buf.length) buf.splice(pos, 1);
+        } else {
+          const ch = k.sequence ?? '';
+          if (!k.ctrl && !k.meta && ch && ![...ch].some((c) => c < ' ' || c === '\x7f')) {
+            buf.splice(pos, 0, ...ch);
+            pos += [...ch].length;
+          }
+        }
+        draw();
+      }
+    } finally {
+      out.off('resize', onResize);
     }
   });
 }

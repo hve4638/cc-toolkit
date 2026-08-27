@@ -1,56 +1,23 @@
 ---
 name: wtree
-description: "Set up policy-based worktree management for a repo: a TUI pane (or fallback step scripts) composes the standalone wtree CLI's policy rules, settings, hooks, and worktree CLAUDE.md"
+description: "Set up policy-based worktree management for a repo: a TUI pane composes the wtree hooks, then hands off to the CLI's own wtree init for the branch rules"
 disable-model-invocation: true
 ---
 
 <wtree_instruction>
 # wtree — set up the wtree policy for this repo
 
-`/wtree` is a one-time setup for the standalone `wtree` CLI, run against the repo containing the cwd. It composes what the CLI cannot decide alone: the policy rules, the machine settings, hooks, and a CLAUDE.md for the worktree folder.
+`/wtree` is a one-time setup for the standalone `wtree` CLI, run against the repo containing the cwd. The CLI's own `wtree init` composes the rules and settings with its own interactive menu; the setup pane adds the one thing init does not cover — the wtree hooks.
 
-Two routes. Inside tmux (`$TMUX` set), use the TUI pane. Outside tmux, do not fall back on your own: recommend re-running inside tmux, mention the step-script route as the alternative, and take it only when the user explicitly asks for it. When talking with the user in Korean, append `--ko` to whichever script you run.
-
-## TUI route (default inside tmux)
-
-The user answers directly in a useterminal pane; deterministic work happens there, and prose work comes back to you through a handoff file.
-
-1. Before opening the pane, check for an existing workspace: if `<repo>/.wtree/hooks` exists, read each hook file. If anything acts beyond its apparent feature (network access, file deletion, credential access, …), warn the user first — adopting an existing workspace applies its hooks after only an in-pane confirmation.
-2. From the repo directory, open the pane:
+1. Hook safety check first: if `<repo>/.wtree/hooks` exists, read each hook file. If anything acts beyond its apparent feature (network access, file deletion, credential access, …), warn the user before opening the pane — the pane offers importing those hooks into the live policy.
+2. From the repo directory, open the pane (append `--ko` when talking with the user in Korean):
 
 ```bash
 useterminal exec node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/tui.mjs"
 ```
 
-3. Tell the user to complete the prompts in the pane, then end your turn and wait. Do not poll or drive the pane — it is the user's.
-4. When the user says the pane is done, read the handoff file and follow it — same tags as below:
+Outside tmux (`$TMUX` unset) there is no pane to open — the script is a plain interactive CLI, so give the user that command to run in their own terminal (the `!` prefix works) and end your turn.
 
-```bash
-cat "$(git rev-parse --path-format=absolute --git-common-dir)/wtree-setup-handoff.md"
-```
-
-Adopting an existing workspace applies inside that first pane, so the handoff may already be the final result. On the compose path the handoff hands you the review work, then an apply-pane command — the same open-wait-read loop once more. If the handoff file is missing or the pane closed at once, run the step route below to see the state.
-
-## Step route (fallback)
-
-The step scripts guide the whole run. Start below and follow each output.
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/skills/wtree/scripts/step1.mjs"
-```
-
-## Tag blocks
-
-Script outputs and the handoff file both come as tagged blocks:
-
-- `<status>` — first line of every output: `Required Answer` (fill the keys and re-run) | `Success` (the step's action is done) | `Blocked` (the environment prevents the setup) | `Error` (wrong input or route)
-- `<info>` — state, results, and instructions; follow it
-- `<require>` — keys the answer still needs, with value hints
-- `<question>` — ask the user exactly this, via the AskUserQuestion tool
-- `<alert>` — a warning to relay to the user
-- `<error>` — what is wrong; nothing was changed
-- `<next>` — the command to run next
-- `<output cmd="...">` — raw output of that command
-
-When a script or a `wtree` command fails it prints why — relay that to the user and stop.
+3. Everything happens in the pane: the user picks the hooks (and the existing `.wtree/hooks` import, when offered), the script writes them into the repo policy, then hands off to `wtree init` where the user picks the starter rules. Tell the user to complete the prompts, then end your turn and wait. Do not poll or drive the pane — it is the user's.
+4. There is no result file. When the user says the pane is done, read the applied policy with `wtree rule` and report it. If the pane ended on a failure, the user relays the on-screen message — follow it.
 </wtree_instruction>

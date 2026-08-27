@@ -1,1 +1,0 @@
-- Give the workspace a final look — any other agreed deviation goes in by editing the workspace files directly (name-allow tweaks in {RULES}, a custom worktree-dir in settings, …)

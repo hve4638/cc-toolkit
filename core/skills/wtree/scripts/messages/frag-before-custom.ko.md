@@ -1,1 +1,0 @@
-- {VOCAB} 를 참조해 {WS}/rules 를 사용자와 함께 작성하고, `wtree check {WS}/rules` 가 에러 0 이 될 때까지 반복한다 (경고는 사용자에게 전달)
