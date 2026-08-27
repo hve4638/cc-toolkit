@@ -1,14 +1,14 @@
 ---
-name: ticket
-description: "Analyze a plugin (skill/hook) failure surfaced in the current session and archive it as a sealed feedback ticket"
+name: add-pluginissue
+description: "Analyze a plugin (skill/hook) failure surfaced in the current session and archive it as a sealed plugin issue"
 disable-model-invocation: true
 argument-hint: "[what went wrong — a description of the problem]"
 ---
 
-<ticket_instruction>
-# ticket
+<add_pluginissue_instruction>
+# add-pluginissue
 
-Analyze a plugin problem that surfaced in the current session and store it as a sealed feedback ticket. The archive is keyed by its own sha256, so once sealed it is immutable.
+Analyze a plugin problem that surfaced in the current session and store it as a sealed plugin issue. The archive is keyed by its own sha256, so once sealed it is immutable.
 
 ## Workflow
 
@@ -18,7 +18,7 @@ Use the `chatrec` skill to find the turns where the problem surfaced and extract
 
 ### 2. Build the staging directory
 
-Create `.agent-memory/ticket/<timestamp>_<slug>/` (project-local, gitignored; timestamp from `date +"%Y-%m-%dT%H%M"`, slug kebab-case). Inside it:
+Create `.agent-memory/pluginissue/<timestamp>_<slug>/` (project-local, gitignored; timestamp from `date +"%Y-%m-%dT%H%M"`, slug kebab-case). Inside it:
 
 - `report.md` (required) — the frontmatter below plus prose.
 - `session.jsonl` (required) — the `chatrec clip` output from step 1.
@@ -27,15 +27,15 @@ Create `.agent-memory/ticket/<timestamp>_<slug>/` (project-local, gitignored; ti
 ### 3. Seal
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/skills/ticket/scripts/seal-ticket.mjs" <staging-dir>
+node "${CLAUDE_PLUGIN_ROOT}/skills/add-pluginissue/scripts/add-pluginissue.mjs" <staging-dir>
 ```
 
-It builds a tar.gz, computes its sha256, moves it to `~/.agent-memory/global/ticket/<sha256>.tar.gz`, appends one metadata line to `~/.agent-memory/global/ticket/index.jsonl`, and prints the final path and hash. Report those to the user.
+It builds a tar.gz, computes its sha256, moves it to `~/.agent-memory/global/pluginissue/<sha256>.tar.gz`, appends one metadata line to `~/.agent-memory/global/pluginissue/index.jsonl`, and prints the final path and hash. Report those to the user.
 
 ## report.md frontmatter (fixed fields)
 
 ```yaml
-id:               # e.g. tk-2026-06-30-001 (date-based, you assign)
+id:               # e.g. pi-2026-06-30-001 (date-based, you assign)
 created_at:       # ISO8601 UTC, immutable once written
 taxonomy_version: "1.0"
 plugin:           # plugin where it broke (best-guess + lower confidence if unsure)
@@ -61,6 +61,6 @@ Cover which feature broke and when, what, and why. Then, by `failure_type`:
 - `ENV_ISSUE` — a dependency, version, or runtime condition. Name the condition.
 
 End with `corrective_hint`: one line on how the next version should fix it. When a field is uncertain, say so and lower `confidence`.
-</ticket_instruction>
+</add_pluginissue_instruction>
 
 $ARGUMENTS

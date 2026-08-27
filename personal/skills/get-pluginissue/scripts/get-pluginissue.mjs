@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// get-ticket — query the global feedback-ticket store that core:ticket
-// publishes (~/.agent-memory/global/ticket/). Subcommands: list | show.
+// get-pluginissue — query the global plugin-issue store that add-pluginissue
+// publishes (~/.agent-memory/global/pluginissue/). Subcommands: list | show.
 // Read-only over the store; show also verifies the archive sha256 and unpacks
 // it. Deterministic; no dependency on core.
 
@@ -13,11 +13,11 @@ import { execFileSync } from 'node:child_process';
 // downstream pipes (head, wc) may close early; exit quietly instead of crashing
 process.stdout.on('error', err => { if (err.code === 'EPIPE') process.exit(0); throw err; });
 
-const STORE = path.join(os.homedir(), '.agent-memory', 'global', 'ticket');
+const STORE = path.join(os.homedir(), '.agent-memory', 'global', 'pluginissue');
 const INDEX = path.join(STORE, 'index.jsonl');
 
 function die(msg) {
-  process.stderr.write(`get-ticket: ${msg}\n`);
+  process.stderr.write(`get-pluginissue: ${msg}\n`);
   process.exit(1);
 }
 
@@ -71,8 +71,8 @@ function makeFilter(a) {
 
 function cmdList(a) {
   const { records, skipped } = readIndex();
-  if (skipped) process.stderr.write(`get-ticket: skipped ${skipped} malformed index line(s)\n`);
-  if (records.length === 0) { process.stdout.write('no tickets found\n'); return; }
+  if (skipped) process.stderr.write(`get-pluginissue: skipped ${skipped} malformed index line(s)\n`);
+  if (records.length === 0) { process.stdout.write('no issues found\n'); return; }
 
   const rows = records.filter(makeFilter(a))
     .sort((x, y) => String(x.created_at || '').localeCompare(String(y.created_at || '')));
@@ -93,7 +93,7 @@ function cmdList(a) {
 
   process.stdout.write(fmt(cols.map(([h]) => h)) + '\n');
   for (const c of cells) process.stdout.write(fmt(c) + '\n');
-  process.stdout.write(`\n${rows.length} ticket(s)\n`);
+  process.stdout.write(`\n${rows.length} issue(s)\n`);
 }
 
 function resolve(records, selector) {
@@ -116,13 +116,13 @@ function findReport(root) {
 
 function cmdShow(a) {
   const selector = a.pos[0];
-  if (!selector) die('show needs a selector (sha256 prefix or ticket id)');
+  if (!selector) die('show needs a selector (sha256 prefix or issue id)');
 
   const { records } = readIndex();
   const cands = resolve(records, selector);
-  if (cands.length === 0) die(`no ticket matches "${selector}"`);
+  if (cands.length === 0) die(`no issue matches "${selector}"`);
   if (cands.length > 1) {
-    process.stderr.write(`get-ticket: "${selector}" is ambiguous — ${cands.length} matches:\n`);
+    process.stderr.write(`get-pluginissue: "${selector}" is ambiguous — ${cands.length} matches:\n`);
     for (const c of cands) process.stderr.write(`  ${String(c.sha256 || '').slice(0, 12)}  ${c.id || ''}  ${c.summary || ''}\n`);
     process.exit(1);
   }
@@ -161,7 +161,7 @@ function cmdShow(a) {
     attachments = fs.readdirSync(attachDir).map(n => path.join(attachDir, n));
   }
 
-  process.stdout.write('\n--- ticket files ---\n');
+  process.stdout.write('\n--- issue files ---\n');
   process.stdout.write(`extracted to:  ${found.stagingDir}\n`);
   process.stdout.write(`session.jsonl: ${fs.existsSync(sessionPath) ? sessionPath : '(missing)'}\n`);
   process.stdout.write(`attachments:   ${attachments.length ? attachments.join('\n               ') : '(none)'}\n`);
@@ -170,5 +170,5 @@ function cmdShow(a) {
 const commands = { list: cmdList, show: cmdShow };
 const args = parseArgs(process.argv.slice(2));
 const run = commands[args.cmd];
-if (!run) die(`usage: get-ticket list [filters] | show <selector> [--out <dir>]  (got: ${args.cmd || '(none)'})`);
+if (!run) die(`usage: get-pluginissue list [filters] | show <selector> [--out <dir>]  (got: ${args.cmd || '(none)'})`);
 run(args);

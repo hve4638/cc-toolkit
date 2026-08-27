@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// seal-ticket — archive a staged feedback ticket into the global, immutable
-// ticket store. Builds a tar.gz, keys it by its own sha256, moves it to
-// ~/.agent-memory/global/ticket/, and appends one metadata line to index.jsonl.
+// add-pluginissue — archive a staged plugin issue into the global, immutable
+// issue store. Builds a tar.gz, keys it by its own sha256, moves it to
+// ~/.agent-memory/global/pluginissue/, and appends one metadata line to index.jsonl.
 // Deterministic; refuses to seal a directory missing report.md or session.jsonl.
 
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 function die(msg) {
-  process.stderr.write(`seal-ticket: ${msg}\n`);
+  process.stderr.write(`add-pluginissue: ${msg}\n`);
   process.exit(1);
 }
 
@@ -45,7 +45,7 @@ function parseFrontmatter(md) {
 
 const arg = process.argv[2];
 if (!arg) {
-  process.stderr.write('usage: seal-ticket <report-dir>\n');
+  process.stderr.write('usage: add-pluginissue <report-dir>\n');
   process.exit(1);
 }
 
@@ -64,7 +64,7 @@ if (needMeta.length) die(`report.md frontmatter missing/empty: ${needMeta.join('
 
 // Destination first, so the tar.gz is built on the same filesystem and the
 // final rename to <sha256>.tar.gz is atomic (no cross-device move).
-const destDir = path.join(os.homedir(), '.agent-memory', 'global', 'ticket');
+const destDir = path.join(os.homedir(), '.agent-memory', 'global', 'pluginissue');
 fs.mkdirSync(destDir, { recursive: true });
 
 // Archive paths are relative to the staging folder name (-C parent dirname).
@@ -107,7 +107,7 @@ try {
       .some(l => { try { return JSON.parse(l).sha256 === sha256; } catch { return false; } });
   if (!dup) fs.appendFileSync(indexPath, JSON.stringify(record) + '\n');
 
-  process.stdout.write(`sealed ticket\n  archive: ${destPath}\n  sha256:  ${sha256}\n`);
+  process.stdout.write(`sealed issue\n  archive: ${destPath}\n  sha256:  ${sha256}\n`);
 } catch (e) {
   try { fs.unlinkSync(tmpTar); } catch {}
   if (destPath) { try { fs.unlinkSync(destPath); } catch {} }

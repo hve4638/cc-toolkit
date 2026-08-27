@@ -13,7 +13,6 @@ Claude Code 용 개인 플러그인 마켓플레이스.
 | [`research`](./research) | 리서치 워크플로 (journal, plan, report, commit) |
 | [`aris`](./aris) | 학술 논문 자동화 (Autonomous Research In Sleep) |
 | [`usefable`](./usefable) | Fable 티어 에이전트 — core 의 executor·리뷰/검수 계열을 fable- prefix 최상위 모델 변형으로 제공 |
-| [`plugin-devtool`](./plugin-devtool) | 이 마켓플레이스 저작용 도구 — core:ticket 이 발행한 피드백 티켓 조회 (`get-ticket`). 일반 세션엔 불필요 |
 
 ## 설치
 
@@ -29,7 +28,6 @@ Claude Code 용 개인 플러그인 마켓플레이스.
 /plugin install research@hve
 /plugin install aris@hve
 /plugin install usefable@hve
-/plugin install plugin-devtool@hve
 ```
 
 ## 설치 후 설정
