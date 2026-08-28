@@ -1,0 +1,13 @@
+{
+  "name": "ws",
+  "version": "0.1.0",
+  "description": "Workspace conventions — wsinit scaffolding, rule-of-workspace, todo skills and the todo CLI",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin"
+  ]
+}

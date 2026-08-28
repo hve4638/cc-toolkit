@@ -51,6 +51,11 @@
       "name": "personal",
       "source": "./personal",
       "description": "Strictly personal environment customization — session-injected personal instructions and personal workflow skills. Not meant for sharing"
+    },
+    {
+      "name": "ws",
+      "source": "./ws",
+      "description": "Workspace conventions — wsinit scaffolding, rule-of-workspace, todo skills and the todo CLI"
     }
   ]
 }

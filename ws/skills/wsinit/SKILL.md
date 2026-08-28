@@ -1,12 +1,12 @@
 ---
-name: init-ws
+name: wsinit
 description: "대상 폴더를 워크스페이스로 지정 — 문서·기록 전용 git repo 초기화"
 disable-model-invocation: true
 argument-hint: "[대상 폴더 (생략 시 현재 폴더)]"
 ---
 
-<init-ws_instruction>
-# init-ws
+<wsinit_instruction>
+# wsinit
 
 이 스킬 폴더의 `WORKSPACE.md` (워크스페이스 정의) 를 읽고 `assets/workspace.tar.gz` (정본 템플릿) 를 임시 디렉터리에 풀어 실물 트리를 확인하고 사용자의 지시에 따른다.
 
@@ -20,6 +20,6 @@ argument-hint: "[대상 폴더 (생략 시 현재 폴더)]"
 - 대상이 git repo 가 아니면 `git init` 해둘지 사용자에게 확인한다.
 
 작업할 때 기존 파일은 최대한 보존한다 — 간단한 rename 과 소규모 이동까지만 허용된다.
-</init-ws_instruction>
+</wsinit_instruction>
 
 Task: $ARGUMENTS
