@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 
 <read-todo>
-워크스페이스 `docs/todo/` 의 todo 와 `docs/milestone/` 의 milestone 을 찾아 알린다. 형식은 [rule-of-workspace 의 RULE_OF_TODO.md](../rule-of-workspace/RULE_OF_TODO.md) 와 [RULE_OF_MILESTONE.md](../rule-of-workspace/RULE_OF_MILESTONE.md) 를 따른다.
+워크스페이스 `docs/todo/` 의 todo 와 `docs/milestone/` 의 milestone 을 찾아 알린다. 형식은 `ruleof todo` 와 `ruleof milestone` 이 출력하는 규칙을 따른다.
 
 1. `todo [경로]` 를 실행해 전체 표를 얻는다. 경로를 생략하면 현재 위치에서 워크스페이스 루트 방향으로 docs/todo 를 찾는다. 이름을 인자로 주면 (`todo <milestone명|todo명>`) 그 대상과 선행 todo 만 좁혀 보여주고, `--detail` 을 붙이면 milestone 소속 `[이름]` 과 간접 선행 `(이름)` 표식이 함께 나온다.
 2. 요청을 표에 대어 대상을 좁힌다:

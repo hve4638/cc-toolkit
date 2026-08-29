@@ -1,3 +1,7 @@
+---
+description: 워크스페이스 todo (docs/todo) 작업 규칙 — 구조·frontmatter·완료 절차
+---
+
 # rule of todo
 
 ## 구조

@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 
 <write-todo>
-워크스페이스 `docs/todo/` 의 todo 와 `docs/milestone/` 의 milestone 을 변형한다 — 생성·수정·완료 전부. 구조·frontmatter 형식·완료 의미는 [rule-of-workspace 의 RULE_OF_TODO.md](../rule-of-workspace/RULE_OF_TODO.md) 와 [RULE_OF_MILESTONE.md](../rule-of-workspace/RULE_OF_MILESTONE.md) 를 따른다. docs/ 는 현재 위치에서 워크스페이스 루트 방향으로 찾는다.
+워크스페이스 `docs/todo/` 의 todo 와 `docs/milestone/` 의 milestone 을 변형한다 — 생성·수정·완료 전부. 구조·frontmatter 형식·완료 의미는 `ruleof todo` 와 `ruleof milestone` 이 출력하는 규칙을 따른다. docs/ 는 현재 위치에서 워크스페이스 루트 방향으로 찾는다.
 
 todo:
 

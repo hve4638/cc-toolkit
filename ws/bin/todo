@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // todo — 워크스페이스 docs/todo 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
-// rule-of-workspace 스킬의 RULE_OF_TODO.md·RULE_OF_MILESTONE.md 형식을 읽는다. 의존성 없는 단일 파일.
+// `ruleof todo`·`ruleof milestone` 규칙의 형식을 읽는다. 의존성 없는 단일 파일.
 //
 // 사용: todo [--stylish] [--detail] [경로] [이름]
 //   경로 — 워크스페이스 루트·docs/todo·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
@@ -103,7 +103,7 @@ if (todos.size === 0 && msArg === undefined) {
 }
 
 // ---- DONE.md 원장: 여기 있는 이름은 확인된 완료 ----
-// 줄 형식은 RULE_OF_TODO.md 의 `YYYY-MM-DD  <폴더명> — <description>`.
+// 줄 형식은 `ruleof todo` 규칙의 `YYYY-MM-DD  <폴더명> — <description>`.
 const doneNames = new Set();
 {
   const doneMd = join(todoDir, 'DONE.md');
@@ -115,7 +115,7 @@ const doneNames = new Set();
   }
 }
 
-// ---- milestone: docs/milestone 의 todos 열거가 소속의 유일한 출처 (RULE_OF_MILESTONE.md) ----
+// ---- milestone: docs/milestone 의 todos 열거가 소속의 유일한 출처 (`ruleof milestone`) ----
 const msOf = new Map();    // todo 이름 -> [milestone 이름]
 const msTodos = new Map(); // milestone 이름 -> todos 열거
 const msDesc = new Map();  // milestone 이름 -> description

@@ -1,3 +1,7 @@
+---
+description: 워크스페이스 milestone (docs/milestone) 작업 규칙 — todo 묶음의 상위 단위
+---
+
 # rule of milestone
 
 milestone 은 todo 의 상위 단위다 — 목표 하나와, 그것을 이루는 todo 이름들의 묶음.

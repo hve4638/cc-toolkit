@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+// ruleof — prints rule documents shipped inside installed plugins (ruleof/<name>/RULE.md).
+// core exposes <plugin-root>/bin on PATH, so `ruleof …` works anywhere. No deps.
+//
+// Usage: ruleof            — list rules (name — description)
+//        ruleof <name>     — print that rule's body
+//
+// Which plugins to scan is hardcoded in SOURCES; each is resolved to its active
+// installPath via ~/.claude/plugins/installed_plugins.json (the plugin cache holds
+// multiple versions — that file is the authority on which one is installed).
+// Plugins that are not installed or ship no ruleof/ folder are silently skipped.
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+
+const SOURCES = ['core@hve', 'ws@hve'];
+
+process.stdout.on('error', () => process.exit(0)); // ignore EPIPE from `| head`-style pipes
+
+const args = process.argv.slice(2);
+if (args[0] === '-h' || args[0] === '--help') {
+  process.stdout.write('Usage: ruleof [name]  — print rule documents shipped with installed plugins\n'
+    + '  ruleof         list available rules (name — description)\n'
+    + '  ruleof <name>  print that rule\'s body\n');
+  process.exit(0);
+}
+
+function installRoots() {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(join(homedir(), '.claude', 'plugins', 'installed_plugins.json'), 'utf8'));
+  } catch {
+    return [];
+  }
+  const roots = [];
+  for (const key of SOURCES) {
+    const entries = data?.plugins?.[key];
+    if (!Array.isArray(entries)) continue;
+    // entries may span scopes/versions; take the first whose ruleof/ exists
+    const hit = entries.map(e => e?.installPath).find(p => p && existsSync(join(p, 'ruleof')));
+    if (hit && !roots.includes(hit)) roots.push(hit);
+  }
+  return roots;
+}
+
+// name -> RULE.md path; on collision the plugin listed earlier in SOURCES wins
+function collectRules() {
+  const rules = new Map();
+  for (const root of installRoots()) {
+    let dirents;
+    try { dirents = readdirSync(join(root, 'ruleof'), { withFileTypes: true }); } catch { continue; }
+    for (const d of dirents.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!d.isDirectory() || rules.has(d.name)) continue;
+      const file = join(root, 'ruleof', d.name, 'RULE.md');
+      if (existsSync(file)) rules.set(d.name, file);
+    }
+  }
+  return rules;
+}
+
+function parseRule(file) {
+  const text = readFileSync(file, 'utf8');
+  const fm = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  const body = fm ? text.slice(fm[0].length).replace(/^\n+/, '') : text;
+  const desc = fm && /^description:[ \t]*(.+)$/m.exec(fm[1]);
+  return { description: desc ? desc[1].trim() : '', body };
+}
+
+function listText(rules) {
+  const width = Math.max(...[...rules.keys()].map(n => n.length));
+  return [...rules].map(([name, file]) =>
+    `${name.padEnd(width)}  ${parseRule(file).description}`).join('\n') + '\n';
+}
+
+const rules = collectRules();
+const name = args.find(a => !a.startsWith('-'));
+
+if (!name) {
+  if (rules.size === 0) { process.stdout.write('no rules found (no installed plugin ships a ruleof/ folder)\n'); process.exit(0); }
+  process.stdout.write(listText(rules));
+  process.exit(0);
+}
+
+const file = rules.get(name);
+if (!file) {
+  process.stderr.write(`ruleof: unknown rule '${name}'\n`);
+  if (rules.size > 0) process.stderr.write('available rules:\n' + listText(rules));
+  process.exit(1);
+}
+process.stdout.write(parseRule(file).body);
