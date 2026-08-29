@@ -4,7 +4,7 @@ description: Write user-facing documents as classless HTML instead of Markdown. 
 ---
 
 <html_instruction>
-Write documents meant to be shown to the user as HTML, not Markdown.
+Write documents meant to be shown to the user as HTML, not Markdown. The deliverable is the HTML file itself; writing it completes the task. (Any extra effort to present it to the user is only noise.)
 
 Good fit:
 - Rich visual elements — SVG, tables, figures

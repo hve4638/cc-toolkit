@@ -4,7 +4,7 @@ description: 사용자에게 보여줄 문서를 Markdown 대신 classless HTML 
 ---
 
 <html_instruction>
-사용자에게 보여줄 목적의 문서는 Markdown 이 아닌 HTML 로 작성한다.
+사용자에게 보여줄 목적의 문서는 Markdown 이 아닌 HTML 로 작성한다. 산출물은 HTML 파일 자체이며, 파일을 쓰는 것으로 작업이 완료된다. (사용자에게 보여주기 위한 추가 노력을 하는 등의 작업은 노이즈일 뿐이다.)
 
 적합:
 - svg, 표, 그림 등 다양한 시각적 요소
