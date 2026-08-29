@@ -15,7 +15,7 @@ todo:
 milestone:
 
 - 생성: `docs/milestone/<이름>/MILESTONE.md` 를 frontmatter 형식대로 만든다. todos 에는 아직 만들지 않은 todo 도 미리 적을 수 있다.
-- 완료: todos 의 모든 이름이 살아있는 todo 폴더에 없고 DONE.md 에 있는지 확인한 뒤 폴더째 삭제한다. 성립하지 않으면 남은 이름을 알리고 멈춘다.
+- 완료: `todo <milestone명>` 을 실행해 완료 성립 (열거된 모든 이름이 DONE.md 에 있음) 을 확인한 뒤 폴더째 삭제한다. 성립하지 않으면 출력에 남는 open·missing 이름을 알리고 멈춘다.
 
 변형 후 `todo [경로]` 를 실행해 경고 없이 파싱되는지 확인하고, 각 규칙 문서의 수정 규칙대로 ws repo 에 커밋한다.
 </write-todo>

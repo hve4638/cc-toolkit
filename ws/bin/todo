@@ -1,18 +1,29 @@
 #!/usr/bin/env node
 // todo — 워크스페이스 docs/todo 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
-// rule-of-workspace 스킬의 RULE_OF_TODO.md 형식을 읽는다. 의존성 없는 단일 파일.
+// rule-of-workspace 스킬의 RULE_OF_TODO.md·RULE_OF_MILESTONE.md 형식을 읽는다. 의존성 없는 단일 파일.
 //
-// 사용: todo [경로]   — 경로는 워크스페이스 루트·docs/todo·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
+// 사용: todo [--stylish] [--detail] [경로] [이름]
+//   경로 — 워크스페이스 루트·docs/todo·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
+//   이름 — milestone 또는 todo. 그것과 선행 todo 의 이행 폐쇄만 표시 (밖에서 끌려온 선행 = 간접).
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 
 process.stdout.on('error', () => process.exit(0)); // `| head` 류 파이프 조기 종료 시 EPIPE 무시
 
-const arg = process.argv[2];
-if (arg === '-h' || arg === '--help') {
-  process.stdout.write('사용: todo [경로]  — docs/todo 의 의존 그래프와 해결 순서를 출력\n');
+const args = process.argv.slice(2);
+const stylish = args.includes('--stylish');
+const detail = args.includes('--detail');
+const rest = args.filter(a => a !== '--stylish' && a !== '--detail');
+if (rest[0] === '-h' || rest[0] === '--help') {
+  process.stdout.write('사용: todo [--stylish] [--detail] [경로] [이름]  — docs/todo 의 의존 그래프와 해결 순서를 출력\n'
+    + '  --stylish  의존을 트리로 표시. 의존이 여럿인 todo 는 첫 의존 아래에만 나타난다\n'
+    + '  --detail   milestone 소속 [이름] 과 조회 대상의 간접 선행 (이름) 표식을 함께 표시\n'
+    + '  이름       milestone 또는 todo 이름. 그것과 선행 todo 만 표시 (존재하는 경로가 아닌 인자를 이름으로 해석,\n'
+    + '             milestone 이 todo 보다 먼저 매치된다)\n');
   process.exit(0);
 }
+const pathArg = rest.find(a => existsSync(a));
+const msArg = rest.find(a => a !== pathArg && !a.startsWith('-'));
 
 // ---- docs/todo 위치 결정: 인자(기본 cwd)에서 자신→조상 순으로 찾는다 ----
 // docs/todo 자체나 그 하위를 받아도 조상 걷기가 같은 디렉터리에 닿는다.
@@ -27,9 +38,9 @@ function findTodoDir(start) {
   }
 }
 
-const todoDir = findTodoDir(arg ?? process.cwd());
+const todoDir = findTodoDir(pathArg ?? process.cwd());
 if (!todoDir) {
-  process.stderr.write(`todo: docs/todo 를 찾지 못함 (기준: ${resolve(arg ?? process.cwd())})\n`);
+  process.stderr.write(`todo: docs/todo 를 찾지 못함 (기준: ${resolve(pathArg ?? process.cwd())})\n`);
   process.exit(1);
 }
 
@@ -86,7 +97,7 @@ for (const ent of readdirSync(todoDir, { withFileTypes: true })) {
   });
 }
 
-if (todos.size === 0) {
+if (todos.size === 0 && msArg === undefined) {
   process.stdout.write('todo 없음\n');
   process.exit(0);
 }
@@ -102,6 +113,40 @@ const doneNames = new Set();
       if (m) doneNames.add(m[1]);
     }
   }
+}
+
+// ---- milestone: docs/milestone 의 todos 열거가 소속의 유일한 출처 (RULE_OF_MILESTONE.md) ----
+const msOf = new Map();    // todo 이름 -> [milestone 이름]
+const msTodos = new Map(); // milestone 이름 -> todos 열거
+const msDesc = new Map();  // milestone 이름 -> description
+{
+  const msDir = join(dirname(todoDir), 'milestone');
+  if (existsSync(msDir) && statSync(msDir).isDirectory()) {
+    for (const ent of readdirSync(msDir, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      const md = join(msDir, ent.name, 'MILESTONE.md');
+      if (!existsSync(md)) continue;
+      const fm = parseFrontmatter(readFileSync(md, 'utf8'));
+      const list = Array.isArray(fm?.todos) ? fm.todos : [];
+      msTodos.set(ent.name, list);
+      msDesc.set(ent.name, typeof fm?.description === 'string' ? fm.description : '');
+      for (const t of list) {
+        if (!msOf.has(t)) msOf.set(t, []);
+        msOf.get(t).push(ent.name);
+      }
+    }
+  }
+}
+const msTag = n => (msOf.get(n) ?? []).map(m => `[${m}]`).join('');
+
+// 이름 인자는 milestone 이 todo 보다 먼저 매치된다 (겹치면 milestone 뷰)
+const targetKind = msArg === undefined ? null
+  : msTodos.has(msArg) ? 'milestone'
+  : todos.has(msArg) ? 'todo' : 'unknown';
+if (targetKind === 'unknown') {
+  const known = [...msTodos.keys()].sort().join(', ');
+  process.stderr.write(`todo: '${msArg}' 는 milestone 도 todo 도 아님${known ? ` (milestone: ${known})` : ''}\n`);
+  process.exit(1);
 }
 
 // ---- 그래프: 폴더가 없는 의존은 완료로 간주하되, DONE.md 에도 없으면 경고 (오타·미생성 신호) ----
@@ -159,47 +204,115 @@ const cycles = [];
   }
 }
 
+// ---- milestone 필터: 소속 alive todo 에서 의존을 따라간 이행 폐쇄. 열거 밖 선행 todo 는 '간접' ----
+let keep = null, indirect = null, msAlive = [], msDone = [], msUnstarted = [];
+if (msArg !== undefined) {
+  const names = targetKind === 'milestone' ? msTodos.get(msArg) : [msArg];
+  msAlive = names.filter(n => todos.has(n));
+  msDone = names.filter(n => !todos.has(n) && doneNames.has(n));
+  msUnstarted = names.filter(n => !todos.has(n) && !doneNames.has(n));
+  keep = new Set(msAlive);
+  const stack = [...msAlive];
+  while (stack.length) {
+    for (const d of todos.get(stack.pop()).deps) {
+      if (!keep.has(d)) { keep.add(d); stack.push(d); }
+    }
+  }
+  indirect = new Set([...keep].filter(n => !msAlive.includes(n)));
+}
+const shown = n => !keep || keep.has(n);
+
 // ---- 출력 ----
 const tty = process.stdout.isTTY;
 const paint = (code, s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : s);
-const dim = s => paint('2', s), bold = s => paint('1', s), yellow = s => paint('33', s);
+const dim = s => paint('2', s), bold = s => paint('1', s), yellow = s => paint('33', s), cyan = s => paint('36', s);
 const width = s => [...s].reduce((w, ch) => w + (/[ᄀ-ᇿ⺀-꓏가-힣豈-﫿＀-｠]/.test(ch) ? 2 : 1), 0);
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - width(s)));
 
-const counts = {};
-for (const t of todos.values()) counts[t.status] = (counts[t.status] ?? 0) + 1;
-const statusOrder = ['pending', 'in-progress', 'on-hold'];
-const statusKeys = [...statusOrder.filter(s => counts[s]),
-  ...Object.keys(counts).filter(s => !statusOrder.includes(s)).sort()];
-const countStr = statusKeys.map(s => `${s} ${counts[s]}`).join(' · ');
-process.stdout.write(`${todos.size}개 (${countStr})\n`);
+if (keep) {
+  const d = targetKind === 'milestone' ? msDesc.get(msArg) : todos.get(msArg).desc;
+  process.stdout.write(`${bold(`[${targetKind.toUpperCase()}] ${msArg}`)}${d ? ` — ${d}` : ''}\n`);
+  const parts = [['done', msDone.length], ['open', msAlive.length], ['missing', msUnstarted.length],
+    ['indirect', indirect.size]].filter(([, v]) => v);
+  process.stdout.write(parts.map(([k, v]) => `${k} ${v}`).join(' · ') + '\n');
+  if (msUnstarted.length) process.stdout.write(`missing: ${msUnstarted.join(', ')}\n`);
+  if (!msAlive.length && !msUnstarted.length) {
+    process.stdout.write('열거된 todo 가 모두 DONE.md 에 있다 — milestone 완료, 폴더째 삭제 가능\n');
+    process.exit(0);
+  }
+} else {
+  const counts = {};
+  for (const t of todos.values()) counts[t.status] = (counts[t.status] ?? 0) + 1;
+  const statusOrder = ['pending', 'in-progress', 'on-hold'];
+  const statusKeys = [...statusOrder.filter(s => counts[s]),
+    ...Object.keys(counts).filter(s => !statusOrder.includes(s)).sort()];
+  const countStr = statusKeys.map(s => `${s} ${counts[s]}`).join(' · ');
+  process.stdout.write(`${todos.size}개 (${countStr})\n`);
+}
 
-const nameW = Math.max(...[...todos.keys()].map(width)) + 2;
-const prioW = Math.max(...[...todos.values()].map(t => width(t.priority))) + 2;
-const statW = Math.max(...[...todos.values()].map(t => width(t.status))) + 2;
+// 필터 뷰에서 열거 밖 선행 todo 는 (이름) 꼬리로 구분한다. --detail 일 때만 표시
+const tagFor = n => (msTag(n) + (indirect?.has(n) ? `(${msArg})` : ''));
+const showTags = detail && msOf.size;
+const shownKeys = [...todos.keys()].filter(shown);
+const nameW = Math.max(...shownKeys.map(width)) + 2;
+const msW = showTags ? Math.max(...shownKeys.map(n => width(tagFor(n) || '-'))) + 2 : 0;
+const prioW = Math.max(...shownKeys.map(n => width(todos.get(n).priority))) + 2;
+const statW = Math.max(...shownKeys.map(n => width(todos.get(n).status))) + 2;
 const repoStr = t => t.repos.join(',') || '-';
-const repoW = Math.max(...[...todos.values()].map(t => width(repoStr(t)))) + 2;
+const repoW = Math.max(...shownKeys.map(n => width(repoStr(todos.get(n))))) + 2;
 function line(n) {
   const t = todos.get(n);
   const deps = t.deps.length ? dim(`  ← ${t.deps.join(', ')}`) : '';
   const unblocks = !t.deps.length && blocks.get(n)?.length ? dim(`  → ${blocks.get(n).join(', ')}`) : '';
-  let row = `  ${pad(n, nameW)}${pad(t.priority, prioW)}${pad(t.status, statW)}${pad(repoStr(t), repoW)}${t.desc}${deps}${unblocks}`;
+  let row = `  ${pad(n, nameW)}${showTags ? pad(tagFor(n) || '-', msW) : ''}${pad(t.priority, prioW)}${pad(t.status, statW)}${pad(repoStr(t), repoW)}${t.desc}${deps}${unblocks}`;
   if (t.status === 'on-hold') row = dim(row.replace(/\x1b\[\d+m/g, ''));
   return row + '\n';
 }
 const readySet = new Set(ready);
-process.stdout.write(`\n${bold('착수 가능')}\n`);
-for (const n of order.filter(n => readySet.has(n))) process.stdout.write(line(n));
-const waiting = order.filter(n => !readySet.has(n));
-if (waiting.length || cyclic.length) {
-  process.stdout.write(`\n${bold('대기')} ${dim('(위에서 아래가 해결 순서)')}\n`);
-  for (const n of [...waiting, ...cyclic.sort(byPrio)]) process.stdout.write(line(n));
+if (stylish) {
+  // 트리 표시: 루트 = 착수 가능, 자식 = 첫 의존이 그 노드인 todo.
+  // DAG 를 트리로 접는 것이라 의존이 여럿이면 첫 의존 아래에만 나타난다. 순환 노드는 아래 경고로만.
+  const kids = new Map();
+  for (const n of order.filter(shown)) {
+    const t = todos.get(n);
+    if (!t.deps.length) continue;
+    if (!kids.has(t.deps[0])) kids.set(t.deps[0], []);
+    kids.get(t.deps[0]).push(n);
+  }
+  for (const arr of kids.values()) arr.sort(byPrio);
+  function stylLine(n) {
+    const t = todos.get(n);
+    const tag = detail ? msTag(n) : '', ind = detail && indirect?.has(n) ? `(${msArg})` : '';
+    if (t.status === 'on-hold') return dim(`${n}${tag ? ' ' + tag : ''}${ind ? ' ' + ind : ''}  ${t.priority} · ${t.status}  ${t.desc}`);
+    return `${n}${tag ? ' ' + cyan(tag) : ''}${ind ? ' ' + dim(ind) : ''}  ${dim(`${t.priority} · ${t.status}`)}  ${t.desc}`;
+  }
+  function draw(n, prefix, isLast, isRoot) {
+    process.stdout.write((isRoot ? '' : prefix + (isLast ? '└─ ' : '├─ ')) + stylLine(n) + '\n');
+    const cs = kids.get(n) ?? [];
+    const childPrefix = isRoot ? '' : prefix + (isLast ? '   ' : '│  ');
+    cs.forEach((c, i) => draw(c, childPrefix, i === cs.length - 1, false));
+  }
+  process.stdout.write('\n');
+  for (const r of ready.filter(shown)) draw(r, '', true, true);
+} else {
+  const readyShown = order.filter(n => readySet.has(n) && shown(n));
+  if (readyShown.length) {
+    process.stdout.write(`\n${bold('착수 가능')}\n`);
+    for (const n of readyShown) process.stdout.write(line(n));
+  }
+  const waiting = [...order.filter(n => !readySet.has(n)), ...cyclic.sort(byPrio)].filter(shown);
+  if (waiting.length) {
+    process.stdout.write(`\n${bold('대기')} ${dim('(위에서 아래가 해결 순서)')}\n`);
+    for (const n of waiting) process.stdout.write(line(n));
+  }
 }
 function warnGroup(title, items) {
   if (!items.length) return;
   process.stdout.write(`\n${bold(yellow(title))}\n`);
   for (const it of items) process.stdout.write(`${yellow(`- ${it}`)}\n`);
 }
-warnGroup('파싱 경고:', parseWarns);
-warnGroup('사라진 의존 경고: (DONE.md 에도 없는 이름 — 오타이거나 미생성)', missingDeps);
-warnGroup('순환 의존 경고:', cycles.map(c => c.join(' → ')));
+// 필터 뷰에서는 표시 중인 todo 의 경고만 남긴다 (경고 문자열은 '이름: 사유' 형태)
+const ofShown = w => shown(w.slice(0, w.indexOf(':')));
+warnGroup('파싱 경고:', parseWarns.filter(ofShown));
+warnGroup('사라진 의존 경고: (DONE.md 에도 없는 이름 — 오타이거나 미생성)', missingDeps.filter(ofShown));
+warnGroup('순환 의존 경고:', cycles.filter(c => c.some(shown)).map(c => c.join(' → ')));
