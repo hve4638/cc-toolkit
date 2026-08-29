@@ -11,4 +11,12 @@
 win=$(tmux new-window -P -F '#{window_id}' -c "$WTREE_PATH" -n "$WTREE_BRANCH") || exit 0
 
 # send-keys, because tmux new-window <cmd> runs a non-interactive shell that skips the user's aliases and functions
-tmux send-keys -t "$win" 'claude' Enter
+# `wtree new <name> -- <args>` passes everything after -- as "$@"; joined, it becomes claude's initial prompt
+cmd=claude
+if [ $# -gt 0 ]; then
+  # the typed line is parsed by the interactive shell — single-quote the prompt, escaping inner ' as '\''
+  prompt=$(printf %s "$*" | sed "s/'/'\\\\''/g")
+  cmd="claude '$prompt'"
+fi
+tmux send-keys -t "$win" -l "$cmd"
+tmux send-keys -t "$win" Enter

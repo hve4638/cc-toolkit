@@ -18,7 +18,7 @@ pane 을 열기 전 에이전트 몫이 하나 있다: `.wtree/hooks` 가 있으
 
 TUI 는 npm init 류 인라인 프롬프트다 — 흐르는 출력에 질문이 끼고, 선택은 방향키+Enter, Esc 는 그 자리 취소, Ctrl-C 는 종료(130). 전체 화면을 잡지 않는다. 프리미티브는 `lib/prompt.mjs`(의존성 없음, raw mode + ANSI, 한글 2폭 절단, 키 큐로 연타 유실 방지). 화면 문구는 `tui.mjs` 안의 en/ko 상수 표이고 `--ko` 로 고른다. 게이트 문제 같은 한 줄짜리 판정문은 영문 고정이다.
 
-`templates/hooks/<기능>/<변형>/` — wtree 훅을 기능·변형 2단으로 담는다(현재 tmux-window 의 always / interactive-only). 변형 폴더가 곧 완성품이다: 훅 종류별 파일(예: post-create + post-destroy)과 INFO.md(첫 줄이 목록 요약, `.ko.md` 페어)만 있고, 슬롯도 조정 지점도 없다 — 조정은 설치된 `.git/wtree/hooks/` 파일을 직접 고치는 것으로 대신한다(INFO 안내). 같은 기능의 변형들은 목록에서 배타 선택된다(feature 가 그룹 키). 폴더 추가만으로 선택지가 늘어난다 — 스크립트는 고치지 않는다. 여러 변형이 공유하는 파일(tmux-window 의 post-destroy)은 동일 사본으로 두고 테스트가 드리프트를 잡는다.
+`templates/hooks/<기능>/<변형>/` — wtree 훅을 기능·변형 2단으로 담는다(현재 tmux-window 의 always / interactive-only, tmux-window-cleanup 의 ask). 변형 폴더가 곧 완성품이다: 훅 종류별 파일(예: post-create)과 INFO.md(첫 줄이 목록 요약, `.ko.md` 페어)만 있고, 슬롯도 조정 지점도 없다 — 조정은 설치된 `.git/wtree/hooks/` 파일을 직접 고치는 것으로 대신한다(INFO 안내). 같은 기능의 변형들은 목록에서 배타 선택되고(feature 가 그룹 키), 변형이 하나뿐인 기능은 기능명만으로 열거된다. 폴더 추가만으로 선택지가 늘어난다 — 스크립트는 고치지 않는다.
 
 같은 훅 종류를 여러 기능이 가지면 기능마다 서브셸로 격리해 하나로 병합한다(`mergeFeatures`) — 가져온 기존 훅도 같은 모양(`{ name, files }`)으로 섞인다. 단, `$0` 재호출 훅은 병합을 거부한다(재진입이 자기 절만이 아니라 뒤 절 전부를 다시 돌리므로).
 
@@ -31,9 +31,11 @@ wtree/
 ├── README.md           # 본 문서
 ├── templates/
 │   └── hooks/
-│       └── tmux-window/
-│           ├── always/             # post-create + post-destroy + INFO.md (완성품)
-│           └── interactive-only/   # post-create + post-destroy + INFO.md (완성품)
+│       ├── tmux-window/
+│       │   ├── always/             # post-create + INFO.md (완성품)
+│       │   └── interactive-only/   # post-create + INFO.md (완성품)
+│       └── tmux-window-cleanup/
+│           └── ask/                # post-destroy + INFO.md (완성품, 단일 변형)
 └── scripts/
     ├── tui.mjs            # 전체 흐름 (게이트 → 훅 선택·기록 → wtree init 위임 → 종료 확인)
     ├── lib/actions.mjs    # 게이트·훅 읽기·병합 (readHookFiles·mergeFeatures)

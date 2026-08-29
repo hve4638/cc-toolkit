@@ -1,0 +1,5 @@
+wtree destroy 때 사라진 워크트리에 좌초된 tmux 윈도우 닫기 제안
+
+`wtree destroy` (또는 `land`) 직후, 명령이 실행된 tmux 윈도우의 모든 pane 이 삭제된 워크트리 경로에 있으면 close/keep 을 묻는 작은 pane 을 띄운다 — pane 하나라도 다른 곳에 있으면 그 윈도우에 다른 작업이 남아 있다는 뜻이라 아무것도 하지 않는다. tmux-window 변형과 조합해도, 단독으로 써도 된다. tmux 밖에서는 아무것도 하지 않는다.
+
+설치된 `.git/wtree/hooks/` 의 파일은 평범한 sh 다 — 동작을 바꾸려면 그 파일을 직접 고친다.

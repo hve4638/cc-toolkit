@@ -89,22 +89,21 @@ test('tui: git repo 밖은 게이트에서 막힌다', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('tui: 이미 설정된 repo 는 게이트에서 막히고 wtree info 를 안내한다', () => {
+test('tui: 이미 설정된 repo 는 게이트를 통과한다 — 차단이 아니라 3선택지 질문 대상', () => {
   const { dir, repo } = makeRepo();
   mkdirSync(join(repo, '.git', 'wtree'), { recursive: true });
   writeFileSync(join(repo, '.git', 'wtree', 'rules'), '[main]\n');
   const r = runTui([], { cwd: repo });
+  // 게이트는 지났고, TTY 부재 거부까지 도달한다 — 3선택지 자체는 대화 경로다.
   assert.equal(r.status, 1);
-  assert.match(r.out, /already configured/);
-  assert.match(r.out, /wtree info/);
+  assert.match(r.err, /needs a terminal/);
+  assert.ok(!r.out.includes('already configured'));
   rmSync(dir, { recursive: true, force: true });
 });
 
 test('tui: --ko 는 게이트 화면의 안내 문구를 한국어로 낸다', () => {
   const { dir, repo } = makeRepo();
-  mkdirSync(join(repo, '.git', 'wtree'), { recursive: true });
-  writeFileSync(join(repo, '.git', 'wtree', 'rules'), '[main]\n');
-  const r = runTui(['--ko'], { cwd: repo });
+  const r = runTui(['--ko'], { cwd: repo, wtree: false });
   assert.equal(r.status, 1);
   assert.match(r.out, /셋업 불가/);
   rmSync(dir, { recursive: true, force: true });

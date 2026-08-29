@@ -1,18 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { HOOK_KINDS, mergeFeatures, readHookFiles } from '../../skills/wtree/scripts/lib/actions.mjs';
+import { HOOK_KINDS, clearInstalledHooks, mergeFeatures, readHookFiles } from '../../skills/wtree/scripts/lib/actions.mjs';
 import { listHookVariants } from '../../skills/wtree/scripts/lib/setuplib.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TPL_ROOT = join(__dirname, '..', '..', 'skills', 'wtree', 'templates', 'hooks');
 const ALWAYS = join(TPL_ROOT, 'tmux-window', 'always');
 const INTERACTIVE_ONLY = join(TPL_ROOT, 'tmux-window', 'interactive-only');
+const CLEANUP = join(TPL_ROOT, 'tmux-window-cleanup', 'ask');
 
 // ---------------------------------------------------------------- 템플릿 변형
 
@@ -35,10 +36,22 @@ test('listHookVariants: tmux-window 두 변형이 같은 배타 그룹(feature)�
   }
 });
 
+test('listHookVariants: 단일 변형 기능(tmux-window-cleanup)은 기능명만으로 열거된다', () => {
+  const cleanup = listHookVariants().filter((v) => v.feature === 'tmux-window-cleanup');
+  assert.equal(cleanup.length, 1);
+  assert.equal(cleanup[0].name, 'tmux-window-cleanup'); // 변형 하나면 · 접미 없음
+  assert.ok(cleanup[0].summary.length > 0);
+});
+
 test('템플릿 변형은 완성품이다 — 슬롯 없음, sh -n 통과', () => {
-  for (const dir of [ALWAYS, INTERACTIVE_ONLY]) {
+  const expected = {
+    [ALWAYS]: ['post-create'],
+    [INTERACTIVE_ONLY]: ['post-create'],
+    [CLEANUP]: ['post-destroy'],
+  };
+  for (const [dir, kinds] of Object.entries(expected)) {
     const files = readHookFiles(dir);
-    assert.deepEqual(Object.keys(files).sort(), ['post-create', 'post-destroy']);
+    assert.deepEqual(Object.keys(files).sort(), kinds);
     for (const [kind, text] of Object.entries(files)) {
       assert.ok(!/(?<!\$)\{[A-Z][A-Z0-9_]*\}/.test(text), `${dir}/${kind}: no {KEY} slot`);
       assert.ok(shOk(text), `${dir}/${kind}: passes sh -n`);
@@ -50,28 +63,50 @@ test('always 변형: 항상 윈도우를 열고, 포커스는 interactive 실행
   const text = readHookFiles(ALWAYS)['post-create'];
   assert.match(text, /detach=-d\n\[ "\$\{WTREE_INTERACTIVE:-0\}" = 1 \] && detach=/);
   assert.ok(!text.includes('|| exit 0   # non-interactive'), 'no creation gate');
-  assert.ok(text.includes(`tmux send-keys -t "$win" 'claude' Enter`));
+  assert.ok(text.includes('tmux send-keys -t "$win" -l "$cmd"'));
 });
 
 test('interactive-only 변형: 비대화 실행은 윈도우를 아예 만들지 않는다', () => {
   const text = readHookFiles(INTERACTIVE_ONLY)['post-create'];
   assert.match(text, /\[ "\$\{WTREE_INTERACTIVE:-0\}" = 1 \] \|\| exit 0/);
   assert.ok(!text.includes('detach'), 'no detach branch — focus always moves when it runs');
-  assert.ok(text.includes(`tmux send-keys -t "$win" 'claude' Enter`));
+  assert.ok(text.includes('tmux send-keys -t "$win" -l "$cmd"'));
 });
 
-test('두 변형의 post-destroy 는 동일 사본이다 (드리프트 가드)', () => {
-  assert.equal(
-    readFileSync(join(ALWAYS, 'post-destroy'), 'utf8'),
-    readFileSync(join(INTERACTIVE_ONLY, 'post-destroy'), 'utf8'),
-  );
+test('post-create: -- 인자가 있으면 이스케이프된 초기 프롬프트로 claude 를 기동한다', () => {
+  for (const dir of [ALWAYS, INTERACTIVE_ONLY]) {
+    const text = readHookFiles(dir)['post-create'];
+    assert.match(text, /\[ \$# -gt 0 \]/, 'gates on positional args');
+    assert.ok(text.includes(`sed "s/'/'\\\\\\\\''/g"`), 'escapes inner single quotes');
+    assert.ok(text.includes(`cmd="claude '$prompt'"`));
+  }
+});
+
+test('두 변형의 post-create claude 기동부는 동일 사본이다 (드리프트 가드)', () => {
+  const tail = (dir) =>
+    readFileSync(join(dir, 'post-create'), 'utf8').split('# send-keys,')[1];
+  assert.ok(tail(ALWAYS), 'always has the send-keys tail');
+  assert.equal(tail(ALWAYS), tail(INTERACTIVE_ONLY));
+});
+
+test('clearInstalledHooks: 설치된 훅만 지우고 *.sample 과 훅 아닌 파일은 남긴다', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wtree-clear-'));
+  writeFileSync(join(dir, 'post-create'), '#!/bin/sh\ntrue\n');
+  writeFileSync(join(dir, 'pre-merge'), '#!/bin/sh\ntrue\n');
+  writeFileSync(join(dir, 'post-create.sample'), '#!/bin/sh\ntrue\n');
+  writeFileSync(join(dir, 'README'), 'not a hook\n');
+  const removed = clearInstalledHooks(dir);
+  assert.deepEqual(removed.sort(), ['post-create', 'pre-merge']);
+  assert.deepEqual(readdirSync(dir).sort(), ['README', 'post-create.sample']);
+  assert.deepEqual(clearInstalledHooks(dir), []); // 재호출은 무해
+  rmSync(dir, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------- 병합
 
 test('mergeFeatures: $0 재호출 훅이 같은 종류에서 겹치면 조립을 거부한다', () => {
-  // tmux-window 의 post-destroy 는 $0 재호출 — 병합되면 재진입이 뒤 절까지 돈다.
-  const a = { name: 'tmux-window · always', files: readHookFiles(ALWAYS) };
+  // tmux-window-cleanup 의 post-destroy 는 $0 재호출 — 병합되면 재진입이 뒤 절까지 돈다.
+  const a = { name: 'tmux-window-cleanup', files: readHookFiles(CLEANUP) };
   const b = { name: 'other', files: { 'post-destroy': '#!/bin/sh\ntrue\n' } };
   assert.throws(() => mergeFeatures([a, b]), /cannot be merged/);
 });
@@ -79,11 +114,12 @@ test('mergeFeatures: $0 재호출 훅이 같은 종류에서 겹치면 조립을
 test('mergeFeatures: 같은 종류만 서브셸 격리로 병합하고, 종류별 파일로 돌려준다', () => {
   const a = { name: 'tmux-window · always', files: readHookFiles(ALWAYS) };
   const b = { name: 'plain', files: { 'post-create': '#!/bin/sh\ntrue\n' } };
-  const merged = mergeFeatures([a, b]);
+  const c = { name: 'tmux-window-cleanup', files: readHookFiles(CLEANUP) };
+  const merged = mergeFeatures([a, b, c]);
   assert.match(merged['post-create'], /# === tmux-window · always ===\n\(/);
   assert.match(merged['post-create'], /# === plain ===\n\(\ntrue\n\)/);
   assert.ok(shOk(merged['post-create']));
-  // post-destroy 는 한쪽만 가지므로 병합 없이 단독 파일 그대로다.
+  // post-destroy 는 cleanup 만 가지므로 병합 없이 단독 파일 그대로다.
   assert.ok(merged['post-destroy'].includes('kill-window'));
   assert.ok(!merged['post-destroy'].includes('# ==='));
 });
@@ -120,7 +156,7 @@ esac
   );
   chmodSync(join(bin, 'tmux'), 0o755);
   const hook = join(dir, 'post-destroy');
-  writeFileSync(hook, readFileSync(join(ALWAYS, 'post-destroy'), 'utf8'));
+  writeFileSync(hook, readFileSync(join(CLEANUP, 'post-destroy'), 'utf8'));
   const r = spawnSync('sh', [hook], {
     encoding: 'utf8',
     env: {

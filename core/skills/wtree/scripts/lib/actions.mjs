@@ -1,6 +1,6 @@
 // /wtree 셋업의 결정적 동작부: 게이트와 훅 조립. 화면 흐름은 tui.mjs 의
 // 것이고, 상태를 만들어 내는 코드는 여기뿐이다.
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { git, isFile, sh } from './setuplib.mjs';
 
@@ -13,15 +13,29 @@ export function runGates() {
   }
   const gitOk = git(['rev-parse', '--is-inside-work-tree']).ok;
   let common = '';
+  let configured = false;
   if (!gitOk) {
     problems.push('cwd is not inside a git work tree');
   } else {
     common = git(['rev-parse', '--path-format=absolute', '--git-common-dir']).stdout;
-    if (isFile(join(common, 'wtree', 'rules'))) {
-      problems.push(`already configured — ${join(common, 'wtree', 'rules')} exists`);
+    // rules 존재 = 구성 완료. 차단이 아니라 질문거리다 — tui 가 덮어쓰기·훅만
+    // 교체·종료의 3선택지를 낸다. 훅만 있는 부분 상태는 평소 흐름이 이어서
+    // 완주하므로 여기 들지 않는다.
+    configured = isFile(join(common, 'wtree', 'rules'));
+  }
+  return { problems, common, ver, configured };
+}
+
+// 설치된 훅(*.sample 제외)을 지운다 — '교체'의 앞 단계. 지운 이름을 돌려준다.
+export function clearInstalledHooks(dir) {
+  const removed = [];
+  for (const kind of HOOK_KINDS) {
+    if (isFile(join(dir, kind))) {
+      rmSync(join(dir, kind));
+      removed.push(kind);
     }
   }
-  return { problems, common, ver };
+  return removed;
 }
 
 // ---- 훅 ---------------------------------------------------------------------

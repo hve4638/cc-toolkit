@@ -7,7 +7,7 @@ disable-model-invocation: true
 <wtree_instruction>
 # wtree — 이 repo 에 wtree 정책 셋업
 
-`/wtree` 는 스탠드얼론 `wtree` CLI 를 위한 1회성 셋업으로, cwd 가 속한 repo 를 대상으로 한다. rules 와 settings 는 CLI 자신의 `wtree init` 이 자체 대화형 메뉴로 조립하고, 셋업 pane 은 init 이 다루지 않는 한 가지 — wtree 훅 — 만 더한다.
+`/wtree` 는 스탠드얼론 `wtree` CLI 를 위한 1회성 셋업으로, cwd 가 속한 repo 를 대상으로 한다. rules 와 settings 는 CLI 자신의 `wtree init` 이 자체 대화형 메뉴로 조립하고, 셋업 pane 은 init 이 다루지 않는 한 가지 — wtree 훅 — 만 더한다. 이미 구성된 repo 여도 된다: 그 경우 pane 이 전체 덮어쓰기·훅만 교체·종료 중 하나를 묻는다.
 
 1. 훅 안전 점검이 먼저다: `<repo>/.wtree/hooks` 가 있으면 각 훅 파일을 읽는다. 표방한 기능 이상의 동작(네트워크 접근, 파일 삭제, 자격 증명 접근 등)이 보이면 pane 을 열기 전에 사용자에게 경고한다 — pane 이 그 훅들을 live 정책으로 가져오는 선택지를 제시하기 때문이다.
 2. repo 디렉터리에서 pane 을 연다 (사용자와 한국어로 대화 중이면 `--ko` 를 붙인다):

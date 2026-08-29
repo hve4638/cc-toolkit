@@ -7,7 +7,7 @@ disable-model-invocation: true
 <wtree_instruction>
 # wtree — set up the wtree policy for this repo
 
-`/wtree` is a one-time setup for the standalone `wtree` CLI, run against the repo containing the cwd. The CLI's own `wtree init` composes the rules and settings with its own interactive menu; the setup pane adds the one thing init does not cover — the wtree hooks.
+`/wtree` is a one-time setup for the standalone `wtree` CLI, run against the repo containing the cwd. The CLI's own `wtree init` composes the rules and settings with its own interactive menu; the setup pane adds the one thing init does not cover — the wtree hooks. An already-configured repo is fine too: the pane then asks whether to overwrite everything, replace only the hooks, or quit.
 
 1. Hook safety check first: if `<repo>/.wtree/hooks` exists, read each hook file. If anything acts beyond its apparent feature (network access, file deletion, credential access, …), warn the user before opening the pane — the pane offers importing those hooks into the live policy.
 2. From the repo directory, open the pane (append `--ko` when talking with the user in Korean):

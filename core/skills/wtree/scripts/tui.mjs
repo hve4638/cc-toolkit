@@ -7,12 +7,12 @@
 // 훅을 init 보다 먼저 기록해도 안전하다: wtree init 은 .git/wtree/hooks 의
 // 기존 파일을 보존하고 *.sample 만 옆에 추가한다 (실측 검증, 2026-08-27).
 // handoff 파일은 없다 — 결과 확인은 에이전트가 `wtree rule` 로 직접 한다.
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { HOOK_KINDS, mergeFeatures, readHookFiles, runGates } from './lib/actions.mjs';
-import { multiselect, paint, pause } from './lib/prompt.mjs';
+import { HOOK_KINDS, clearInstalledHooks, mergeFeatures, readHookFiles, runGates } from './lib/actions.mjs';
+import { multiselect, paint, pause, select } from './lib/prompt.mjs';
 import { git, isDir, isFile, listHookVariants, setKo, sh } from './lib/setuplib.mjs';
 
 // ---- 화면 문구 --------------------------------------------------------------
@@ -25,6 +25,17 @@ const L = {
     importLabel: (d) => `import ${d}`,
     importNote: (files) => files.join(', '),
     importCaution: 'caution: imported hooks run as shell code on wtree verbs',
+    existsFound: (p) => `already configured — ${p} exists`,
+    qExists: 'how should this setup proceed?',
+    existOverwrite: 'overwrite',
+    existOverwriteNote: 'redo hooks and rules — wtree init keeps the old rules in .backup/',
+    existHooksOnly: 'replace hooks only',
+    existHooksOnlyNote: 'the rules stay as they are',
+    existQuit: 'quit',
+    existQuitNote: 'change nothing',
+    replaceNote: 'installed hooks are replaced by the new selection — submitting none just removes them',
+    clearedHooks: (names) => `installed hooks removed: ${names.join(', ')}`,
+    hooksOnlyDone: 'hooks replaced — the rules are untouched',
     shFail: (f) => `hook failed sh -n — nothing was written: ${f}`,
     mergeFail: 'hook assembly failed — nothing was written:',
     wroteHooks: (d) => `hooks written: ${d}`,
@@ -47,6 +58,17 @@ const L = {
     importLabel: (d) => `${d} 가져오기`,
     importNote: (files) => files.join(', '),
     importCaution: '주의: 가져온 훅은 wtree 동사 때 셸로 실행됨',
+    existsFound: (p) => `이미 설정된 repo — ${p} 존재`,
+    qExists: '어떻게 진행할까?',
+    existOverwrite: '덮어쓰기',
+    existOverwriteNote: '훅과 rules 를 다시 구성 — 기존 rules 는 wtree init 이 .backup/ 에 보존',
+    existHooksOnly: '훅만 교체',
+    existHooksOnlyNote: 'rules 는 그대로 둠',
+    existQuit: '종료',
+    existQuitNote: '아무것도 바꾸지 않음',
+    replaceNote: '설치된 훅은 새 선택으로 교체됨 — 아무것도 안 고르면 제거만 됨',
+    clearedHooks: (names) => `기존 훅 제거: ${names.join(', ')}`,
+    hooksOnlyDone: '훅 교체 완료 — rules 는 그대로',
     shFail: (f) => `훅이 sh -n 검사에 실패 — 아무것도 기록되지 않음: ${f}`,
     mergeFail: '훅 조립 실패 — 아무것도 기록되지 않음:',
     wroteHooks: (d) => `훅 기록 완료: ${d}`,
@@ -103,7 +125,6 @@ async function main() {
   if (gate.problems.length) {
     println(paint.red(t.blockedTitle));
     for (const p of gate.problems) println(paint.red(`  - ${p}`));
-    if (gate.problems.some((p) => p.startsWith('already configured'))) println(paint.dim(`  ${t.alreadyHint}`));
     await closePane(1);
     return;
   }
@@ -120,6 +141,30 @@ async function main() {
   println(paint.dim(`  repo: ${primary}`));
   println(paint.dim(`  wtree: ${gate.ver.stdout}`));
   println('');
+
+  // ---- 이미 구성된 repo: 3선택지 ----
+  // rules 가 있으면 차단 대신 진로를 묻는다. 덮어쓰기는 평소 흐름 그대로 —
+  // rules 쪽 파괴 단계는 wtree init 자신이 .backup 고지와 함께 한 번 더
+  // 확인하므로(실측: Ask 모드의 confirm이 곧 force) 여기서 강제 플래그를
+  // 넘길 일이 없다. 어느 쪽이든 훅은 통째 교체다.
+  let hooksOnly = false;
+  if (gate.configured) {
+    println(paint.yellow(t.existsFound(join(common, 'wtree', 'rules'))));
+    println(paint.dim(`  ${t.alreadyHint}`));
+    println('');
+    const pick = await select({
+      message: t.qExists,
+      items: [
+        { label: t.existOverwrite, note: t.existOverwriteNote },
+        { label: t.existHooksOnly, note: t.existHooksOnlyNote },
+        { label: t.existQuit, note: t.existQuitNote },
+      ],
+    });
+    if (pick === null || pick === 2) return cancelled();
+    hooksOnly = pick === 1;
+    println(paint.dim(t.replaceNote));
+    println('');
+  }
 
   // ---- 훅 선택 ----
   // 템플릿은 완성품 변형이라 후속 질문이 없다 — 같은 기능의 변형끼리는
@@ -170,8 +215,8 @@ async function main() {
 
   // ---- 훅 기록 ----
   let hooksDir = null;
+  let merged = {};
   if (features.length) {
-    let merged;
     try {
       merged = mergeFeatures(features);
     } catch (e) {
@@ -189,15 +234,33 @@ async function main() {
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
+  }
+  if (features.length || gate.configured) {
     hooksDir = join(common, 'wtree', 'hooks');
     mkdirSync(hooksDir, { recursive: true });
     println('');
-    println(`${paint.green('✔')} ${t.wroteHooks(hooksDir)}`);
-    for (const [kind, text] of Object.entries(merged)) {
-      writeFileSync(join(hooksDir, kind), text);
-      chmodSync(join(hooksDir, kind), 0o755);
-      println(paint.dim(`  - ${kind}`));
+    // 구성된 repo 의 두 진로는 모두 '교체' — 검증이 끝난 뒤에만 지운다.
+    if (gate.configured) {
+      const removed = clearInstalledHooks(hooksDir);
+      if (removed.length) println(paint.dim(t.clearedHooks(removed)));
     }
+    if (features.length) {
+      println(`${paint.green('✔')} ${t.wroteHooks(hooksDir)}`);
+      for (const [kind, text] of Object.entries(merged)) {
+        writeFileSync(join(hooksDir, kind), text);
+        chmodSync(join(hooksDir, kind), 0o755);
+        println(paint.dim(`  - ${kind}`));
+      }
+    }
+  }
+
+  // ---- 훅만 교체: init 은 건드리지 않는다 ----
+  if (hooksOnly) {
+    println('');
+    println(`${paint.green('✔')} ${t.hooksOnlyDone}`);
+    println(t.doneNote);
+    await closePane(0);
+    return;
   }
 
   // ---- wtree init 위임 ----
@@ -206,19 +269,24 @@ async function main() {
   println('');
   // 자식이 도는 동안 부모는 Ctrl-C 를 무시한다 — init 자신이 130 으로 정리하고
   // 나오면, 여기로 돌아와 종료 확인 화면까지 간다.
+  // 성공 판정은 rules 의 mtime 변화 — 덮어쓰기 경로는 rules 가 이미 있어서
+  // 존재 검사로는 init 의 자체 확인에서 물러난 경우(exit 0, 무변경)를 못 가른다.
+  const rulesPath = join(common, 'wtree', 'rules');
+  const mtimeOf = (p) => (isFile(p) ? statSync(p).mtimeMs : 0);
+  const rulesBefore = mtimeOf(rulesPath);
   const ignoreSigint = () => {};
   process.on('SIGINT', ignoreSigint);
   const init = spawnSync('wtree', ['init'], { stdio: 'inherit' });
   process.off('SIGINT', ignoreSigint);
 
   println('');
-  if (init.status === 0 && isFile(join(common, 'wtree', 'rules'))) {
+  if (init.status === 0 && isFile(rulesPath) && mtimeOf(rulesPath) !== rulesBefore) {
     println(`${paint.green('✔')} ${t.initOk}`);
     println(t.doneNote);
     await closePane(0);
   } else {
     println(paint.yellow(t.initFail));
-    if (hooksDir) println(paint.dim(`  ${t.hooksRemain(hooksDir)}`));
+    if (hooksDir && features.length) println(paint.dim(`  ${t.hooksRemain(hooksDir)}`));
     await closePane(1);
   }
 }
