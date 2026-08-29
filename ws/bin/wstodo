@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// todo — 워크스페이스 docs/todo 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
+// wstodo — 워크스페이스 docs/todo 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
 // `ruleof todo`·`ruleof milestone` 규칙의 형식을 읽는다. 의존성 없는 단일 파일.
 //
-// 사용: todo [--stylish] [--detail] [경로] [이름]
+// 사용: wstodo [--stylish] [--detail] [경로] [이름]
 //   경로 — 워크스페이스 루트·docs/todo·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
 //   이름 — milestone 또는 todo. 그것과 선행 todo 의 이행 폐쇄만 표시 (밖에서 끌려온 선행 = 간접).
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
@@ -15,7 +15,7 @@ const stylish = args.includes('--stylish');
 const detail = args.includes('--detail');
 const rest = args.filter(a => a !== '--stylish' && a !== '--detail');
 if (rest[0] === '-h' || rest[0] === '--help') {
-  process.stdout.write('사용: todo [--stylish] [--detail] [경로] [이름]  — docs/todo 의 의존 그래프와 해결 순서를 출력\n'
+  process.stdout.write('사용: wstodo [--stylish] [--detail] [경로] [이름]  — docs/todo 의 의존 그래프와 해결 순서를 출력\n'
     + '  --stylish  의존을 트리로 표시. 의존이 여럿인 todo 는 첫 의존 아래에만 나타난다\n'
     + '  --detail   milestone 소속 [이름] 과 조회 대상의 간접 선행 (이름) 표식을 함께 표시\n'
     + '  이름       milestone 또는 todo 이름. 그것과 선행 todo 만 표시 (존재하는 경로가 아닌 인자를 이름으로 해석,\n'
@@ -40,7 +40,7 @@ function findTodoDir(start) {
 
 const todoDir = findTodoDir(pathArg ?? process.cwd());
 if (!todoDir) {
-  process.stderr.write(`todo: docs/todo 를 찾지 못함 (기준: ${resolve(pathArg ?? process.cwd())})\n`);
+  process.stderr.write(`wstodo: docs/todo 를 찾지 못함 (기준: ${resolve(pathArg ?? process.cwd())})\n`);
   process.exit(1);
 }
 
@@ -145,7 +145,7 @@ const targetKind = msArg === undefined ? null
   : todos.has(msArg) ? 'todo' : 'unknown';
 if (targetKind === 'unknown') {
   const known = [...msTodos.keys()].sort().join(', ');
-  process.stderr.write(`todo: '${msArg}' 는 milestone 도 todo 도 아님${known ? ` (milestone: ${known})` : ''}\n`);
+  process.stderr.write(`wstodo: '${msArg}' 는 milestone 도 todo 도 아님${known ? ` (milestone: ${known})` : ''}\n`);
   process.exit(1);
 }
 

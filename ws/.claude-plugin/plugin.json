@@ -1,7 +1,7 @@
 {
   "name": "ws",
-  "version": "0.4.0",
-  "description": "Workspace conventions — wsinit scaffolding, workspace rule documents (read via core's ruleof CLI), todo skills and the todo CLI",
+  "version": "0.5.0",
+  "description": "Workspace conventions — wsinit scaffolding, workspace rule documents (read via core's ruleof CLI), todo skills and the wstodo CLI",
   "author": {
     "name": "Hve"
   },

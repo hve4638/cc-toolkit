@@ -35,7 +35,7 @@ YYYY-MM-DD  <폴더명> — <description>
 
 DONE.md 는 append-only 원장이다 — 기존 줄은 고치지 않는다. 같은 이름이 재작업 후 다시 완료되면 줄이 하나 더 늘어날 뿐이다.
 
-다른 todo 의 depends 에 남은 완료 이름은 지우지 않아도 된다 — `todo` CLI 가 DONE.md 를 대조해 완료로 해소한다.
+다른 todo 의 depends 에 남은 완료 이름은 지우지 않아도 된다 — `wstodo` CLI 가 DONE.md 를 대조해 완료로 해소한다.
 
 ## 수정
 
