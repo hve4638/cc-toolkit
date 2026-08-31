@@ -1,10 +1,10 @@
 ---
-description: 워크스페이스 milestone (docs/milestone) 작업 규칙 — todo 묶음의 상위 단위
+description: 워크스페이스 milestone (docs/milestone) 작업 규칙 — ticket 묶음의 상위 단위
 ---
 
 # rule of milestone
 
-milestone 은 todo 의 상위 단위다 — 목표 하나와, 그것을 이루는 todo 이름들의 묶음.
+milestone 은 ticket 의 상위 단위다 — 목표 하나와, 그것을 이루는 ticket 이름들의 묶음.
 
 ## 구조
 
@@ -19,18 +19,18 @@ frontmatter 는 다음 형식이다. 본문에는 목표와 배경을 서술한�
 ```yaml
 ---
 description: 한 줄 요약
-todos: []            # 이 milestone 의 범위인 todo 폴더명. 아직 만들지 않은 todo 도 미리 적는다
+tickets: []          # 이 milestone 의 범위인 ticket 폴더명. 아직 만들지 않은 ticket 도 미리 적는다
 created: YYYY-MM-DD
 ---
 ```
 
 ## 링크 방향
 
-todo 쪽에는 milestone 소속 표시를 두지 않는다. todo 는 완료 시 폴더째 삭제되므로, todo 쪽에 둔 소속 정보는 완료와 함께 사라진다. 소속은 이 파일의 todos 열거가 유일한 출처다.
+ticket 쪽에는 milestone 소속 표시를 두지 않는다. ticket 은 완료 시 폴더째 삭제되므로, ticket 쪽에 둔 소속 정보는 완료와 함께 사라진다. 소속은 이 파일의 tickets 열거가 유일한 출처다.
 
 ## 완료
 
-todos 에 열거된 모든 이름이 `docs/todo/` 에 살아있지 않고 `docs/todo/DONE.md` 에 있으면 완료다. 완료를 확인한 뒤 폴더째 삭제한다.
+tickets 에 열거된 모든 이름이 `docs/ticket/` 에 살아있지 않고 `docs/ticket/DONE.md` 에 있으면 완료다. 완료를 확인한 뒤 폴더째 삭제한다.
 
 ## 수정
 

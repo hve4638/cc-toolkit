@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// wstodo — 워크스페이스 docs/todo 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
-// `ruleof todo`·`ruleof milestone` 규칙의 형식을 읽는다. 의존성 없는 단일 파일.
+// wsticket — 워크스페이스 docs/ticket 의 얽힘(의존 그래프)과 해결 순서를 보여준다.
+// `ruleof ticket`·`ruleof milestone` 규칙의 형식을 읽는다. 의존성 없는 단일 파일.
 //
-// 사용: wstodo [--stylish] [--detail] [경로] [이름]
-//   경로 — 워크스페이스 루트·docs/todo·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
-//   이름 — milestone 또는 todo. 그것과 선행 todo 의 이행 폐쇄만 표시 (밖에서 끌려온 선행 = 간접).
+// 사용: wsticket [--stylish] [--detail] [경로] [이름]
+//   경로 — 워크스페이스 루트·docs/ticket·그 하위 어디든. 생략 시 cwd 에서 위로 탐색.
+//   이름 — milestone 또는 ticket. 그것과 선행 ticket 의 이행 폐쇄만 표시 (밖에서 끌려온 선행 = 간접).
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 
@@ -15,22 +15,22 @@ const stylish = args.includes('--stylish');
 const detail = args.includes('--detail');
 const rest = args.filter(a => a !== '--stylish' && a !== '--detail');
 if (rest[0] === '-h' || rest[0] === '--help') {
-  process.stdout.write('사용: wstodo [--stylish] [--detail] [경로] [이름]  — docs/todo 의 의존 그래프와 해결 순서를 출력\n'
-    + '  --stylish  의존을 트리로 표시. 의존이 여럿인 todo 는 첫 의존 아래에만 나타난다\n'
+  process.stdout.write('사용: wsticket [--stylish] [--detail] [경로] [이름]  — docs/ticket 의 의존 그래프와 해결 순서를 출력\n'
+    + '  --stylish  의존을 트리로 표시. 의존이 여럿인 ticket 은 첫 의존 아래에만 나타난다\n'
     + '  --detail   milestone 소속 [이름] 과 조회 대상의 간접 선행 (이름) 표식을 함께 표시\n'
-    + '  이름       milestone 또는 todo 이름. 그것과 선행 todo 만 표시 (존재하는 경로가 아닌 인자를 이름으로 해석,\n'
-    + '             milestone 이 todo 보다 먼저 매치된다)\n');
+    + '  이름       milestone 또는 ticket 이름. 그것과 선행 ticket 만 표시 (존재하는 경로가 아닌 인자를 이름으로 해석,\n'
+    + '             milestone 이 ticket 보다 먼저 매치된다)\n');
   process.exit(0);
 }
 const pathArg = rest.find(a => existsSync(a));
 const msArg = rest.find(a => a !== pathArg && !a.startsWith('-'));
 
-// ---- docs/todo 위치 결정: 인자(기본 cwd)에서 자신→조상 순으로 찾는다 ----
-// docs/todo 자체나 그 하위를 받아도 조상 걷기가 같은 디렉터리에 닿는다.
-function findTodoDir(start) {
+// ---- docs/ticket 위치 결정: 인자(기본 cwd)에서 자신→조상 순으로 찾는다 ----
+// docs/ticket 자체나 그 하위를 받아도 조상 걷기가 같은 디렉터리에 닿는다.
+function findTicketDir(start) {
   let dir = resolve(start);
   while (true) {
-    const cand = join(dir, 'docs', 'todo');
+    const cand = join(dir, 'docs', 'ticket');
     if (existsSync(cand) && statSync(cand).isDirectory()) return cand;
     const parent = dirname(dir);
     if (parent === dir) return null;
@@ -38,9 +38,9 @@ function findTodoDir(start) {
   }
 }
 
-const todoDir = findTodoDir(pathArg ?? process.cwd());
-if (!todoDir) {
-  process.stderr.write(`wstodo: docs/todo 를 찾지 못함 (기준: ${resolve(pathArg ?? process.cwd())})\n`);
+const ticketDir = findTicketDir(pathArg ?? process.cwd());
+if (!ticketDir) {
+  process.stderr.write(`wsticket: docs/ticket 을 찾지 못함 (기준: ${resolve(pathArg ?? process.cwd())})\n`);
   process.exit(1);
 }
 
@@ -75,18 +75,18 @@ function parseFrontmatter(text) {
 const unquote = s => s.trim().replace(/^['"]|['"]$/g, '');
 
 // ---- 수집 ----
-// TODO.md·frontmatter 가 깨진 폴더도 '파싱 불가' 노드로 그래프에 남긴다 —
+// TICKET.md·frontmatter 가 깨진 폴더도 '파싱 불가' 노드로 그래프에 남긴다 —
 // 실재하는 폴더에 대한 의존이 "완료로 간주" 로 새지 않고, 고치는 일 자체가 선행 작업으로 보인다.
-const todos = new Map(); // 폴더명 -> {desc, priority, status, repos, depends}
+const tickets = new Map(); // 폴더명 -> {desc, priority, status, repos, depends}
 const parseWarns = [];   // '이름: 사유'
 const missingDeps = [];  // '이름: 없는 의존'
-for (const ent of readdirSync(todoDir, { withFileTypes: true })) {
+for (const ent of readdirSync(ticketDir, { withFileTypes: true })) {
   if (!ent.isDirectory()) continue;
-  const md = join(todoDir, ent.name, 'TODO.md');
+  const md = join(ticketDir, ent.name, 'TICKET.md');
   let fm = null;
-  if (!existsSync(md)) parseWarns.push(`${ent.name}: TODO.md 없음`);
+  if (!existsSync(md)) parseWarns.push(`${ent.name}: TICKET.md 없음`);
   else if (!(fm = parseFrontmatter(readFileSync(md, 'utf8')))) parseWarns.push(`${ent.name}: frontmatter 없음`);
-  todos.set(ent.name, {
+  tickets.set(ent.name, {
     desc: typeof fm?.description === 'string' ? fm.description : '',
     priority: typeof fm?.priority === 'string' && fm.priority ? fm.priority : 'normal',
     status: fm ? (typeof fm.status === 'string' && fm.status ? fm.status : 'pending') : 'invalid',
@@ -97,16 +97,16 @@ for (const ent of readdirSync(todoDir, { withFileTypes: true })) {
   });
 }
 
-if (todos.size === 0 && msArg === undefined) {
-  process.stdout.write('todo 없음\n');
+if (tickets.size === 0 && msArg === undefined) {
+  process.stdout.write('ticket 없음\n');
   process.exit(0);
 }
 
 // ---- DONE.md 원장: 여기 있는 이름은 확인된 완료 ----
-// 줄 형식은 `ruleof todo` 규칙의 `YYYY-MM-DD  <폴더명> — <description>`.
+// 줄 형식은 `ruleof ticket` 규칙의 `YYYY-MM-DD  <폴더명> — <description>`.
 const doneNames = new Set();
 {
-  const doneMd = join(todoDir, 'DONE.md');
+  const doneMd = join(ticketDir, 'DONE.md');
   if (existsSync(doneMd)) {
     for (const line of readFileSync(doneMd, 'utf8').split(/\r?\n/)) {
       const m = line.match(/^\d{4}-\d{2}-\d{2}\s+(\S+)/);
@@ -115,20 +115,20 @@ const doneNames = new Set();
   }
 }
 
-// ---- milestone: docs/milestone 의 todos 열거가 소속의 유일한 출처 (`ruleof milestone`) ----
-const msOf = new Map();    // todo 이름 -> [milestone 이름]
-const msTodos = new Map(); // milestone 이름 -> todos 열거
+// ---- milestone: docs/milestone 의 tickets 열거가 소속의 유일한 출처 (`ruleof milestone`) ----
+const msOf = new Map();    // ticket 이름 -> [milestone 이름]
+const msTickets = new Map(); // milestone 이름 -> tickets 열거
 const msDesc = new Map();  // milestone 이름 -> description
 {
-  const msDir = join(dirname(todoDir), 'milestone');
+  const msDir = join(dirname(ticketDir), 'milestone');
   if (existsSync(msDir) && statSync(msDir).isDirectory()) {
     for (const ent of readdirSync(msDir, { withFileTypes: true })) {
       if (!ent.isDirectory()) continue;
       const md = join(msDir, ent.name, 'MILESTONE.md');
       if (!existsSync(md)) continue;
       const fm = parseFrontmatter(readFileSync(md, 'utf8'));
-      const list = Array.isArray(fm?.todos) ? fm.todos : [];
-      msTodos.set(ent.name, list);
+      const list = Array.isArray(fm?.tickets) ? fm.tickets : [];
+      msTickets.set(ent.name, list);
       msDesc.set(ent.name, typeof fm?.description === 'string' ? fm.description : '');
       for (const t of list) {
         if (!msOf.has(t)) msOf.set(t, []);
@@ -139,26 +139,26 @@ const msDesc = new Map();  // milestone 이름 -> description
 }
 const msTag = n => (msOf.get(n) ?? []).map(m => `[${m}]`).join('');
 
-// 이름 인자는 milestone 이 todo 보다 먼저 매치된다 (겹치면 milestone 뷰)
+// 이름 인자는 milestone 이 ticket 보다 먼저 매치된다 (겹치면 milestone 뷰)
 const targetKind = msArg === undefined ? null
-  : msTodos.has(msArg) ? 'milestone'
-  : todos.has(msArg) ? 'todo' : 'unknown';
+  : msTickets.has(msArg) ? 'milestone'
+  : tickets.has(msArg) ? 'ticket' : 'unknown';
 if (targetKind === 'unknown') {
-  const known = [...msTodos.keys()].sort().join(', ');
-  process.stderr.write(`wstodo: '${msArg}' 는 milestone 도 todo 도 아님${known ? ` (milestone: ${known})` : ''}\n`);
+  const known = [...msTickets.keys()].sort().join(', ');
+  process.stderr.write(`wsticket: '${msArg}' 는 milestone 도 ticket 도 아님${known ? ` (milestone: ${known})` : ''}\n`);
   process.exit(1);
 }
 
 // ---- 그래프: 폴더가 없는 의존은 완료로 간주하되, DONE.md 에도 없으면 경고 (오타·미생성 신호) ----
-for (const [name, t] of todos) {
+for (const [name, t] of tickets) {
   t.deps = t.depends.filter(d => {
-    if (todos.has(d)) return true;
+    if (tickets.has(d)) return true;
     if (!doneNames.has(d)) missingDeps.push(`${name}: '${d}' 없음`);
     return false;
   });
 }
 const blocks = new Map(); // 이름 -> 이것에 의존하는 것들
-for (const [name, t] of todos) {
+for (const [name, t] of tickets) {
   for (const d of t.deps) {
     if (!blocks.has(d)) blocks.set(d, []);
     blocks.get(d).push(name);
@@ -168,9 +168,9 @@ for (const [name, t] of todos) {
 // ---- Kahn 위상 정렬: 순서가 곧 해결 순서. 남는 노드는 순환 ----
 const prioRank = { critical: 0, high: 1, normal: 2, low: 3 };
 const byPrio = (a, b) =>
-  (prioRank[todos.get(a).priority] ?? 2) - (prioRank[todos.get(b).priority] ?? 2) || a.localeCompare(b);
-const indeg = new Map([...todos.keys()].map(n => [n, todos.get(n).deps.length]));
-const ready = [...todos.keys()].filter(n => indeg.get(n) === 0).sort(byPrio);
+  (prioRank[tickets.get(a).priority] ?? 2) - (prioRank[tickets.get(b).priority] ?? 2) || a.localeCompare(b);
+const indeg = new Map([...tickets.keys()].map(n => [n, tickets.get(n).deps.length]));
+const ready = [...tickets.keys()].filter(n => indeg.get(n) === 0).sort(byPrio);
 const order = [];
 const queue = [...ready];
 while (queue.length) {
@@ -183,7 +183,7 @@ while (queue.length) {
   }
   queue.push(...next.sort(byPrio));
 }
-const cyclic = [...todos.keys()].filter(n => !order.includes(n));
+const cyclic = [...tickets.keys()].filter(n => !order.includes(n));
 
 // 남은 노드에서 순환 경로 추출: 각 노드에서 미해소 의존을 따라가다 재방문 지점이 곧 순환.
 // 순환에 걸리기만 하고 그 안에 있지는 않은 노드(순환 뒤에 줄 선 노드)는 경로만 지나가고 순환으로 잡히지 않는다.
@@ -197,24 +197,24 @@ const cycles = [];
     let cur = n;
     while (cur !== undefined && !seen.has(cur) && !path.includes(cur)) {
       path.push(cur);
-      cur = todos.get(cur).deps.find(d => cyclicSet.has(d));
+      cur = tickets.get(cur).deps.find(d => cyclicSet.has(d));
     }
     if (cur !== undefined && path.includes(cur)) cycles.push([...path.slice(path.indexOf(cur)), cur]);
     for (const p of path) seen.add(p);
   }
 }
 
-// ---- milestone 필터: 소속 alive todo 에서 의존을 따라간 이행 폐쇄. 열거 밖 선행 todo 는 '간접' ----
+// ---- milestone 필터: 소속 alive ticket 에서 의존을 따라간 이행 폐쇄. 열거 밖 선행 ticket 은 '간접' ----
 let keep = null, indirect = null, msAlive = [], msDone = [], msUnstarted = [];
 if (msArg !== undefined) {
-  const names = targetKind === 'milestone' ? msTodos.get(msArg) : [msArg];
-  msAlive = names.filter(n => todos.has(n));
-  msDone = names.filter(n => !todos.has(n) && doneNames.has(n));
-  msUnstarted = names.filter(n => !todos.has(n) && !doneNames.has(n));
+  const names = targetKind === 'milestone' ? msTickets.get(msArg) : [msArg];
+  msAlive = names.filter(n => tickets.has(n));
+  msDone = names.filter(n => !tickets.has(n) && doneNames.has(n));
+  msUnstarted = names.filter(n => !tickets.has(n) && !doneNames.has(n));
   keep = new Set(msAlive);
   const stack = [...msAlive];
   while (stack.length) {
-    for (const d of todos.get(stack.pop()).deps) {
+    for (const d of tickets.get(stack.pop()).deps) {
       if (!keep.has(d)) { keep.add(d); stack.push(d); }
     }
   }
@@ -230,38 +230,38 @@ const width = s => [...s].reduce((w, ch) => w + (/[ᄀ-ᇿ⺀-꓏가-힣豈-﫿�
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - width(s)));
 
 if (keep) {
-  const d = targetKind === 'milestone' ? msDesc.get(msArg) : todos.get(msArg).desc;
+  const d = targetKind === 'milestone' ? msDesc.get(msArg) : tickets.get(msArg).desc;
   process.stdout.write(`${bold(`[${targetKind.toUpperCase()}] ${msArg}`)}${d ? ` — ${d}` : ''}\n`);
   const parts = [['done', msDone.length], ['open', msAlive.length], ['missing', msUnstarted.length],
     ['indirect', indirect.size]].filter(([, v]) => v);
   process.stdout.write(parts.map(([k, v]) => `${k} ${v}`).join(' · ') + '\n');
   if (msUnstarted.length) process.stdout.write(`missing: ${msUnstarted.join(', ')}\n`);
   if (!msAlive.length && !msUnstarted.length) {
-    process.stdout.write('열거된 todo 가 모두 DONE.md 에 있다 — milestone 완료, 폴더째 삭제 가능\n');
+    process.stdout.write('열거된 ticket 이 모두 DONE.md 에 있다 — milestone 완료, 폴더째 삭제 가능\n');
     process.exit(0);
   }
 } else {
   const counts = {};
-  for (const t of todos.values()) counts[t.status] = (counts[t.status] ?? 0) + 1;
+  for (const t of tickets.values()) counts[t.status] = (counts[t.status] ?? 0) + 1;
   const statusOrder = ['pending', 'in-progress', 'on-hold'];
   const statusKeys = [...statusOrder.filter(s => counts[s]),
     ...Object.keys(counts).filter(s => !statusOrder.includes(s)).sort()];
   const countStr = statusKeys.map(s => `${s} ${counts[s]}`).join(' · ');
-  process.stdout.write(`${todos.size}개 (${countStr})\n`);
+  process.stdout.write(`${tickets.size}개 (${countStr})\n`);
 }
 
-// 필터 뷰에서 열거 밖 선행 todo 는 (이름) 꼬리로 구분한다. --detail 일 때만 표시
+// 필터 뷰에서 열거 밖 선행 ticket 은 (이름) 꼬리로 구분한다. --detail 일 때만 표시
 const tagFor = n => (msTag(n) + (indirect?.has(n) ? `(${msArg})` : ''));
 const showTags = detail && msOf.size;
-const shownKeys = [...todos.keys()].filter(shown);
+const shownKeys = [...tickets.keys()].filter(shown);
 const nameW = Math.max(...shownKeys.map(width)) + 2;
 const msW = showTags ? Math.max(...shownKeys.map(n => width(tagFor(n) || '-'))) + 2 : 0;
-const prioW = Math.max(...shownKeys.map(n => width(todos.get(n).priority))) + 2;
-const statW = Math.max(...shownKeys.map(n => width(todos.get(n).status))) + 2;
+const prioW = Math.max(...shownKeys.map(n => width(tickets.get(n).priority))) + 2;
+const statW = Math.max(...shownKeys.map(n => width(tickets.get(n).status))) + 2;
 const repoStr = t => t.repos.join(',') || '-';
-const repoW = Math.max(...shownKeys.map(n => width(repoStr(todos.get(n))))) + 2;
+const repoW = Math.max(...shownKeys.map(n => width(repoStr(tickets.get(n))))) + 2;
 function line(n) {
-  const t = todos.get(n);
+  const t = tickets.get(n);
   const deps = t.deps.length ? dim(`  ← ${t.deps.join(', ')}`) : '';
   const unblocks = !t.deps.length && blocks.get(n)?.length ? dim(`  → ${blocks.get(n).join(', ')}`) : '';
   let row = `  ${pad(n, nameW)}${showTags ? pad(tagFor(n) || '-', msW) : ''}${pad(t.priority, prioW)}${pad(t.status, statW)}${pad(repoStr(t), repoW)}${t.desc}${deps}${unblocks}`;
@@ -270,18 +270,18 @@ function line(n) {
 }
 const readySet = new Set(ready);
 if (stylish) {
-  // 트리 표시: 루트 = 착수 가능, 자식 = 첫 의존이 그 노드인 todo.
+  // 트리 표시: 루트 = 착수 가능, 자식 = 첫 의존이 그 노드인 ticket.
   // DAG 를 트리로 접는 것이라 의존이 여럿이면 첫 의존 아래에만 나타난다. 순환 노드는 아래 경고로만.
   const kids = new Map();
   for (const n of order.filter(shown)) {
-    const t = todos.get(n);
+    const t = tickets.get(n);
     if (!t.deps.length) continue;
     if (!kids.has(t.deps[0])) kids.set(t.deps[0], []);
     kids.get(t.deps[0]).push(n);
   }
   for (const arr of kids.values()) arr.sort(byPrio);
   function stylLine(n) {
-    const t = todos.get(n);
+    const t = tickets.get(n);
     const tag = detail ? msTag(n) : '', ind = detail && indirect?.has(n) ? `(${msArg})` : '';
     if (t.status === 'on-hold') return dim(`${n}${tag ? ' ' + tag : ''}${ind ? ' ' + ind : ''}  ${t.priority} · ${t.status}  ${t.desc}`);
     return `${n}${tag ? ' ' + cyan(tag) : ''}${ind ? ' ' + dim(ind) : ''}  ${dim(`${t.priority} · ${t.status}`)}  ${t.desc}`;
@@ -311,7 +311,7 @@ function warnGroup(title, items) {
   process.stdout.write(`\n${bold(yellow(title))}\n`);
   for (const it of items) process.stdout.write(`${yellow(`- ${it}`)}\n`);
 }
-// 필터 뷰에서는 표시 중인 todo 의 경고만 남긴다 (경고 문자열은 '이름: 사유' 형태)
+// 필터 뷰에서는 표시 중인 ticket 의 경고만 남긴다 (경고 문자열은 '이름: 사유' 형태)
 const ofShown = w => shown(w.slice(0, w.indexOf(':')));
 warnGroup('파싱 경고:', parseWarns.filter(ofShown));
 warnGroup('사라진 의존 경고: (DONE.md 에도 없는 이름 — 오타이거나 미생성)', missingDeps.filter(ofShown));

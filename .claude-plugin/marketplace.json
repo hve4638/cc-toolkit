@@ -55,7 +55,7 @@
     {
       "name": "ws",
       "source": "./ws",
-      "description": "Workspace conventions — wsinit scaffolding, workspace rule documents (read via core's ruleof CLI), todo skills and the wstodo CLI"
+      "description": "Workspace conventions — wsinit scaffolding, workspace rule documents (read via core's ruleof CLI), ticket skills and the wsticket CLI"
     }
   ]
 }
