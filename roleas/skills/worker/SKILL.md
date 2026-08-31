@@ -29,6 +29,7 @@ Orchestrator가 이 세션에 ticket 하나를 위임했다. 지목된 ticket의
 ## Orchestrator와 상호작용
 
 - 작업 종료(사용자의 요청에 따른 merge 시), 또는 필요한 맥락 추가 제공 필요 시, 또는 범위 외 문제 보고 시 SendMessage를 통해 Orchestrator와 통신해라.
+  - SendMessage 대상이 아닌 것: 결정 필요, 의도 확인 등. 현 세션에서 사용자에게 직접 묻는다.
 - 일반적으로 Orchestrator는 worker 자신과 동일 tmux 세션 내에 존재한다.
 </worker>
 
