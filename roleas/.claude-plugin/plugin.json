@@ -1,0 +1,13 @@
+{
+  "name": "roleas",
+  "version": "0.1.0",
+  "description": "Session role skills over the ws ticket system — orchestrator issues and delegates tickets, worker executes a delegated ticket",
+  "author": {
+    "name": "Hve"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin"
+  ]
+}

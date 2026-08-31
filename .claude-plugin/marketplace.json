@@ -56,6 +56,11 @@
       "name": "ws",
       "source": "./ws",
       "description": "Workspace conventions — wsinit scaffolding, workspace rule documents (read via core's ruleof CLI), ticket skills and the wsticket CLI"
+    },
+    {
+      "name": "roleas",
+      "source": "./roleas",
+      "description": "Session role skills over the ws ticket system — orchestrator issues and delegates tickets, worker executes a delegated ticket"
     }
   ]
 }
