@@ -1,6 +1,6 @@
 {
   "name": "roleas",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Session role skills over the ws ticket system — orchestrator issues and delegates tickets, worker executes a delegated ticket",
   "author": {
     "name": "Hve"
