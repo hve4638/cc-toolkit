@@ -35,7 +35,7 @@ if [ "${1:-}" = --ask ]; then
   printf '\033[?25l'
   esc=$(printf '\033')
   cr=$(printf '\r')
-  sel=1
+  sel=0   # cursor starts on close — the destroy just happened, closing is the expected answer
   drawn=
   draw() {
     [ -n "$drawn" ] && printf '\033[3A'
@@ -101,5 +101,13 @@ panes=$(tmux list-panes -t "$win" -F '#{pane_current_path}') || exit 0
 printf '%s\n' "$panes" | while IFS= read -r p; do
   on_dead_path "$p" "$WTREE_PATH" || exit 1
 done || exit 0
+
+# mark before asking — [D] states the fact of the destroy, not the user's answer:
+# close removes the window anyway, keep (or no answer) leaves the mark visible.
+name=$(tmux display-message -p -t "$win" '#{window_name}') || name=
+case "$name" in
+  '' | "[D]"*) ;;   # unreadable name, or already marked (cascade / re-run)
+  *) tmux rename-window -t "$win" "[D]$name" ;;
+esac
 
 tmux split-window -t "$win" -l 5 -c "$WTREE_REPO" sh "$0" --ask "$win" "$WTREE_BRANCH" "$WTREE_PATH"

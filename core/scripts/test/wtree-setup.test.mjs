@@ -148,7 +148,9 @@ function runPostDestroy({ panes, panesExit = 0, env = {} }) {
     `#!/bin/sh
 echo "$@" >> "$LOGF"
 case "$1" in
-  display-message) echo @1; exit 0 ;;
+  display-message)
+    case "$*" in *window_name*) echo "\${WNAME:-work}" ;; *) echo @1 ;; esac
+    exit 0 ;;
   list-panes) [ -n "\${PANES}" ] && printf '%s\\n' "\${PANES}"; exit "\${PANES_EXIT:-0}" ;;
   *) exit 0 ;;
 esac
@@ -177,14 +179,23 @@ esac
   return { status: r.status, calls };
 }
 
-test('post-destroy: 모든 pane 이 죽은 경로면 ask pane 을 띄운다 ((deleted) 접미사 포함)', () => {
+test('post-destroy: 모든 pane 이 죽은 경로면 [D] 표식 후 ask pane 을 띄운다 ((deleted) 접미사 포함)', () => {
   const r = runPostDestroy({ panes: '/x/wt (deleted)\n/x/wt/sub' });
+  assert.match(r.calls, /rename-window -t @1 \[D\]work/);
+  assert.match(r.calls, /split-window/);
+  assert.ok(r.calls.indexOf('rename-window') < r.calls.indexOf('split-window'), 'mark lands before the ask');
+});
+
+test('post-destroy: 이미 [D] 인 이름은 다시 붙이지 않는다 (cascade / 재실행)', () => {
+  const r = runPostDestroy({ panes: '/x/wt', env: { WNAME: '[D]work' } });
+  assert.ok(!r.calls.includes('rename-window'));
   assert.match(r.calls, /split-window/);
 });
 
 test('post-destroy: 다른 경로 pane 이 하나라도 있으면 아무것도 하지 않는다', () => {
   const r = runPostDestroy({ panes: '/x/wt (deleted)\n/home/elsewhere' });
   assert.ok(!r.calls.includes('split-window'));
+  assert.ok(!r.calls.includes('rename-window'), 'no mark on a window that still hosts other work');
   assert.equal(r.status, 0);
 });
 
