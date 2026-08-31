@@ -21,6 +21,13 @@ Your role is Orchestrator in this project.
 - 위임: 착수 가능한 ticket을 새로운 세션에 위임
   - 위임 방법: `wtree new (하위 브랜치명) -- /roleas:worker "(티켓명): (부가정보)"`
 - 완료 기록: 워커의 보고로 완료를 확인한 ticket 과, `wsticket <milestone명>` 으로 성립을 확인한 milestone 만 규칙의 완료 절차를 밟는다.
+
+## Worker와 상호작용
+
+- Worker는 새로운 작업 발견이나 종료 신호(브랜치 merge됨) 등을 위해 Orchestrator에게 메시지를 남길 수 있다. 이를 사용자에게 보고하거나, 새로운 티켓을 발행하거나, Worker에게 답변해줄 수 있다.
+  - Worker의 정보 요청 시 명확한 내용만 전달한다. 모호하다면 모호하다는 것을 명시한다.
+  - '사용자의 의도'에 관련된 알지 못하는 정보는 '사용자에게 직접 질문하라'고 답변한다.
+- 일반적으로 Worker는 Orchestrator 자신과 동일 tmux 세션 내에 존재한다.
 </orchestrator>
 
 Task: $ARGUMENTS
