@@ -2,6 +2,8 @@
 
 워크스페이스는 프로젝트 repo 를 담는 폴더이면서 그 자체는 문서·기록 전용 git repo 다. ticket·계획·버그리포트·결정 기록이 프로젝트 repo 대신 여기에 쌓이고, 내부 프로젝트 repo 는 `.gitignore` 로 추적에서 제외된다.
 
+내부 repo 는 wtree 로 운용한다는 전제다. 템플릿 `CLAUDE.md` 가 wtree 사용법과 merge 커밋 메시지 형식을 담고 있어, 워크트리 세션에도 상속된다.
+
 이름 관례: 워크스페이스 폴더는 `<이름>-ws`, 내부 repo 는 `<이름>` 또는 `<이름>-<브랜치>`, 워크트리 디렉터리는 `<이름>.worktrees`.
 
 ## 두 CLAUDE 파일
@@ -20,4 +22,4 @@
 
 ## 템플릿 보수
 
-정본은 `assets/workspace.tar.gz` 하나다. 고칠 때는 임시 디렉터리에 풀어 수정하고 재봉인한다. 맨 폴더가 아니라 tar 인 이유: git 이 빈 디렉터리 (`docs/`, `references/`) 를 추적하지 못해, 폴더로 두면 배포에서 빈 디렉터리가 사라진다.
+정본은 `assets/workspace.tar.gz` 하나다. 고칠 때는 임시 디렉터리에 풀어 수정하고 재봉인한다. 맨 폴더가 아니라 tar 인 이유: git 이 빈 디렉터리 (`docs/ticket/`, `docs/milestone/`, `references/`) 를 추적하지 못해, 폴더로 두면 배포에서 빈 디렉터리가 사라진다.
