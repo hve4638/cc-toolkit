@@ -91,3 +91,33 @@ bump 단계 기준:
 - patch — 오탈자·사소한 문구 수정·주석 등 minor 미만 변경
 - minor — 그 외 (기능 추가·확장, 리팩토링, 새 스킬·에이전트 추가, 규칙 변경)
 - major — 사용자 명시 시에만
+
+### core addon — 훅 기능은 addon 으로 만든다
+
+core 에 훅 이벤트 (SessionStart·PreToolUse·PostToolUse·Stop) 에서 도는 기능을 넣을 때는 `hooks/hooks.json` 에 항목을 더하지 않고 addon 을 만든다. 네 이벤트는 이미 `core/event/main.mjs` 가 매처 `*` 로 받고 있고, 켜진 규칙과 `core/event/manifest.json` 을 보고 해당 addon 만 import 해 실행한다. 전체 규약 (api 층, 합침 규칙, 이벤트별 주의사항) 은 `core/event/README.md` 가 기준이다.
+
+파일 위치는 `core/addon/<이름>/addon.mjs` 또는 `core/skills/<이름>/addon.mjs`. 폴더 이름은 동작과 무관하고, 규칙 이름과 addon 을 잇는 것은 선언과 manifest 뿐이다. 골격:
+
+```js
+// @ts-check
+/** @type {import('../../event/lib/index.mjs').AddonDecl} */
+export default {
+  rules: { 'my-rule': { events: ['PreToolUse'] } },
+  handlers: {
+    PreToolUse(api, payload, rules) { /* api 호출로만 결과를 적는다 */ },
+  },
+};
+```
+
+- `rules` 가 있으면 agentaddon `event` 파일에 그 이름을 적어야 켜진다. `alwaysEvents` 에 적은 이벤트는 규칙이 꺼져 있어도 핸들러가 불리고 규칙은 플래그로만 쓰인다. `rules` 를 생략하면 켜고 끌 수 없는 상시 addon 이다.
+- 핸들러는 반환값이 없다. 컨텍스트 주입은 `api.injectContext`, 권한은 `api.permission.deny/ask`, 도구 입력 교체는 `api.tool.rewrite` (병합이 아니라 완전한 입력으로 교체), 턴 제어는 `api.turn.*`.
+- import 시점에는 선언만 한다. 파일 읽기·프로세스 실행은 핸들러 안으로 미룬다 (manifest 생성기와 호스트가 모듈을 import 하므로).
+
+addon.mjs 를 만들거나 `rules`·`alwaysEvents`·`handlers` 키를 바꿨으면 manifest 를 재생성해 같이 커밋한다. instruction addon 의 조각 (`core/addon/instruction/instructions/*.md`) 을 더하거나 frontmatter 의 `rule:` 을 바꾼 경우도 같다. `skills/available-addon-rule/available-rules.txt` 도 같은 실행이 갱신한다:
+
+```bash
+node core/event/build-manifest.mjs
+cd core && node --test scripts/test/event-*.test.mjs
+```
+
+`core/event/lib/` 은 생성물이다. 호스트 로직을 고칠 때는 `core/_build/src/event/index.mts` 를 고치고 `_build` 에서 `pnpm build:event` 로 다시 뽑는다.
