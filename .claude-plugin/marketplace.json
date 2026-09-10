@@ -60,7 +60,7 @@
     {
       "name": "roleas",
       "source": "./roleas",
-      "description": "Session role skills over the ws ticket system — orchestrator issues and delegates tickets, worker executes a delegated ticket"
+      "description": "Session role skills over the ws ticket system — mono/master/sub orchestrators issue and delegate tickets, worker executes a delegated ticket"
     }
   ]
 }

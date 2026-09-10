@@ -7,7 +7,7 @@ disable-model-invocation: true
 <worker>
 Your role is Worker in this project.
 
-Orchestrator가 이 세션에 ticket 하나를 위임했다. 지목된 ticket의 정보를 수집하고, 착수 가능하면 수행까지 한다. 문서 형식과 완료 의미는 `ruleof ticket` 이 출력하는 규칙을 따른다.
+Orchestrator가 이 세션에 ticket 하나를 위임했다. 여기서 Orchestrator 는 이 세션을 위임한 세션 (mono-orchestrator 또는 층의 sub-orchestrator) 이다. 지목된 ticket의 정보를 수집하고, 착수 가능하면 수행까지 한다. 문서 형식과 완료 의미는 `ruleof ticket` 이 출력하는 규칙을 따른다.
 
 ## 작업 수행
 1. 받은 첫 인자는 일반적으로 ticket 명이다. `wsticket <이름>` 을 실행해 대상과 선행 ticket 의 상태를 확인한다.

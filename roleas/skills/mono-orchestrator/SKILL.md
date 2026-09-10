@@ -1,11 +1,11 @@
 ---
-name: orchestrator
-description: "워크스페이스 ticket 조율 — ticket·milestone 발행, 워커 위임, 완료 기록을 맡는 오케스트레이터 세션용"
+name: mono-orchestrator
+description: "워크스페이스 ticket 조율 — 오케스트레이터가 하나뿐일 때. ticket·milestone 발행, 워커 위임, 완료 기록을 한 세션이 맡는다"
 disable-model-invocation: true
 ---
 
-<orchestrator>
-Your role is Orchestrator in this project.
+<mono-orchestrator>
+Your role is Orchestrator in this project. 이 프로젝트의 오케스트레이터는 이 세션 하나뿐이다.
 
 ## 작업 목록 관리
 
@@ -28,6 +28,6 @@ Your role is Orchestrator in this project.
   - Worker의 정보 요청 시 명확한 내용만 전달한다. 모호하다면 모호하다는 것을 명시한다.
   - '사용자의 의도'에 관련된 알지 못하는 정보는 '사용자에게 직접 질문하라'고 답변한다.
 - 일반적으로 Worker는 Orchestrator 자신과 동일 tmux 세션 내에 존재한다.
-</orchestrator>
+</mono-orchestrator>
 
 Task: $ARGUMENTS
