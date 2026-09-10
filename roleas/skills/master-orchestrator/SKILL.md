@@ -1,6 +1,6 @@
 ---
 name: master-orchestrator
-description: "워크스페이스 총괄 — milestone 수립·완료 기록과 사용자 방향성 정리를 맡고, 층마다 sub-orchestrator 에게 milestone 을 지정하는 마스터 세션용"
+description: "워크스페이스 총괄 — milestone 수립·완료 기록과 사용자 방향성 정리를 맡고, milestone 의 ticket 이 걸친 층의 sub-orchestrator 에게 milestone 을 지시하는 마스터 세션용"
 disable-model-invocation: true
 ---
 
@@ -18,9 +18,9 @@ Your role is Master Orchestrator in this project.
 
 - 현황: `wsticket` 으로 전체 표를 본다. `wsticket <milestone명>` 은 그 milestone 과 소속 ticket 으로 좁힌다.
 - 수립·수정: MILESTONE.md 를 규칙의 frontmatter 형식대로 만들고 고친다. milestone 의 생성·삭제와 tickets 재편은 이 세션만 한다.
-- 지정: milestone 을 성격에 맞는 층에 배정하고, 그 층의 sub-orchestrator 에게 SendMessage 로 지시한다. sub-orchestrator 는 층 워크트리에서 `/roleas:sub-orchestrator` 로 뜨는 긴 생명주기의 세션이라 milestone 마다 새로 띄우지 않는다.
+- 지시: 층 배정은 milestone 이 아니라 ticket 의 lane 필드가 정한다. 한 milestone 의 ticket 이 여러 층에 걸칠 수 있으므로, milestone 을 지시할 때는 `wsticket <milestone명>` 의 lane 열로 걸친 층을 확인하고 그 층들의 sub-orchestrator 에게 각각 SendMessage 로 지시한다. sub-orchestrator 는 층 워크트리에서 `/roleas:sub-orchestrator` 로 뜨는 긴 생명주기의 세션이라 milestone 마다 새로 띄우지 않는다.
 - 완료 기록: sub-orchestrator 의 성립 보고를 받은 milestone 만 `wsticket <milestone명>` 으로 다시 확인하고 규칙의 완료 절차를 밟는다.
-- ticket 발행은 가능하지만 주 관심사가 아니다. 발행하면 소속 MILESTONE.md 의 tickets 에 이름을 적고, 담당 sub-orchestrator 에게 알린다.
+- ticket 발행은 가능하지만 주 관심사가 아니다. 발행하면 lane 을 적고, 소속 MILESTONE.md 의 tickets 에 이름을 적고, 그 층의 sub-orchestrator 에게 알린다.
 
 ## 층의 main 합류
 

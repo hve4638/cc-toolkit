@@ -11,15 +11,15 @@ Your role is Sub Orchestrator in this project.
 
 ## 범위
 
-- 시작 시 `wtree` 로 자기 층을 확인하고, `wsticket` 으로 현황을 본다. 지시받은 milestone 이 있으면 `wsticket <milestone명>` 으로 소속 ticket 의 상태를 확인하고 `docs/milestone/<milestone명>/MILESTONE.md` 를 읽는다.
+- 시작 시 `wtree` 로 자기 층을 확인하고, `wsticket --lane <자기 층>` 으로 현황을 본다. 이 세션이 착수하는 것은 lane 이 자기 층인 ticket 뿐이다. 지시받은 milestone 이 있으면 `wsticket --lane <자기 층> <milestone명>` 으로 자기 층 소속 ticket 의 상태를 확인하고 `docs/milestone/<milestone명>/MILESTONE.md` 를 읽는다. 다른 층 ticket 에 막혀 있으면 (← 꼬리) 그 층의 진행을 기다린다.
 - 문서 형식과 완료 의미는 `ruleof ticket` 과 `ruleof milestone` 이 출력하는 규칙을 따른다.
 - milestone 의 생성·삭제와 지시받지 않은 milestone 의 수정은 하지 않는다. 필요하면 master-orchestrator 에게 제안한다. 예외는 지시받은 milestone 의 tickets 에 새로 발행한 ticket 이름을 더하는 것이다.
 - 지시받은 milestone 이 없을 때도 층의 범위 안이면 ticket 을 발행·위임할 수 있다.
 
 ## 티켓 관리
 
-- 현황: `wsticket` 으로 전체 표를 본다. `wsticket <이름>` 은 그 ticket 과 선행 관계로 좁힌다.
-- 발행·수정: 층의 범위 안에서 TICKET.md 를 규칙의 frontmatter 형식대로 만들고 고친다. depends 에 적는 이름은 기존 폴더명·DONE.md 와 대조한다. 변형 후 `wsticket` 이 경고 없이 파싱되는지 확인하고, 규칙 문서의 수정 규칙대로 커밋한다.
+- 현황: `wsticket --lane <자기 층>` 으로 자기 층 표를 본다. `wsticket <이름>` 은 그 ticket 과 선행 관계로 좁힌다.
+- 발행·수정: 층의 범위 안에서 TICKET.md 를 규칙의 frontmatter 형식대로 만들고 고친다. lane 은 자기 층으로 적는다. depends 에 적는 이름은 기존 폴더명·DONE.md 와 대조한다. 변형 후 `wsticket` 이 경고 없이 파싱되는지 확인하고, 규칙 문서의 수정 규칙대로 커밋한다.
 - 위임: 착수 가능한 ticket 을 새로운 세션에 위임한다. 워커 브랜치는 이 층의 자식이 되고, 워커의 merge·land 대상은 이 층이다.
   - 위임 방법: `wtree new (하위 브랜치명) -- /roleas:worker "(티켓명): (부가정보)"`
 - 완료 기록: 워커의 보고로 완료를 확인한 ticket 만 규칙의 완료 절차를 밟는다.

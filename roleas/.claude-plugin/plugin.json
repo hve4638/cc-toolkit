@@ -1,6 +1,6 @@
 {
   "name": "roleas",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Session role skills over the ws ticket system — mono/master/sub orchestrators issue and delegate tickets, worker executes a delegated ticket",
   "author": {
     "name": "Hve"

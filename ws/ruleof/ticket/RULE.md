@@ -21,9 +21,12 @@ priority: critical | high | normal | low  # 얼마나 빨리 고쳐야 하는지
 repos: [afron-dev]   # 영향받는 저장소
 depends: []          # 의존하는 다른 ticket 의 폴더명
 status: pending | in-progress | on-hold
+lane: major | minor | maintain   # 이 ticket 을 맡는 층 (wtree 의 dev/<lane> 브랜치와 그 sub-orchestrator). 층을 쓰지 않는 워크스페이스에서는 생략
 created: YYYY-MM-DD
 ---
 ```
+
+층은 milestone 이 아니라 ticket 의 속성이다 — 한 milestone 의 ticket 이 여러 층에 걸칠 수 있다. `wsticket --lane <층>` 으로 그 층의 ticket 만 본다.
 
 ## 완료
 
