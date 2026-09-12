@@ -13,6 +13,8 @@ description: 사용자에게 보여줄 문서를 Markdown 대신 classless HTML 
 - 주기적으로 갱신되는 문서
 - 텍스트만으로 충분한 표현 가능
 
+문체: 사용자가 쓰는 언어로 답하되, ASD-STE100 Simplified Technical English 의 문장 규칙을 적용한다 — 한 문장에 사실 하나, 짧은 능동태 문장.
+
 ## classless css
 
 스타일시트를 link 하고 classless 로 작성한다: 시맨틱 HTML 요소만 사용 — class 속성, 인라인 스타일, 커스텀 CSS 금지. 표현은 전부 스타일시트가 담당한다.

@@ -13,6 +13,8 @@ Poor fit:
 - Documents updated periodically
 - Content that plain text expresses well enough
 
+Style: write in the language the user is using, applying the sentence rules of ASD-STE100 Simplified Technical English — one fact per sentence, short active-voice sentences.
+
 ## classless css
 
 Link the stylesheet and write classless: semantic HTML elements only — no class attributes, no inline styles, no custom CSS. The stylesheet handles all presentation.
