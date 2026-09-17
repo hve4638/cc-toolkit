@@ -13,6 +13,8 @@ Unless told otherwise, draw the recap only from what is in the current conversat
 What to report:
 - Goal / current state / next step
 
+Style: write in the language the user is using, applying the sentence rules of ASD-STE100 Simplified Technical English — one fact per sentence, short active-voice sentences.
+
 If there is effectively no session context to recap, answer "no active context to resume" and stop.
 </brief_instruction>
 

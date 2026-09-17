@@ -13,6 +13,8 @@ disable-model-invocation: true
 알려줘야 할 것:
 - 목표 / 현재 상태 / 다음 할 일
 
+문체: 사용자가 쓰는 언어로 답하되, ASD-STE100 Simplified Technical English 의 문장 규칙을 적용한다 — 한 문장에 사실 하나, 짧은 능동태 문장.
+
 복기할 세션 맥락이 없다면 "이어받을 활성 맥락이 없다"고 답변 후 종료
 </brief_instruction>
 
