@@ -38,6 +38,7 @@
 | | `/available-addon-rule` | agentaddon `event` 파일에 적어 켤 수 있는 규칙 이름 목록 |
 | 작업 모드 | `/r` | 읽기 우선 모드 — 명시적 작업 요청 전까지 정보 수집·보고만 수행 |
 | 스펙 | `/interview` | 계획·결정·아이디어를 질문 하나씩 + 추천 답으로 집요하게 인터뷰. 종료는 사용자가 선언, 요약 파일은 opt-in |
+| 규약 | `/rule-docker-compose` | docker compose 배포 구조 규약 — 배포 디렉터리의 compose 가 clone 한 저장소의 base 조각을 include. compose 작업 시 모델도 자동 로드 |
 
 ## 자동 규약
 
